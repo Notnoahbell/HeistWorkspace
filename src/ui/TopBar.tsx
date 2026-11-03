@@ -9,6 +9,8 @@ import { pathTo, useBoardId, type Crumb } from '../board/nav';
 import { enterBoard } from '../board/actions';
 import { BoardIcon } from './BoardIcon';
 import { CollabBar } from './Collab';
+import { HeistLogo } from './HeistLogo';
+import { usePresence } from '../sync/presence';
 
 /** Crumbs shown in full before the middle collapses into "…". */
 const MAX_CRUMBS = 4;
@@ -23,12 +25,12 @@ function CrumbButton({ crumb, current }: { crumb: Crumb; current: boolean }) {
   const dropTarget = useUi((s) => s.boardDrop === crumb.id);
   return (
     <button
-      data-crumb-id={crumb.shared ? undefined : crumb.id}
+      data-crumb-id={crumb.id}
       data-drop-target={dropTarget || undefined}
       className="crumb"
       aria-current={current ? 'page' : undefined}
       title={current ? crumb.title : `Go to ${crumb.title}`}
-      onClick={() => !current && !crumb.shared && enterBoard(crumb.id)}
+      onClick={() => !current && enterBoard(crumb.id)}
     >
       <CrumbIcon crumb={crumb} />
       <span>{crumb.title}</span>
@@ -74,6 +76,8 @@ function Overflow({ hidden }: { hidden: Crumb[] }) {
 
 export function TopBar() {
   const boardId = useBoardId();
+  // The logo wears your colour (your cursor colour on this board).
+  const myColor = usePresence((s) => s.myColor);
   // Serialise so we only re-render when the path itself changes.
   const pathKey = useBoard((s) => JSON.stringify(pathTo(boardId, s.items)));
   const path: Crumb[] = JSON.parse(pathKey);
@@ -89,10 +93,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="top-brand" title="Heist Workspace">
-        <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
-          <rect x="4" y="6" width="24" height="20" fill="var(--accent)" />
-          <rect x="4" y="6" width="24" height="5" fill="#fab005" />
-        </svg>
+        <HeistLogo color={myColor ?? 'var(--text)'} height={26} />
       </div>
 
       <nav className="crumbs" aria-label="Board path">

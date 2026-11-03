@@ -49,11 +49,7 @@ export interface Crumb {
   icon: string | null;
   color: string | null;
   home: boolean;
-  /** The "Shared with you" root of a path into someone else's board. Not a board. */
-  shared?: boolean;
 }
-
-export const SHARED_ROOT = 'shared';
 
 export function crumbFor(id: string, items = useBoard.getState().items): Crumb {
   if (isHome(id)) return { id, title: 'Home', icon: 'House', color: null, home: true };
@@ -62,8 +58,8 @@ export function crumbFor(id: string, items = useBoard.getState().items): Crumb {
 }
 
 /**
- * Home → … → the board itself. For a board shared with you, the path starts
- * at "Shared with you" (the owner's boards above it aren't yours to see).
+ * Home → … → the board itself. A board shared with you sits right under your
+ * Home in the path (the owner's boards above it aren't yours to see).
  */
 export function pathTo(id: string, items = useBoard.getState().items): Crumb[] {
   const path: Crumb[] = [];
@@ -75,10 +71,8 @@ export function pathTo(id: string, items = useBoard.getState().items): Crumb[] {
     if (isHome(cur)) return path;
     cur = items[cur]?.boardId;
   }
-  if (cur && cur !== homeId() && path.length) {
-    path.unshift({ id: SHARED_ROOT, title: 'Shared with you', icon: 'Users', color: null, home: false, shared: true });
-  } else if (!path[0]?.home) {
-    path.unshift(crumbFor(homeId(), items));
-  }
+  // Shared with you (the owner's boards above aren't visible): start from your
+  // own Home, so it's always one click away.
+  if (!path[0]?.home) path.unshift(crumbFor(homeId(), items));
   return path;
 }

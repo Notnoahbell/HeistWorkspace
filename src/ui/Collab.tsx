@@ -3,16 +3,14 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Link2, Share2, Users } from 'lucide-react';
+import { Check, Link2, Share2 } from 'lucide-react';
 import { useBoard, type Board } from '../board/store';
 import { useBoardId } from '../board/nav';
-import { enterBoard } from '../board/actions';
-import { homeId, isHome, session } from '../session';
+import { isHome, session } from '../session';
 import { BOARD_ICONS } from '../lib/icons';
-import { usePresence, type Profile } from '../sync/presence';
+import { usePresence, type Peer, type Profile } from '../sync/presence';
+import { camera } from '../canvas/camera';
 import { setProfile } from '../sync/client';
-import { BoardIcon } from './BoardIcon';
-import { effectiveIcon } from '../lib/iconGuess';
 
 const ICON = { size: 16, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 const PROFILE_ICONS = [
@@ -59,7 +57,30 @@ function Popover({ button, label, children }: { button: (open: boolean, toggle: 
   );
 }
 
-/** People on this board right now (one avatar per person). */
+const STACK_MAX = 4;
+
+/** Jump the view to someone's cursor. */
+function goTo(p: Peer) {
+  if (p.at) camera.centerOn(p.at.x, p.at.y, camera.z, camera.width, camera.height);
+}
+
+function PersonButton({ peer, onPick }: { peer: Peer; onPick?: () => void }) {
+  return (
+    <button
+      className="here-person"
+      title={peer.at ? `${peer.name} — click to go to their cursor` : `${peer.name} (cursor off the board)`}
+      aria-label={`Go to ${peer.name}`}
+      onClick={() => { goTo(peer); onPick?.(); }}
+    >
+      <Avatar profile={peer} color={peer.color} size={28} />
+    </button>
+  );
+}
+
+/**
+ * People on this board right now: overlapping circles that fan out on hover.
+ * Click someone to jump to their cursor.
+ */
 function HereNow() {
   const boardId = useBoardId();
   const peers = usePresence(useShallow((s) => {
@@ -67,10 +88,33 @@ function HereNow() {
     return Object.values(s.peers).filter((p) => p.boardId === boardId && !seen.has(p.userId) && seen.add(p.userId));
   }));
   if (!peers.length) return null;
+  const shown = peers.slice(0, STACK_MAX);
+  const rest = peers.slice(STACK_MAX);
   return (
     <div className="here-now" aria-label={`${peers.length} other ${peers.length === 1 ? 'person' : 'people'} here`}>
-      {peers.slice(0, 5).map((p) => <Avatar key={p.userId} profile={p} color={p.color} size={24} />)}
-      {peers.length > 5 && <span className="here-more">+{peers.length - 5}</span>}
+      {shown.map((p) => <PersonButton key={p.userId} peer={p} />)}
+      {rest.length > 0 && (
+        <Popover
+          label="Everyone here"
+          button={(open, toggle) => (
+            <button className="here-person here-more" aria-expanded={open} onClick={toggle} title={`${rest.length} more`}>
+              +{rest.length}
+            </button>
+          )}
+        >
+          {(close) => (
+            <>
+              <h3>Everyone here</h3>
+              {peers.map((p) => (
+                <button key={p.userId} className="pop-row" onClick={() => { goTo(p); close(); }}>
+                  <Avatar profile={p} color={p.color} size={22} />
+                  <span>{p.name}</span>
+                </button>
+              ))}
+            </>
+          )}
+        </Popover>
+      )}
     </div>
   );
 }
@@ -83,38 +127,6 @@ function ownsBoard(items: Record<string, unknown>, boardId: string) {
     b = all[b]?.boardId;
   }
   return false;
-}
-
-/** Boards other people have shared with you (the tops of trees you don't own). */
-function SharedWithMe() {
-  // Their parent is someone else's board or Home, which you can't see.
-  const shared = useBoard(useShallow((s) => Object.values(s.items).filter(
-    (it): it is Board => it.kind === 'board' && it.boardId !== homeId() && !s.items[it.boardId],
-  )));
-  if (!shared.length) return null;
-  return (
-    <Popover
-      label="Shared with you"
-      button={(open, toggle) => (
-        <button className="top-btn" aria-expanded={open} onClick={toggle} title="Boards shared with you">
-          <Users {...ICON} />
-          <span className="top-badge">{shared.length}</span>
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          <h3>Shared with you</h3>
-          {shared.map((b) => (
-            <button key={b.id} className="pop-row" onClick={() => { close(); enterBoard(b.id); }}>
-              <BoardIcon icon={effectiveIcon(b)} color={b.color} size={12} className="crumb-swatch" />
-              <span>{b.title || 'Untitled board'}</span>
-            </button>
-          ))}
-        </>
-      )}
-    </Popover>
-  );
 }
 
 /** Share the open board with other people. */
@@ -228,7 +240,6 @@ export function CollabBar() {
   return (
     <div className="top-right">
       <HereNow />
-      <SharedWithMe />
       <ShareBoard />
       <ProfileMenu />
     </div>

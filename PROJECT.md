@@ -91,7 +91,8 @@ self-hosted.
       upserts/deletes (last write wins per item), state in `data/server-db.json`
 - [x] Testing identity: user id = hash of a random per-browser device id (`?as=` to be
       several users). IP-only ids collapse an office behind one public IP into one user.
-- [x] Per-user Home; share boards with people (owner only); "Shared with you" list
+- [x] Per-user Home; share boards with people (owner only); boards shared with you get a
+      shortcut tile on your Home (`linkTo`), and their path starts at your Home
 - [x] Live cursors (exact positions, no interpolation) in per-board distinct colours,
       name bubbles, cursor chat ("/", 60 chars), presence avatars, profile name/icon
 - [ ] "Follow" a user's viewport; live selection highlights; @mentions
@@ -116,6 +117,10 @@ Sized for ~150 users; a single modest server handles this comfortably.
 
 ## Decisions
 
+- **2026-11-03: UI shell** — no left sidebar; a floating, icon-only bottom bar (add +
+  view controls) and a floating selection toolbar (single item or group). The bottom
+  bar and people avatars are rounded, after the Figma references — exceptions to the
+  hard-edge rule. The top-left logo is the Heist mark in your cursor colour.
 - **2026-11-03: Online testing on Render** (free web service via `render.yaml`).
   The free disk is wiped on restart, so clients re-upload their own boards and
   profile on connect; ids don't depend on server state. Needs a persistent disk

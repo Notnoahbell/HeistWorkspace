@@ -33,6 +33,8 @@ let retry = 0;
 
 const MSG_LIMIT = 60;
 const DEVICE_KEY = 'heist:device';
+/** Shared boards whose Home shortcut you removed (so it isn't re-added). */
+const DISMISSED_KEY = 'heist:dismissed-shares';
 const PROFILE_KEY = 'heist:profile';
 
 function socketUrl() {
@@ -119,6 +121,7 @@ function onMessage(m: ServerMsg) {
     case 'snapshot':
       remote(() => Object.fromEntries(m.items.map((it) => [it.id, it])));
       ready = true;
+      syncShortcuts();
       refreshBoard();
       sendPresenceNow();
       break;
@@ -129,6 +132,7 @@ function onMessage(m: ServerMsg) {
         for (const id of m.deletes) delete next[id];
         return next;
       });
+      syncShortcuts();
       break;
     case 'you':
       usePresence.setState({ myColor: m.color });
@@ -170,6 +174,50 @@ export function connect() {
 function scheduleRetry() {
   const delay = Math.min(15000, 500 * 2 ** retry++);
   setTimeout(connect, delay);
+}
+
+// --- Shortcuts on your Home to boards shared with you ------------------------------
+
+/** Same id in every tab, so two tabs can't both add a shortcut for the same board. */
+const shortcutId = (boardId: string) => `link-${session.userId}-${boardId}`;
+
+function dismissed(): string[] {
+  try { return JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? '[]'); } catch { return []; }
+}
+
+/** Removing a shortcut by hand: remember, so it isn't put back. */
+export function dismissShortcut(boardId: string) {
+  try { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...new Set([...dismissed(), boardId])])); } catch {}
+}
+
+/**
+ * Every board shared with you gets a shortcut tile on your Home (to the right
+ * of what's there), and shortcuts to boards you've lost access to go away.
+ */
+function syncShortcuts() {
+  const items = useBoard.getState().items;
+  const home = homeId();
+  const skip = new Set(dismissed());
+  // Shared roots: boards whose parent you can't see (someone else's board or Home).
+  const roots = Object.values(items).filter((it) => it.kind === 'board' && !it.linkTo && it.boardId !== home && !items[it.boardId]);
+  const linked = new Set(Object.values(items).flatMap((it) => (it.kind === 'board' && it.linkTo ? [it.linkTo] : [])));
+  const add = roots.filter((r) => !linked.has(r.id) && !skip.has(r.id));
+  const stale = Object.values(items).filter((it) => it.kind === 'board' && it.linkTo && it.boardId === home && !items[it.linkTo]);
+  if (!add.length && !stale.length) return;
+
+  // Lay new shortcuts out in a row to the right of everything on your Home.
+  const mine = Object.values(items).filter((it) => it.boardId === home);
+  let x = mine.length ? Math.max(...mine.map((it) => it.x + it.w)) + 48 : 0;
+  const y = mine.length ? Math.min(...mine.map((it) => it.y)) : 0;
+  x = Math.round(x / 16) * 16;
+  const store = useBoard.getState();
+  for (const r of add) {
+    const id = shortcutId(r.id);
+    if (items[id]) continue;
+    store.insertItems([{ id, kind: 'board', boardId: home, x, y, w: 160, z: 0, title: '', color: null, icon: null, parentId: null, linkTo: r.id }]);
+    x += 192;
+  }
+  for (const s of stale) store.removeItem(s.id);
 }
 
 // --- Local edits → server -------------------------------------------------------

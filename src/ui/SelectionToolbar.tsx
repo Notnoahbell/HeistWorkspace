@@ -1,20 +1,71 @@
-// Floating toolbar above the selected item. Same actions and panels as the
-// sidebar's item menu; rendered in screen space so it stays a constant size.
+// Floating toolbar above the selection: the item's actions and settings
+// panels, or group actions when several things are selected. Rendered in
+// screen space so it stays a constant size.
 
 import { useSyncExternalStore } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { Columns3, Copy, CopyPlus, Trash2 } from 'lucide-react';
 import { camera } from '../canvas/camera';
 import { useBoard } from '../board/store';
-import { itemSize, posOf } from '../board/actions';
+import { deleteSelection, groupIntoColumn, itemSize, posOf } from '../board/actions';
+import { copySelection, duplicateSelection } from '../board/clipboard';
 import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
 import { useBoardId } from '../board/nav';
 import { Flyout } from './Flyout';
-import { itemActions, Panel } from './panels';
+import { ICON_PROPS, itemActions, Panel } from './panels';
 
 const PANEL_WIDTH = 272;
 const GAP = 12;
 
+/** Several things selected: group actions above the selection's bounds. */
+function GroupToolbar({ ids }: { ids: string[] }) {
+  const items = useBoard(useShallow((s) => ids.map((id) => s.items[id]).filter(Boolean)));
+  const hidden = useUi((s) => s.movingId != null || s.dragId != null);
+  useLayout((s) => s.slots); // follow column reflows
+  useSyncExternalStore(camera.subscribe, () => camera.version);
+  if (!items.length || hidden) return null;
+
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity;
+  for (const it of items) {
+    const at = posOf(it);
+    x0 = Math.min(x0, at.x); y0 = Math.min(y0, at.y);
+    x1 = Math.max(x1, at.x + itemSize(it).w);
+  }
+  const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
+  const copyable = items.some((it) => it.kind !== 'board');
+  const actions = [
+    { key: 'column', label: 'Gather into a new column', icon: <Columns3 {...ICON_PROPS} />, run: () => groupIntoColumn() },
+    ...(copyable ? [
+      { key: 'copy', label: 'Copy (Ctrl+C)', icon: <Copy {...ICON_PROPS} />, run: copySelection },
+      { key: 'dup', label: 'Duplicate (Ctrl+D)', icon: <CopyPlus {...ICON_PROPS} />, run: duplicateSelection },
+    ] : []),
+    { key: 'delete', label: `Delete ${items.length} items`, icon: <Trash2 {...ICON_PROPS} />, run: deleteSelection, danger: true },
+  ];
+
+  return (
+    <div
+      className="selection-toolbar"
+      style={{ left: (a.x + b.x) / 2 + camera.origin.x, top: Math.max(camera.origin.y + 8, a.y + camera.origin.y - GAP) }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <span className="toolbar-count">{items.length}</span>
+      {actions.map((act) => (
+        <button key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
+          {act.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SelectionToolbar() {
+  const ids = useUi((s) => s.selectedIds);
+  if (ids.length > 1) return <GroupToolbar ids={ids} />;
+  return <SingleToolbar />;
+}
+
+function SingleToolbar() {
   const boardId = useBoardId();
   const selectedId = useUi((s) => s.selectedId);
   const hidden = useUi((s) => (s.movingId != null && s.movingId === s.selectedId) || s.editingId != null);

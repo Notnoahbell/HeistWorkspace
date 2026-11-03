@@ -302,6 +302,16 @@ export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
         del,
       ];
     case 'board': {
+      if (item.linkTo) {
+        const target = item.linkTo;
+        return [
+          { key: 'open', label: 'Open', glyph: <ArrowUpRight {...ICON_PROPS} size={18} />, run: () => enterBoard(target) },
+          {
+            key: 'delete', label: 'Remove', danger: true, glyph: <Trash2 {...ICON_PROPS} size={18} />,
+            run: () => confirmDelete(item.id),
+          },
+        ];
+      }
       const actions: ItemAction[] = [
         color,
         { key: 'icon', label: 'Icon', panel: 'icon', glyph: <BoardIcon icon={effectiveIcon(item)} color={item.color} size={14} className="glyph-board" /> },

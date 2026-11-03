@@ -95,7 +95,15 @@ export interface Board extends ItemBase, Stacked {
   icon: string | null;
   /** User ids this board (and everything in it) is shared with. Owner only. */
   sharedWith?: string[];
+  /**
+   * A shortcut: this tile stands for another board (e.g. one shared with you,
+   * placed on your Home). Its own title/colour/icon are unused.
+   */
+  linkTo?: string;
 }
+
+/** The board a tile opens: itself, or what it's a shortcut to. */
+export const boardTarget = (b: Board) => b.linkTo ?? b.id;
 
 export type Item = Note | Todo | Link | Column | Board;
 /** Items that can be stacked in a column (everything, columns included). */

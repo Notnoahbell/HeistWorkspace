@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Canvas } from './canvas/Canvas';
-import type { Point } from './canvas/camera';
 import { isTyping } from './canvas/input';
 import { useBoard, type ItemKind } from './board/store';
 import { useUi } from './board/ui';
@@ -14,7 +13,7 @@ import { LinkView } from './board/LinkView';
 import {
   clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, zoomToFit,
 } from './board/actions';
-import { Sidebar } from './ui/Sidebar';
+import { BottomBar } from './ui/BottomBar';
 import { TopBar } from './ui/TopBar';
 import { SelectionToolbar } from './ui/SelectionToolbar';
 import { Marquee, startMarquee } from './ui/Marquee';
@@ -50,7 +49,7 @@ function ItemLayer({ boardId }: { boardId: string }) {
 function EmptyHint({ boardId }: { boardId: string }) {
   const empty = useBoard((s) => !Object.values(s.items).some((i) => i.boardId === boardId));
   if (!empty) return null;
-  return <div className="empty-hint">Drag something in from the left to get started</div>;
+  return <div className="empty-hint">Drag something up from the bar below to get started</div>;
 }
 
 const limit = () => contentBounds();
@@ -59,12 +58,6 @@ const ADD_KEYS: Record<string, ItemKind> = { n: 'note', l: 'link', t: 'todo', b:
 
 export function App() {
   const boardId = useBoardId();
-  const coordsRef = useRef<HTMLSpanElement>(null);
-
-  const onPointerWorld = useCallback((p: Point) => {
-    if (coordsRef.current) coordsRef.current.textContent = `${Math.round(p.x)}, ${Math.round(p.y)}`;
-  }, []);
-
   // Back/forward navigation shouldn't keep a selection from another board.
   useEffect(() => { useUi.getState().set({ selectedIds: [], editingId: null, contextMenu: null }); }, [boardId]);
 
@@ -133,7 +126,6 @@ export function App() {
         viewId={boardId}
         limit={limit}
         frame={zoomToFit}
-        onPointerWorld={onPointerWorld}
         onBackgroundPointerDown={startMarquee}
         onBackgroundContextMenu={(e) => {
           e.preventDefault();
@@ -147,7 +139,7 @@ export function App() {
       </Canvas>
 
       <TopBar />
-      <Sidebar ref={coordsRef} />
+      <BottomBar />
       <SelectionToolbar />
       <EmptyHint boardId={boardId} />
       <Marquee />

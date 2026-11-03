@@ -24,7 +24,8 @@
   /* Outline for colour swatches and previews. */
   --swatch-stroke: rgb(0 0 0 / 0.32);
   --ink-light: #f4f4f6;
-  --sidebar-w: 76px;
+  --sidebar-w: 0px;
+  --brand-w: 60px;
   --topbar-h: 48px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
@@ -538,53 +539,8 @@ html, body, #root {
 .link-title { font-weight: 650; font-size: 14px; line-height: 1.35; -webkit-line-clamp: 2; }
 .link-desc { font-size: 12.5px; line-height: 1.4; opacity: 0.7; -webkit-line-clamp: 3; }
 
-/* --- Sidebar add tiles ---------------------------------------------------- */
 
-/* Raised mini-versions of each item, so the add buttons read as objects. */
-.side-tile {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 30px;
-  background: var(--note-default);
-  color: var(--text);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 3px 8px rgb(0 0 0 / 0.07);
-  transition: transform 0.06s ease-out, box-shadow 0.06s ease-out;
-}
-.side-add:hover .side-tile {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.14), 0 6px 14px rgb(0 0 0 / 0.1);
-}
-.side-add:active .side-tile { transform: translateY(0); }
-
-.tile-note { align-content: center; gap: 4px; padding: 0 9px; }
-.tile-note i { display: block; width: 100%; height: 2px; background: currentColor; }
-.tile-note i:last-child { width: 70%; justify-self: start; }
-
-.tile-board {
-  width: 34px;
-  height: 34px;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: none;
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.14)) drop-shadow(0 3px 4px rgb(0 0 0 / 0.08));
-}
-.side-add:hover .tile-board { box-shadow: none; }
-
-.tile-column {
-  width: 30px;
-  height: 36px;
-  align-content: start;
-  gap: 3px;
-  padding: 4px;
-  background: var(--column-default);
-}
-.tile-column i { display: block; width: 100%; height: 7px; background: var(--stacked-default); }
-.tile-column i:first-child { height: 3px; width: 60%; justify-self: center; background: currentColor; opacity: 0.55; }
-
-.side-add > span:last-child { margin-top: 3px; }
-
-/* Preview tile dragged out of the sidebar; looks like a held item. */
+/* Preview tile dragged out of the bottom bar; looks like a held item. */
 .spawn-preview {
   display: none;
   position: fixed;
@@ -608,7 +564,7 @@ html, body, #root {
   z-index: 25;
   height: var(--topbar-h);
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: var(--brand-w) minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   background: var(--panel);
   border-bottom: 1px solid var(--panel-border);
@@ -713,107 +669,7 @@ html, body, #root {
   height: 22px;
 }
 
-/* --- Sidebar ------------------------------------------------------------- */
-
-/* Fixed width, always. Tools and the selected item's menu are two panes
-   that slide past each other inside it. */
-.sidebar {
-  position: fixed;
-  inset: var(--topbar-h) auto 0 0;
-  z-index: 20;
-  width: var(--sidebar-w);
-  background: var(--rail);
-  border-right: 1px solid var(--panel-border);
-  overflow: hidden;
-  user-select: none;
-}
-
-.side-pane {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  padding: 6px 8px 10px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-/* No transform while showing, so fixed-position children (the drag preview)
-   still position against the window. */
-.sidebar[data-mode='item'] .side-tools { transform: translateX(-100%); }
-.side-item { transform: translateX(100%); }
-.sidebar[data-mode='item'] .side-item { transform: none; }
-
-.side-section {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 0;
-}
-.side-spacer + .side-section { border-top: 1px solid var(--panel-border); }
-.side-section h2 {
-  margin: 2px 0 4px;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  color: var(--text-dim);
-}
-
-.side-spacer { flex: 1; }
-
-.sidebar button {
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  cursor: var(--cursor, default);
-}
-.sidebar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
-.side-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 7px 2px 6px;
-}
-.side-btn span { font-size: 10.5px; color: var(--text-dim); }
-.side-btn:hover { background: var(--hover); }
-.side-btn:active { background: var(--accent-soft); }
-.side-btn[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
-.side-btn[aria-pressed='true'] span { color: var(--accent); }
-.side-add { touch-action: none; }
-
-.side-back {
-  display: grid;
-  place-items: center;
-  height: 36px;
-  margin-bottom: 6px;
-  color: var(--text-dim) !important;
-}
-.side-back:hover { background: var(--hover) !important; color: var(--text) !important; }
-
-/* Item menu buttons: a square preview tile with the label under it. */
-.side-action { gap: 5px; padding: 6px 2px 8px; }
-.side-action:hover { background: transparent; }
-.side-glyph {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  background: var(--note-default);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 3px 8px rgb(0 0 0 / 0.07);
-  color: var(--text) !important;
-  font-size: 0 !important;
-}
-.side-action:hover .side-glyph { box-shadow: 0 2px 4px rgb(0 0 0 / 0.14), 0 6px 14px rgb(0 0 0 / 0.1); }
-.side-action[aria-pressed='true'] { background: transparent; }
-.side-action[aria-pressed='true'] .side-glyph { outline: 2px solid var(--accent); outline-offset: -2px; }
-.side-action[data-danger='true'] .side-glyph { color: #e5484d !important; }
+/* --- Colour previews (toolbar buttons) ---------------------------------- */
 
 .glyph-swatch {
   display: block;
@@ -833,36 +689,6 @@ html, body, #root {
   place-items: center;
   width: 24px;
   height: 20px;
-}
-
-.side-zoom {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  margin-top: 2px;
-  border: 1px solid var(--panel-border);
-  overflow: hidden;
-}
-.side-zoom button {
-  display: grid;
-  place-items: center;
-  height: 28px;
-}
-.side-zoom button:hover { background: var(--hover); }
-.side-zoom .mono {
-  border-block: 1px solid var(--panel-border);
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.side-coords {
-  margin-top: 6px;
-  font-size: 10px;
-  text-align: center;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* --- Selection toolbar --------------------------------------------------- */
@@ -1244,15 +1070,6 @@ html, body, #root {
 .menu-item[data-danger='true'] { color: #e5484d; }
 .menu-sep { height: 1px; margin: 4px 0; background: var(--panel-border); }
 
-.side-count {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 2px 0 8px;
-  line-height: 1.1;
-}
-.side-count strong { font-size: 18px; }
-.side-count span { font-size: 10.5px; color: var(--text-dim); }
 
 /* --- Drag into another board --------------------------------------------- */
 
@@ -1495,3 +1312,110 @@ button, a, label { cursor: var(--cursor, default); }
 .profile-icons { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .profile-icons button { display: grid; place-items: center; padding: 3px; }
 .profile-icons button[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* --- Bottom bar ---------------------------------------------------------- */
+
+/* Floating, icon-only (rounded, after the Figma toolbar reference). */
+.bottom-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08), 0 14px 36px rgb(0 0 0 / 0.14);
+  user-select: none;
+}
+.bar-group { display: flex; align-items: center; gap: 2px; }
+.bar-view {
+  padding: 2px;
+  margin-left: 4px;
+  background: var(--hover);
+  border-radius: 10px;
+}
+.bar-btn {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: var(--cursor, default);
+  touch-action: none;
+}
+.bar-view .bar-btn { min-width: 34px; height: 34px; border-radius: 8px; color: var(--text-dim); }
+.bar-btn:hover { background: var(--hover); color: var(--text); }
+.bar-view .bar-btn:hover { background: var(--panel); }
+.bar-btn:active { background: var(--accent-soft); }
+.bar-btn[aria-pressed='true'] { background: var(--accent); color: #fff; }
+.bar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bar-zoom { min-width: 52px !important; font: 12px var(--mono); }
+
+/* --- Top bar: logo, people here ------------------------------------------ */
+
+.top-brand { width: var(--brand-w); }
+
+.avatar { border-radius: 50%; }
+
+/* Overlapping circles; hovering fans them out. */
+.here-now {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+  padding-left: 8px;
+}
+.here-person {
+  display: grid;
+  place-items: center;
+  margin-left: -8px;
+  padding: 0;
+  border: 2px solid var(--panel) !important;
+  border-radius: 50%;
+  transition: margin 0.14s ease-out, transform 0.14s ease-out;
+}
+.here-now:hover .here-person { margin-left: 3px; }
+.here-person:hover { transform: translateY(-1px); background: transparent !important; }
+.here-more {
+  width: 32px;
+  height: 32px;
+  background: var(--hover) !important;
+  color: var(--text-dim) !important;
+  font-size: 11px;
+  font-weight: 700;
+}
+.here-now .top-pop { display: grid; }
+
+/* A board shared with you, as a shortcut on your Home. */
+.shared-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+}
+.board-tile[data-missing] .board-swatch-wrap { opacity: 0.4; }
+
+.toolbar-count {
+  min-width: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+}

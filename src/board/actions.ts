@@ -10,6 +10,7 @@ import {
 } from './store';
 import { currentBoardId, openBoard } from './nav';
 import { useUi } from './ui';
+import { dismissShortcut } from '../sync/client';
 
 const board = useBoard.getState;
 const ui = useUi.getState;
@@ -122,7 +123,7 @@ function boardTargetAt(p: Point, client: Point, exclude: Set<string>): string | 
     const { w, h } = itemSize(it);
     if (p.x < o.x || p.x > o.x + w || p.y < o.y || p.y > o.y + h) continue;
     const z = stackZ(items, it.id);
-    if (z > hitZ) { hit = it.id; hitZ = z; }
+    if (z > hitZ) { hit = it.linkTo ?? it.id; hitZ = z; }
   }
   return hit;
 }
@@ -304,6 +305,8 @@ export function spawnAndDrag(
 export function deleteItem(id: string) {
   const item = board().items[id];
   if (!item) return;
+  // Removing a shortcut to a shared board: don't re-add it on the next sync.
+  if (item.kind === 'board' && item.linkTo) dismissShortcut(item.linkTo);
   // A deleted column leaves its notes where they were.
   const release = item.kind === 'column'
     ? Object.fromEntries(item.childIds.map((c) => [c, layout().slots[c]]).filter(([, p]) => p))

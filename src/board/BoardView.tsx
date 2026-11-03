@@ -1,5 +1,6 @@
 import { memo, useLayoutEffect, useRef } from 'react';
-import { stackDepth, stackTone, stackZ, useBoard } from './store';
+import { stackDepth, stackTone, stackZ, useBoard, type Board } from './store';
+import { Users } from 'lucide-react';
 import { useLayout } from './layout';
 import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
@@ -20,13 +21,17 @@ export const BoardView = memo(function BoardView({ id }: { id: string }) {
   const parentId = board?.parentId ?? null;
   const stackIndex = useBoard((s) => stackZ(s.items, id));
   const depth = useBoard((s) => stackDepth(s.items, id));
-  const summary = useBoard((s) => boardSummary(s.items, id));
+  // A shortcut (e.g. a board shared with you, on your Home) shows and opens its target.
+  const linkTo = board?.linkTo ?? null;
+  const target = useBoard((s) => (linkTo ? (s.items[linkTo]?.kind === 'board' ? s.items[linkTo] as Board : null) : board));
+  const targetId = linkTo ?? id;
+  const summary = useBoard((s) => boardSummary(s.items, targetId));
   const slot = useLayout((s) => (parentId ? s.slots[id] : undefined));
   const fill = useLayout((s) => (parentId ? s.fills[id] : undefined));
   const selected = useUi((s) => s.selectedIds.includes(id));
   const editing = useUi((s) => s.editingId === id);
-  const dropTarget = useUi((s) => s.boardDrop === id);
-  const received = useUi((s) => s.toast?.boardId === id ? s.toast.at : 0);
+  const dropTarget = useUi((s) => s.boardDrop === targetId);
+  const received = useUi((s) => s.toast?.boardId === targetId ? s.toast.at : 0);
   const nameRef = useRef<HTMLDivElement>(null);
   const lifted = useLiftedZ(id);
   const dragging = useUi((s) => s.dragId === id);
@@ -40,11 +45,12 @@ export const BoardView = memo(function BoardView({ id }: { id: string }) {
     // The floating square is clipped to smoothed corners: shadow it with a filter.
     () => !row,
     // Clicking a selected board's name renames it; anywhere else opens it.
+    // (Shortcuts just open: rename the board itself from inside it.)
     (e) => {
       const r = nameRef.current?.getBoundingClientRect();
-      const onName = r && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
+      const onName = !linkTo && r && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
       if (onName) useUi.getState().set({ selectedId: id, editingId: id });
-      else enterBoard(id);
+      else if (useBoard.getState().items[targetId]) enterBoard(targetId);
     });
   useReportHeight(id, visRef);
 
@@ -71,7 +77,9 @@ export const BoardView = memo(function BoardView({ id }: { id: string }) {
   if (!board) return null;
 
   const zIndex = lifted ?? stackIndex;
-  const name = board.title || 'Untitled board';
+  const shown = target ?? board;
+  const name = linkTo && !target ? 'Unavailable board' : shown.title || 'Untitled board';
+  const icon = effectiveIcon(shown);
 
   return (
     <div
@@ -90,23 +98,30 @@ export const BoardView = memo(function BoardView({ id }: { id: string }) {
         data-stacked={row ? stackTone(depth) : undefined}
         data-drop-target={dropTarget || undefined}
         data-selected={selected}
+        data-shortcut={linkTo ? true : undefined}
+        data-missing={linkTo && !target ? true : undefined}
         style={{ width: row ? fill ?? NOTE_WIDTH : board.w }}
       >
         {row ? (
-          <BoardIcon icon={effectiveIcon(board)} color={board.color} size={28} squircle={BOARD_SWATCH} />
+          <BoardIcon icon={icon} color={shown.color} size={28} squircle={BOARD_SWATCH} />
         ) : (
           <div ref={swatchRef} className="board-swatch-wrap">
-            <BoardIcon icon={effectiveIcon(board)} color={board.color} size={28} squircle={BOARD_SWATCH} />
+            <BoardIcon icon={icon} color={shown.color} size={28} squircle={BOARD_SWATCH} />
             {(selected || dropTarget) && <SquircleRing size={BOARD_SWATCH} />}
+            {linkTo && (
+              <span className="shared-badge" title="Shared with you">
+                <Users size={11} strokeWidth={2.4} aria-hidden="true" />
+              </span>
+            )}
           </div>
         )}
         <div className="board-meta">
-          {editing ? (
+          {editing && !linkTo ? (
             <BoardNameInput id={id} title={board.title} />
           ) : (
-            <div ref={nameRef} className="board-name" data-empty={!board.title}>{name}</div>
+            <div ref={nameRef} className="board-name" data-empty={!shown.title}>{name}</div>
           )}
-          <div className="board-count">{summary}</div>
+          <div className="board-count">{linkTo && !target ? 'No longer shared with you' : summary}</div>
         </div>
       </div>
     </div>
