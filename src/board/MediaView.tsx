@@ -6,7 +6,7 @@ import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { mediaSubtitle, retryUpload, useLocalMedia } from './media';
-import { Scrubber } from '../ui/Scrubber';
+import { Scrubber, useContrastTone } from '../ui/Scrubber';
 import { openViewer } from '../ui/MediaViewer';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
@@ -33,6 +33,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
+  const tone = useContrastTone(video);
 
   const togglePlay = () => {
     if (!video) return;
@@ -101,7 +102,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
                   <Pause size={14} fill="currentColor" {...ICON} />
                 </button>
               )}
-              <Scrubber video={video} className="media-scrub" />
+              <Scrubber video={video} className="media-scrub" tone={tone} />
             </>
           )}
 
