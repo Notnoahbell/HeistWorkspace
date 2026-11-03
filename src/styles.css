@@ -678,11 +678,23 @@ html, body, #root {
   box-shadow: inset 0 0 0 1px var(--swatch-stroke);
 }
 .glyph-strip {
+  position: relative;
   display: block;
   width: 24px;
   height: 18px;
-  background: linear-gradient(var(--strip) 0 5px, var(--note-default) 5px);
+  background: var(--note-default);
   box-shadow: inset 0 0 0 1px var(--swatch-stroke);
+}
+/* The band across the top: the strip colour, hatched while there's none. */
+.glyph-strip i {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6px;
+  background: var(--strip);
+  border-bottom: 1px solid var(--swatch-stroke);
+}
+.glyph-strip[data-empty] i {
+  background: repeating-linear-gradient(135deg, var(--text-dim) 0 1.5px, transparent 1.5px 4px);
 }
 .glyph-board {
   display: grid;

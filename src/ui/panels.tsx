@@ -286,7 +286,12 @@ export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
         color,
         {
           key: 'strip', label: 'Strip', panel: 'strip',
-          glyph: <span className="glyph-strip" style={{ '--strip': item.strip ?? 'transparent' } as CSSProperties} />,
+          // A card with a band across the top: the strip colour, or hatched when there's none yet.
+          glyph: (
+            <span className="glyph-strip" data-empty={!item.strip || undefined} style={{ '--strip': item.strip ?? 'transparent' } as CSSProperties}>
+              <i />
+            </span>
+          ),
         },
         {
           key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
