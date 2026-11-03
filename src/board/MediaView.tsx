@@ -6,6 +6,8 @@ import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { mediaSubtitle, retryUpload, useLocalMedia } from './media';
+import { Scrubber } from '../ui/Scrubber';
+import { openViewer } from '../ui/MediaViewer';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -13,8 +15,8 @@ const keep = { onPointerDown: (e: SyntheticEvent) => e.stopPropagation(), onDoub
 
 /**
  * A photo, GIF or video, with a caption (name + details) that tucks away
- * behind an arrow. Click a selected video to play/pause; click the name of a
- * selected card to rename it.
+ * behind an arrow. Double-click (or click a selected card) to open it in the
+ * player; click the name of a selected card to rename it. GIFs just loop.
  */
 export const MediaView = memo(function MediaView({ id }: { id: string }) {
   const item = useBoard((s) => s.items[id]);
@@ -28,15 +30,13 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   const editing = useUi((s) => s.editingId === id);
   const stacked = useUi((s) => (s.dragId === id ? undefined : stackTone(depth)));
   const lifted = useLiftedZ(id);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [time, setTime] = useState(0);
 
   const togglePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) void v.play(); else v.pause();
+    if (!video) return;
+    if (video.paused) void video.play(); else video.pause();
   };
 
   const rest = !media ? null : media.parentId ? (slot ?? null) : { x: media.x, y: media.y };
@@ -44,14 +44,18 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     const r = nameRef.current?.getBoundingClientRect();
     if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4) {
       useUi.getState().set({ selectedId: id, editingId: id });
-    } else if (media?.mediaType === 'video') togglePlay();
+    } else {
+      // Carry on in the player from where the card is.
+      video?.pause();
+      openViewer(id, video?.currentTime ?? 0);
+    }
   });
   useReportHeight(id, visRef);
 
   if (!media) return null;
 
   const src = local?.url || media.src;
-  const { width = 16, height = 9, duration } = media.meta;
+  const { width = 16, height = 9 } = media.meta;
   const failed = media.upload === 'failed';
   const uploading = media.upload === 'uploading';
 
@@ -70,14 +74,13 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
           {src ? (
             media.mediaType === 'video' ? (
               <video
-                ref={videoRef}
+                ref={setVideo}
                 src={src}
                 preload="metadata"
                 playsInline
                 loop
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
-                onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
               />
             ) : (
               <img src={src} alt={media.name} draggable={false} />
@@ -98,24 +101,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
                   <Pause size={14} fill="currentColor" {...ICON} />
                 </button>
               )}
-              <div
-                className="media-scrub"
-                role="slider"
-                aria-label="Seek"
-                aria-valuemin={0}
-                aria-valuemax={duration ?? 0}
-                aria-valuenow={time}
-                {...keep}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const v = videoRef.current;
-                  if (!v || !Number.isFinite(v.duration)) return;
-                  const r = e.currentTarget.getBoundingClientRect();
-                  v.currentTime = ((e.clientX - r.left) / r.width) * v.duration;
-                }}
-              >
-                <span style={{ width: `${duration ? (time / duration) * 100 : 0}%` }} />
-              </div>
+              <Scrubber video={video} className="media-scrub" />
             </>
           )}
 

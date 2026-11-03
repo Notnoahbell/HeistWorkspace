@@ -47,6 +47,8 @@ interface UiState {
    * empty canvas (offers "add here"); otherwise it acts on the selection.
    */
   contextMenu: { x: number; y: number; world?: { x: number; y: number } } | null;
+  /** Media card open in the full-size player, and where to start a video (s). */
+  viewer: { id: string; time: number } | null;
   /**
    * Patch UI state. Setting either selection field keeps the other in step,
    * so single-selection code can keep using `selectedId`.
@@ -70,6 +72,7 @@ export const useUi = create<UiState>()(
       snap: true,
       flyout: null,
       contextMenu: null,
+      viewer: null,
       set: (patch) => {
         if ('selectedIds' in patch && !('selectedId' in patch)) {
           const ids = patch.selectedIds ?? [];

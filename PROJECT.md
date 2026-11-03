@@ -211,7 +211,9 @@ npm run build      # typecheck + production build
 - Links: L (type a URL, Enter); click it again to open it. To-dos: T; tick boxes any time
 - Photos/videos: Upload in the rail, drop files onto the board, or paste an image. Name
   defaults to the filename — click the name of a selected card to rename; the arrow
-  hides/shows the name and details. Click a selected video (or ▶) to play/pause
+  hides/shows the name and details. ▶ plays a video in place; drag its timeline to scrub.
+  GIFs loop on their own. Double-click (or Enter) opens the full-size player: Space/K
+  play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close
 - Columns: C; double-click header to rename; double-click body to add a note
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
   follows the cursor and becomes a real item once it clears the sidebar

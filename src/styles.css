@@ -945,11 +945,56 @@ html, body, #root {
 .media-frame button:hover { background: rgb(0 0 0 / 0.75); }
 .media-play { left: 50%; top: 50%; width: 52px; height: 52px; transform: translate(-50%, -50%); border-radius: 50%; }
 .media-play svg { margin-left: 3px; }
-.media-pause { left: 8px; bottom: 14px; width: 28px; height: 28px; opacity: 0; transition: opacity 0.12s; }
+.media-pause { left: 8px; bottom: 24px; width: 28px; height: 28px; opacity: 0; transition: opacity 0.12s; }
 .media:hover .media-pause { opacity: 1; }
-.media-scrub { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: rgb(0 0 0 / 0.25); }
-.media-scrub > span { display: block; height: 100%; max-height: 3px; margin-top: 5px; background: #fff; }
-.media-scrub:hover > span { max-height: none; margin-top: 0; }
+/* Timeline: a thin bar with a tall hit area; thickens and shows a knob on hover/drag. */
+.scrub { position: relative; height: 18px; display: flex; align-items: flex-end; cursor: pointer; touch-action: none; }
+.scrub-track { position: relative; width: 100%; height: 3px; background: rgb(255 255 255 / 0.3); transition: height 0.1s; }
+.scrub-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #fff; }
+.scrub-fill::after {
+  content: ''; position: absolute; right: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  transform: scale(0); transition: transform 0.1s;
+}
+.scrub:hover .scrub-track, .scrub[data-dragging] .scrub-track { height: 5px; }
+.scrub:hover .scrub-fill::after, .scrub[data-dragging] .scrub-fill::after { transform: scale(1); }
+.scrub-hover {
+  position: absolute; bottom: 16px; transform: translateX(-50%); padding: 3px 6px;
+  background: rgb(0 0 0 / 0.8); color: #fff; font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.media-scrub { position: absolute; left: 0; right: 0; bottom: 0; }
+.media-scrub .scrub-track { background: rgb(0 0 0 / 0.3); }
+
+/* Full-size player. */
+.viewer {
+  position: fixed; inset: 0; z-index: 900;
+  display: grid; grid-template-rows: auto 1fr auto;
+  background: rgb(10 10 14 / 0.92); color: #fff;
+  animation: viewer-in 0.14s ease-out;
+}
+@keyframes viewer-in { from { opacity: 0; } }
+.viewer[data-full] { background: #000; }
+.viewer-bar, .viewer-controls { display: flex; align-items: center; gap: 6px; padding: 10px 14px; transition: opacity 0.2s; }
+.viewer[data-idle] { cursor: none; }
+.viewer[data-idle] :is(.viewer-bar, .viewer-controls) { opacity: 0; }
+.viewer-title { flex: 1; min-width: 0; padding-left: 4px; }
+.viewer-name { font-size: 15px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-sub { margin-top: 2px; font-size: 12px; opacity: 0.6; }
+.viewer-btn {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px;
+  border: 0; padding: 0; background: none; color: inherit; cursor: pointer;
+}
+.viewer-btn:hover { background: rgb(255 255 255 / 0.12); }
+.viewer-stage { position: relative; min-height: 0; display: grid; place-items: center; padding: 0 24px; }
+.viewer[data-full] .viewer-stage { padding: 0; }
+.viewer-stage > :is(img, video) {
+  display: block; max-width: 100%; max-height: 100%; object-fit: contain;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.5); user-select: none;
+}
+.viewer-stage > video { width: 100%; height: 100%; box-shadow: none; }
+.viewer-time { flex: none; min-width: 92px; font-size: 13px; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.viewer-scrub { flex: 1; height: 24px; align-items: center; margin: 0 6px; }
+.viewer-scrub .scrub-hover { bottom: 22px; }
 .media-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(0 0 0 / 0.25); }
 .media-progress > span { display: block; height: 100%; background: var(--accent); transition: width 0.15s; }
 .media-retry { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 7px 12px !important; font-size: 13px; font-weight: 600; }
