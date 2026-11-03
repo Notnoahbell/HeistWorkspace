@@ -24,8 +24,8 @@
   /* Outline for colour swatches and previews. */
   --swatch-stroke: rgb(0 0 0 / 0.32);
   --ink-light: #f4f4f6;
-  --sidebar-w: 0px;
-  --brand-w: 60px;
+  --sidebar-w: 64px;
+  --brand-w: var(--sidebar-w);
   --topbar-h: 48px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
@@ -540,7 +540,7 @@ html, body, #root {
 .link-desc { font-size: 12.5px; line-height: 1.4; opacity: 0.7; -webkit-line-clamp: 3; }
 
 
-/* Preview tile dragged out of the bottom bar; looks like a held item. */
+/* Preview tile dragged out of the tool rail; looks like a held item. */
 .spawn-preview {
   display: none;
   position: fixed;
@@ -1313,53 +1313,98 @@ button, a, label { cursor: var(--cursor, default); }
 .profile-icons button { display: grid; place-items: center; padding: 3px; }
 .profile-icons button[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: -1px; }
 
-/* --- Bottom bar ---------------------------------------------------------- */
+/* --- Tool rail ------------------------------------------------------------ */
 
-/* Floating, icon-only (rounded, after the Figma toolbar reference). */
-.bottom-bar {
+/* Down the left, under the top bar. Never changes: item settings live in the
+   floating toolbar above the selection. */
+.tool-rail {
   position: fixed;
-  left: 50%;
-  bottom: 18px;
-  z-index: 22;
+  inset: var(--topbar-h) auto 0 0;
+  z-index: 20;
+  width: var(--sidebar-w);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 6px;
-  transform: translateX(-50%);
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08), 0 14px 36px rgb(0 0 0 / 0.14);
+  padding: 12px 0;
+  background: var(--rail);
+  border-right: 1px solid var(--panel-border);
   user-select: none;
 }
-.bar-group { display: flex; align-items: center; gap: 2px; }
-.bar-view {
-  padding: 2px;
-  margin-left: 4px;
-  background: var(--hover);
-  border-radius: 10px;
-}
-.bar-btn {
+.rail-group { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rail-spacer { flex: 1; }
+
+.rail-add,
+.rail-btn {
   display: grid;
   place-items: center;
-  min-width: 40px;
-  height: 40px;
-  padding: 0 8px;
   border: 0;
-  border-radius: 9px;
   background: transparent;
   color: var(--text);
   font: inherit;
   cursor: var(--cursor, default);
   touch-action: none;
 }
-.bar-view .bar-btn { min-width: 34px; height: 34px; border-radius: 8px; color: var(--text-dim); }
-.bar-btn:hover { background: var(--hover); color: var(--text); }
-.bar-view .bar-btn:hover { background: var(--panel); }
-.bar-btn:active { background: var(--accent-soft); }
-.bar-btn[aria-pressed='true'] { background: var(--accent); color: #fff; }
-.bar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.bar-zoom { min-width: 52px !important; font: 12px var(--mono); }
+.rail-add { width: 52px; height: 48px; }
+.rail-add:focus-visible,
+.rail-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Raised mini-versions of each item, so the add buttons read as objects. */
+.rail-tile {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 30px;
+  background: var(--note-default);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 3px 8px rgb(0 0 0 / 0.07);
+  transition: transform 0.06s ease-out, box-shadow 0.06s ease-out;
+}
+.rail-add:hover .rail-tile {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.14), 0 6px 14px rgb(0 0 0 / 0.1);
+}
+.rail-add:active .rail-tile { transform: translateY(0); }
+
+.tile-note { align-content: center; gap: 4px; padding: 0 9px; }
+.tile-note i { display: block; width: 100%; height: 2px; background: currentColor; }
+.tile-note i:last-child { width: 70%; justify-self: start; }
+
+.tile-board {
+  width: 34px;
+  height: 34px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: none;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.14)) drop-shadow(0 3px 4px rgb(0 0 0 / 0.08));
+}
+.rail-add:hover .tile-board { box-shadow: none; }
+
+.tile-column {
+  width: 30px;
+  height: 36px;
+  align-content: start;
+  gap: 3px;
+  padding: 4px;
+  background: var(--column-default);
+}
+.tile-column i { display: block; width: 100%; height: 7px; background: var(--stacked-default); }
+.tile-column i:first-child { height: 3px; width: 60%; justify-self: center; background: currentColor; opacity: 0.55; }
+
+.rail-view { gap: 4px; }
+.rail-btn { width: 40px; height: 36px; color: var(--text-dim); }
+.rail-btn:hover { background: var(--hover); color: var(--text); }
+.rail-btn:active { background: var(--accent-soft); }
+.rail-btn[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+.rail-zoom {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--panel-border);
+}
+.rail-zoom .rail-btn { height: 30px; }
+.rail-pct {
+  border-block: 1px solid var(--panel-border) !important;
+  font: 10.5px var(--mono);
+}
 
 /* --- Top bar: logo, people here ------------------------------------------ */
 

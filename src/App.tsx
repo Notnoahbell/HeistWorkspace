@@ -13,7 +13,7 @@ import { LinkView } from './board/LinkView';
 import {
   clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, zoomToFit,
 } from './board/actions';
-import { BottomBar } from './ui/BottomBar';
+import { ToolRail } from './ui/ToolRail';
 import { TopBar } from './ui/TopBar';
 import { SelectionToolbar } from './ui/SelectionToolbar';
 import { Marquee, startMarquee } from './ui/Marquee';
@@ -49,7 +49,7 @@ function ItemLayer({ boardId }: { boardId: string }) {
 function EmptyHint({ boardId }: { boardId: string }) {
   const empty = useBoard((s) => !Object.values(s.items).some((i) => i.boardId === boardId));
   if (!empty) return null;
-  return <div className="empty-hint">Drag something up from the bar below to get started</div>;
+  return <div className="empty-hint">Drag something in from the left to get started</div>;
 }
 
 const limit = () => contentBounds();
@@ -139,7 +139,7 @@ export function App() {
       </Canvas>
 
       <TopBar />
-      <BottomBar />
+      <ToolRail />
       <SelectionToolbar />
       <EmptyHint boardId={boardId} />
       <Marquee />
