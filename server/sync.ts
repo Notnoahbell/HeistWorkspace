@@ -50,8 +50,14 @@ const PALETTE = [
   '#3E63DD', '#8E4EC6', '#D6409F', '#7C5E46', '#5F6B7A', '#29A383',
 ];
 
-const ADJECTIVES = ['Teal', 'Amber', 'Coral', 'Indigo', 'Olive', 'Plum', 'Slate', 'Saffron', 'Jade', 'Rust', 'Azure', 'Mint'];
-const ANIMALS = ['Otter', 'Heron', 'Lynx', 'Falcon', 'Badger', 'Marten', 'Ibis', 'Gecko', 'Orca', 'Hare', 'Wren', 'Bison'];
+const ADJECTIVES = [
+  'Teal', 'Amber', 'Coral', 'Indigo', 'Olive', 'Plum', 'Slate', 'Saffron', 'Jade', 'Rust', 'Azure', 'Mint',
+  'Copper', 'Crimson', 'Ivory', 'Cobalt', 'Sage', 'Ochre', 'Violet', 'Umber', 'Pearl', 'Scarlet', 'Lilac', 'Moss',
+];
+const ANIMALS = [
+  'Otter', 'Heron', 'Lynx', 'Falcon', 'Badger', 'Marten', 'Ibis', 'Gecko', 'Orca', 'Hare', 'Wren', 'Bison',
+  'Puffin', 'Ocelot', 'Tapir', 'Kestrel', 'Narwhal', 'Pika', 'Stoat', 'Toucan', 'Quokka', 'Mole', 'Crane', 'Newt',
+];
 const MSG_LIMIT = 60;
 const NAME_LIMIT = 32;
 
@@ -245,9 +251,18 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     return 'u' + createHash('sha256').update(`${db.salt}|${ip}|${as}`).digest('hex').slice(0, 12);
   }
 
+  /** A friendly default name from the id, skipping names someone already has. */
   function defaultProfile(userId: string): Profile {
-    const n = parseInt(userId.slice(1, 9), 16); // up to 2^32: keep to plain arithmetic
-    return { id: userId, name: `${ADJECTIVES[n % ADJECTIVES.length]} ${ANIMALS[Math.floor(n / 256) % ANIMALS.length]}`, icon: null };
+    const taken = new Set(Object.values(db.profiles).map((p) => p.name));
+    const total = ADJECTIVES.length * ANIMALS.length;
+    const start = parseInt(userId.slice(1, 9), 16) % total; // plain arithmetic: values reach 2^32
+    let name = '';
+    for (let k = 0; k < total; k++) {
+      const n = (start + k) % total;
+      name = `${ADJECTIVES[n % ADJECTIVES.length]} ${ANIMALS[Math.floor(n / ADJECTIVES.length)]}`;
+      if (!taken.has(name)) break;
+    }
+    return { id: userId, name, icon: null };
   }
 
   function onConnect(ws: WebSocket, req: IncomingMessage) {

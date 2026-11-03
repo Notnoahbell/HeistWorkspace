@@ -10,9 +10,6 @@ import { CURSOR_PATH } from '../lib/cursor';
 import { usePresence } from '../sync/presence';
 import { CHAT_LIMIT, setChat, setCursor } from '../sync/client';
 
-/** After Enter, how long the message stays up for others. */
-const CHAT_LINGER_MS = 5000;
-
 export function CursorShape({ color }: { color: string }) {
   return (
     <svg className="peer-cursor" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -45,15 +42,13 @@ export function PeerCursors() {
 /**
  * Your cursor position goes out as you move; off the canvas it's hidden.
  * "/" opens cursor chat beside your pointer: others see the text in place of
- * your name. Esc, clicking away or clearing it puts your name back; Enter
- * closes the box and leaves the message up for a few seconds.
+ * your name. Enter, Esc, clicking away or clearing it puts your name back.
  */
 export function CursorChat() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const pointer = useRef({ x: 0, y: 0 });
-  const linger = useRef(0);
   const closing = useRef(false);
   const color = usePresence((s) => s.myColor);
   const online = usePresence((s) => s.status === 'online');
@@ -78,7 +73,6 @@ export function CursorChat() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== '/' || open || isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
       e.preventDefault();
-      clearTimeout(linger.current);
       setPos(pointer.current);
       setText('');
       setChat('');
@@ -91,31 +85,35 @@ export function CursorChat() {
 
   if (!open || !online) return null;
 
-  const close = (keep: boolean) => {
+  const close = () => {
     // Removing the focused input can fire a blur; only the first close counts.
     if (closing.current) return;
     closing.current = true;
     setOpen(false);
-    if (keep && text.trim()) linger.current = window.setTimeout(() => setChat(''), CHAT_LINGER_MS);
-    else setChat('');
+    setChat('');
   };
 
   return (
-    <div className="chat-bubble" style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, background: color ?? 'var(--accent)' }}>
+    <div
+      className="chat-bubble"
+      // A hidden copy of the text sizes the box to exactly what's typed.
+      data-value={text || 'Say something'}
+      style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, background: color ?? 'var(--accent)' }}
+    >
       <input
         ref={(el) => el?.focus({ preventScroll: true })}
         value={text}
         maxLength={CHAT_LIMIT}
+        // Tiny built-in width: the hidden copy of the text sizes the box.
+        size={1}
         placeholder="Say something"
         aria-label="Cursor chat"
         spellCheck={false}
         onChange={(e) => { setText(e.target.value); setChat(e.target.value); }}
-        onBlur={() => close(false)}
+        onBlur={close}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') { e.preventDefault(); close(false); }
-          if (e.key === 'Enter') { e.preventDefault(); close(true); }
+          if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); }
         }}
-        style={{ width: `${Math.max(9, text.length + 1)}ch` }}
       />
     </div>
   );

@@ -1330,7 +1330,7 @@ button, a, label { cursor: var(--cursor, default); }
   left: 14px;
   top: 18px;
   max-width: 260px;
-  padding: 5px 11px;
+  padding: 8px 16px;
   border-radius: 999px;
   color: #fff;
   font-size: 12.5px;
@@ -1345,25 +1345,41 @@ button, a, label { cursor: var(--cursor, default); }
 .peer-bubble { width: max-content; }
 .peer-bubble[data-msg='true'] { white-space: normal; overflow-wrap: anywhere; font-weight: 500; border-radius: 14px; }
 
-/* Your own bubble, only while typing a cursor-chat message. */
+/* Your own bubble, only while typing a cursor-chat message. It sizes to the
+   text: a hidden copy (::after) and the input share one grid cell. */
 .chat-bubble {
   position: fixed;
   z-index: 60;
   left: 0;
   top: 0;
+  display: inline-grid;
+  max-width: none;
   margin: 18px 0 0 14px;
-  padding: 3px 11px;
+  padding: 8px 16px;
   overflow: visible;
 }
+.chat-bubble::after,
 .chat-bubble input {
-  min-width: 9ch;
-  max-width: 240px;
-  padding: 2px 0;
+  grid-area: 1 / 1;
+  min-width: 2px;
+  max-width: 260px;
+  padding: 0;
+  font: inherit;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: pre;
+}
+.chat-bubble::after {
+  content: attr(data-value) ' ';
+  visibility: hidden;
+  overflow: hidden;
+}
+.chat-bubble input {
+  /* Fill the cell the hidden copy sizes (the input itself has size=1). */
+  width: 100%;
   border: 0;
   background: transparent;
   color: #fff;
-  font: inherit;
-  font-weight: 500;
   outline: none;
   cursor: text;
 }
