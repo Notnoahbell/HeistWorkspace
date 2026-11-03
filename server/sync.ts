@@ -5,9 +5,12 @@
 // everyone who can see the item. Presence (cursors, cursor chat) is ephemeral
 // and routed per board.
 //
-// Identity (testing only): a user id is a salted hash of the client's IP, so
-// each machine is one user. `?as=<name>` on the socket URL mixes into the
-// hash, to be several users from one machine.
+// Identity (testing only, no logins): each browser keeps a random anonymous
+// device id and sends it on connect; the user id is a hash of it. (IP isn't
+// enough online: everyone in one office shares a public address.) Without a
+// device id it falls back to the IP. `?as=<name>` mixes into the hash, to be
+// several users from one browser. Ids don't depend on server state, so they
+// survive the server restarting with an empty disk.
 //
 // Access: you can see your own Home tree, plus any board shared with you
 // (`sharedWith` on a board) and everything inside it.
@@ -245,10 +248,13 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
   // --- Connections -------------------------------------------------------------------
 
   function userIdFor(req: IncomingMessage) {
+    const params = new URL(req.url ?? '/', 'http://local').searchParams;
+    const device = (params.get('device') ?? '').slice(0, 64);
+    const as = (params.get('as') ?? '').slice(0, 64);
     const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
     const ip = forwarded || req.socket.remoteAddress || 'unknown';
-    const as = new URL(req.url ?? '/', 'http://local').searchParams.get('as') ?? '';
-    return 'u' + createHash('sha256').update(`${db.salt}|${ip}|${as}`).digest('hex').slice(0, 12);
+    const who = device ? `device:${device}` : `ip:${db.salt}|${ip}`;
+    return 'u' + createHash('sha256').update(`heist|${who}|${as}`).digest('hex').slice(0, 12);
   }
 
   /** A friendly default name from the id, skipping names someone already has. */

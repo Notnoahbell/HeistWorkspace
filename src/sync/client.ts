@@ -15,6 +15,7 @@ import { useBoard, type Item } from '../board/store';
 import { currentBoardId, refreshBoard, subscribeBoard } from '../board/nav';
 import { homeId, isHome, session, setSessionUser } from '../session';
 import { usePresence, type Peer, type Profile } from './presence';
+import { newId } from '../lib/id';
 
 type ServerMsg =
   | { t: 'welcome'; userId: string; connId: string; profile: Profile }
@@ -31,14 +32,36 @@ let applyingRemote = false;
 let retry = 0;
 
 const MSG_LIMIT = 60;
+const DEVICE_KEY = 'heist:device';
+const PROFILE_KEY = 'heist:profile';
 
 function socketUrl() {
   const url = new URL('/sync', location.href);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Testing aid: ?as=<name> makes this tab a different user on the same machine.
+  url.searchParams.set('device', deviceId());
+  // Testing aid: ?as=<name> makes this tab a different user in the same browser.
   const as = new URLSearchParams(location.search).get('as');
   if (as) url.searchParams.set('as', as);
   return url.href;
+}
+
+/** This browser's anonymous id (no logins yet). */
+function deviceId(): string {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = newId(24);
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
+}
+
+/** Your own name/icon, kept so it can be restored if the server forgot it. */
+function savedProfile(): Partial<Profile> | null {
+  try { return JSON.parse(localStorage.getItem(PROFILE_KEY) ?? 'null'); } catch { return null; }
 }
 
 const send = (msg: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); };
@@ -82,6 +105,9 @@ function onMessage(m: ServerMsg) {
       }
       refreshBoard();
       send({ t: 'push', items: ownItems(useBoard.getState().items) });
+      // A server that restarted with an empty disk forgets names: put yours back.
+      const saved = savedProfile();
+      if (saved && (saved.name !== m.profile.name || saved.icon !== m.profile.icon)) setProfile(saved);
       break;
     }
     case 'users':
@@ -195,4 +221,7 @@ export const CHAT_LIMIT = MSG_LIMIT;
 export function setProfile(patch: Partial<Pick<Profile, 'name' | 'icon'>>) {
   send({ t: 'profile', ...patch });
   usePresence.setState((s) => ({ me: s.me ? { ...s.me, ...patch } : s.me }));
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...savedProfile(), ...patch }));
+  } catch {}
 }

@@ -2,6 +2,8 @@
 // real-time sync (/sync) on one port. For hosting on a machine on the LAN:
 //
 //   npm run build && npm run serve      → http://<this machine's IP>:8080
+//
+// Also what runs on Render (see render.yaml); it honours PORT and DATA_DIR.
 
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
@@ -13,7 +15,10 @@ import { createSyncServer } from './sync.ts';
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist');
-const sync = createSyncServer({ dataFile: join(ROOT, 'data', 'server-db.json') });
+// Where boards are saved. On hosts with a throwaway disk (e.g. Render's free
+// tier) this resets on restart; browsers re-upload their own boards on connect.
+const DATA_DIR = process.env.DATA_DIR ?? join(ROOT, 'data');
+const sync = createSyncServer({ dataFile: join(DATA_DIR, 'server-db.json') });
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',

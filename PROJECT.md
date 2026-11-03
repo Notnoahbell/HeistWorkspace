@@ -89,7 +89,8 @@ self-hosted.
 ### Phase 4 — Collaboration (LAN testing build)
 - [x] Sync server (`server/sync.ts`) on this machine: WebSocket `/sync`, whole-item
       upserts/deletes (last write wins per item), state in `data/server-db.json`
-- [x] Testing identity: user id = salted hash of IP (`?as=` to be several users)
+- [x] Testing identity: user id = hash of a random per-browser device id (`?as=` to be
+      several users). IP-only ids collapse an office behind one public IP into one user.
 - [x] Per-user Home; share boards with people (owner only); "Shared with you" list
 - [x] Live cursors (exact positions, no interpolation) in per-board distinct colours,
       name bubbles, cursor chat ("/", 60 chars), presence avatars, profile name/icon
@@ -115,6 +116,10 @@ Sized for ~150 users; a single modest server handles this comfortably.
 
 ## Decisions
 
+- **2026-11-03: Online testing on Render** (free web service via `render.yaml`).
+  The free disk is wiped on restart, so clients re-upload their own boards and
+  profile on connect; ids don't depend on server state. Needs a persistent disk
+  or database before real use.
 - **2026-11-03: LAN-first collaboration.** The sync server runs on one machine
   (dev server plugin, or `server/index.ts` in production) rather than a hosted
   service; GitHub holds the code. Public hosting is a later decision — GitHub

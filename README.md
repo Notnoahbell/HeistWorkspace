@@ -4,9 +4,9 @@ A lightweight infinite canvas for organising and reviewing work together: notes,
 links, to-do lists, columns and nested boards, with live cursors and shared
 editing. Built with React, TypeScript and Vite.
 
-> **Status: early testing build.** Accounts are tied to your network address
-> (see [Testing identity](#testing-identity)) and sync is "last edit wins" per
-> item. Don't put anything sensitive in it yet.
+> **Status: early testing build.** There are no logins — anyone with the link
+> can get in (see [Testing identity](#testing-identity)) — and sync is "last
+> edit wins" per item. Don't put anything sensitive in it yet.
 
 ## Run it
 
@@ -32,6 +32,21 @@ Windows may ask to allow Node.js through the firewall the first time; allow it
 on private networks. Everyone's boards are saved on that machine in
 `data/server-db.json` (not committed).
 
+### Host it online (Render, free)
+
+The repo includes a [Render Blueprint](render.yaml): one free web service that
+builds the app and runs `server/index.ts` (app + sync + link previews).
+
+1. Push this repo to GitHub.
+2. On [render.com](https://render.com), sign in with GitHub → **New** → **Blueprint** →
+   pick the repo → **Apply**.
+3. Share the `https://heist-workspace-….onrender.com` address it gives you.
+
+Every push to `main` redeploys. The free tier sleeps after ~15 minutes idle (the
+first visit then takes ~30 s) and its disk is wiped on restart; browsers
+re-upload their own boards and names when they reconnect, so nothing is lost
+as long as someone still has it in their browser.
+
 ## Using it
 
 - **Add things** from the left bar: click, or drag a tile onto the canvas. Keys: N note,
@@ -47,10 +62,12 @@ on private networks. Everyone's boards are saved on that machine in
 
 ## Testing identity
 
-There are no logins yet. The sync server gives each visitor an id derived from a
-salted hash of their IP address, so each computer is one person (the address
-itself isn't stored). To be several people from one computer while testing,
-add `?as=<anything>` to the URL, e.g. `http://localhost:5173/?as=second`.
+There are no logins yet. Each browser keeps a random anonymous id, and the
+server derives your user id from it — so each browser is one person, and you
+stay the same person across visits. (An IP address isn't enough once it's
+online: everyone in one office shares a public address.) To be several people
+from one browser while testing, add `?as=<anything>` to the URL, e.g.
+`http://localhost:5173/?as=second`.
 
 ## Project notes
 

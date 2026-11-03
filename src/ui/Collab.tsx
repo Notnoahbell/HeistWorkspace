@@ -217,7 +217,7 @@ function ProfileMenu() {
               ))}
             </div>
           </div>
-          <p className="pop-note">Testing build: your account is tied to this computer's network address.</p>
+          <p className="pop-note">Testing build: there are no logins yet — you're recognised by this browser.</p>
         </>
       )}
     </Popover>
