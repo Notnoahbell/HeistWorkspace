@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, Columns3, ExternalLink, Link2, PenLine, Rows3, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, Columns3, ExternalLink, Link2, PenLine, Rows3, Search, Trash2, Type,
 } from 'lucide-react';
 import { useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
 import { useUi, type PanelKey } from '../board/ui';
@@ -221,6 +221,7 @@ function RenamePanel({ value, placeholder, onChange }: { value: string; placehol
 export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
   switch (panel) {
     case 'color': {
+      if (item.kind === 'media') return null;
       const def = `var(--${item.kind}-default)`;
       return <ColorPanel value={item.color} presets={COLOR_PRESETS} noneLabel="Default" noneBackground={def} onChange={(v) => update(item.id, { color: v })} />;
     }
@@ -255,7 +256,7 @@ export interface ItemAction {
 
 /** What you can do with an item, in display order. `isOpenBoard` = the board you're inside. */
 export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
-  const colorGlyph = <span className="glyph-swatch" style={{ background: item.color ?? `var(--${item.kind}-default)` }} />;
+  const colorGlyph = <span className="glyph-swatch" style={{ background: ('color' in item && item.color) || `var(--${item.kind}-default)` }} />;
   const color: ItemAction = { key: 'color', label: 'Colour', glyph: colorGlyph, panel: 'color' };
   const del: ItemAction = {
     key: 'delete', label: 'Delete', glyph: <Trash2 {...ICON_PROPS} size={18} />, run: () => confirmDelete(item.id), danger: true,
@@ -266,6 +267,27 @@ export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
       return [color, { key: 'text', label: 'Text', panel: 'text', glyph: <Type {...ICON_PROPS} size={18} /> }, del];
     case 'todo':
       return [color, del];
+    case 'media':
+      return [
+        {
+          key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
+          // Renames inline, in the caption (shown again if it was tucked away).
+          run: () => {
+            update(item.id, { captionHidden: false });
+            useUi.getState().set({ editingId: item.id, flyout: null });
+          },
+        },
+        item.captionHidden
+          ? { key: 'caption', label: 'Show name', glyph: <ChevronUp {...ICON_PROPS} size={18} />, run: () => update(item.id, { captionHidden: false }) }
+          : { key: 'caption', label: 'Hide name', glyph: <ChevronDown {...ICON_PROPS} size={18} />, run: () => update(item.id, { captionHidden: true }) },
+        ...(item.src
+          ? [{
+              key: 'open', label: 'Open original', glyph: <ExternalLink {...ICON_PROPS} size={18} />,
+              run: () => window.open(item.src, '_blank', 'noopener,noreferrer'),
+            }]
+          : []),
+        del,
+      ];
     case 'link':
       return [
         color,

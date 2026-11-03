@@ -5,7 +5,7 @@
 
 import { useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus, Rows3 } from 'lucide-react';
+import { ImageUp, LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus, Rows3 } from 'lucide-react';
 import { camera } from '../canvas/camera';
 import { ZOOM_STEP, zoomAtCenter } from '../canvas/input';
 import { useUi } from '../board/ui';
@@ -15,12 +15,16 @@ import {
 } from '../board/constants';
 import type { ItemKind } from '../board/store';
 import { BoardIcon } from './BoardIcon';
+import { ACCEPT, addMediaFiles } from '../board/media';
+
+/** Kinds made from the rail's add tiles (media comes from files instead). */
+type AddKind = Exclude<ItemKind, 'media'>;
 
 const ICON = { size: 18, strokeWidth: 1.8, 'aria-hidden': true } as const;
 const TILE_ICON = { size: 18, strokeWidth: 2, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 
 /** One raised tile per thing you can add, all in the same style. */
-const TOOLS: { kind: ItemKind; name: string; label: string; key: string; tile: ReactNode }[] = [
+const TOOLS: { kind: AddKind; name: string; label: string; key: string; tile: ReactNode }[] = [
   { kind: 'note', name: 'Note', label: 'Note', key: 'N', tile: <span className="rail-tile tile-note"><i /><i /><i /></span> },
   { kind: 'link', name: 'Link', label: 'Link', key: 'L', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
   { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
@@ -29,7 +33,7 @@ const TOOLS: { kind: ItemKind; name: string; label: string; key: string; tile: R
   { kind: 'column', name: 'Column', label: 'Column', key: 'C', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
 ];
 
-const SIZE: Record<ItemKind, { w: number; h: number }> = {
+const SIZE: Record<AddKind, { w: number; h: number }> = {
   note: { w: NOTE_WIDTH, h: NOTE_MIN_HEIGHT },
   link: { w: NOTE_WIDTH, h: NOTE_MIN_HEIGHT },
   todo: { w: NOTE_WIDTH, h: NOTE_MIN_HEIGHT },
@@ -38,7 +42,7 @@ const SIZE: Record<ItemKind, { w: number; h: number }> = {
 };
 
 /** What a new item looks like while it's being dragged out of the rail. */
-function Preview({ kind }: { kind: ItemKind }) {
+function Preview({ kind }: { kind: AddKind }) {
   const { w, h } = SIZE[kind];
   switch (kind) {
     case 'note':
@@ -71,7 +75,7 @@ function Preview({ kind }: { kind: ItemKind }) {
  * the cursor and becomes a real, still-held item once it leaves the rail.
  */
 function AddButton({ kind, name, label, keyHint, tile, rail }: {
-  kind: ItemKind; name: string; label: string; keyHint: string; tile: ReactNode; rail: () => HTMLElement | null;
+  kind: AddKind; name: string; label: string; keyHint: string; tile: ReactNode; rail: () => HTMLElement | null;
 }) {
   const press = useRef<{ x: number; y: number; dragging: boolean; spawned: boolean } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -129,6 +133,36 @@ function AddButton({ kind, name, label, keyHint, tile, rail }: {
   );
 }
 
+/** Pick photos/videos to add at the centre of the view. */
+function UploadButton() {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button
+        className="rail-add"
+        title="Upload photos, GIFs or videos — or drop files onto the board"
+        aria-label="Upload photos or videos"
+        onClick={() => input.current?.click()}
+      >
+        <span className="rail-tile"><ImageUp {...TILE_ICON} /></span>
+        <span className="rail-label">Upload</span>
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept={ACCEPT}
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = [...(e.currentTarget.files ?? [])];
+          e.currentTarget.value = '';
+          if (files.length) void addMediaFiles(files, viewportCenterWorld());
+        }}
+      />
+    </>
+  );
+}
+
 export function ToolRail() {
   const ref = useRef<HTMLElement>(null);
   const snap = useUi((s) => s.snap);
@@ -140,6 +174,7 @@ export function ToolRail() {
         {TOOLS.map((t) => (
           <AddButton key={t.kind} kind={t.kind} name={t.name} label={t.label} keyHint={t.key} tile={t.tile} rail={() => ref.current} />
         ))}
+        <UploadButton />
       </div>
       <div className="rail-spacer" />
       <div className="rail-group rail-view">

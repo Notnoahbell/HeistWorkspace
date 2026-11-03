@@ -141,9 +141,9 @@ html, body, #root {
 
 /* Stacked in a column: flat (the column carries the depth), with a tone that
    alternates by depth so each level contrasts with the column holding it. */
-:is(.note, .todo, .link, .board-row, .column)[data-stacked] { box-shadow: none; }
-:is(.note, .todo, .link, .board-row)[data-stacked='odd'] { --note-default: var(--stacked-default); }
-:is(.note, .todo, .link, .board-row)[data-stacked='even'] { --note-default: var(--stacked-even-default); }
+:is(.note, .todo, .link, .media, .board-row, .column)[data-stacked] { box-shadow: none; }
+:is(.note, .todo, .link, .media, .board-row)[data-stacked='odd'] { --note-default: var(--stacked-default); }
+:is(.note, .todo, .link, .media, .board-row)[data-stacked='even'] { --note-default: var(--stacked-even-default); }
 .column[data-stacked='odd'] { --column-default: var(--stacked-default); }
 
 .note {
@@ -920,6 +920,72 @@ html, body, #root {
 .icon-grid button[aria-pressed='false'] .icon-cell { background: transparent !important; }
 .icon-grid button:hover .icon-cell { outline: 1px solid var(--panel-border); outline-offset: -1px; }
 .icon-grid button[aria-pressed='true'] .icon-cell { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* --- Photos & videos ------------------------------------------------------ */
+
+.media {
+  position: relative;
+  background: var(--note-default);
+  color: var(--text);
+  /* Must match shadow(0) in body.ts so release doesn't pop. */
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1), 0 0.5px 1px rgb(0 0 0 / 0.08);
+}
+.media[data-selected='true'] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.media-frame { position: relative; overflow: hidden; background: rgb(0 0 0 / 0.06); }
+.media-frame > img,
+.media-frame > video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; }
+.media-pending {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 13px; color: var(--text-dim);
+}
+.media-frame button {
+  position: absolute; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; padding: 0; color: #fff; background: rgb(0 0 0 / 0.55); cursor: inherit;
+}
+.media-frame button:hover { background: rgb(0 0 0 / 0.75); }
+.media-play { left: 50%; top: 50%; width: 52px; height: 52px; transform: translate(-50%, -50%); border-radius: 50%; }
+.media-play svg { margin-left: 3px; }
+.media-pause { left: 8px; bottom: 14px; width: 28px; height: 28px; opacity: 0; transition: opacity 0.12s; }
+.media:hover .media-pause { opacity: 1; }
+.media-scrub { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: rgb(0 0 0 / 0.25); }
+.media-scrub > span { display: block; height: 100%; max-height: 3px; margin-top: 5px; background: #fff; }
+.media-scrub:hover > span { max-height: none; margin-top: 0; }
+.media-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(0 0 0 / 0.25); }
+.media-progress > span { display: block; height: 100%; background: var(--accent); transition: width 0.15s; }
+.media-retry { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 7px 12px !important; font-size: 13px; font-weight: 600; }
+.media-reveal { right: 6px; bottom: 6px; width: 24px; height: 24px; opacity: 0; transition: opacity 0.12s; }
+.media:hover .media-reveal,
+.media[data-selected='true'] .media-reveal { opacity: 1; }
+
+.media-caption { display: flex; align-items: flex-start; gap: 6px; padding: 9px 6px 10px 12px; }
+.media-text { flex: 1; min-width: 0; }
+.media-name {
+  display: block; width: 100%; margin: 0; padding: 0; border: 0; outline: 0; background: none;
+  font: inherit; font-size: 14px; font-weight: 650; line-height: 1.35; color: inherit;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.media-name[data-empty='true'] { opacity: 0.45; }
+.media-name-input { cursor: text; }
+.media-name-input::placeholder { color: inherit; opacity: 0.45; }
+.media-sub { margin-top: 2px; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-hide {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-top: -1px;
+  border: 0; padding: 0; background: none; color: var(--text-dim); cursor: inherit;
+}
+.media-hide:hover { color: var(--text); background: rgb(0 0 0 / 0.06); }
+@media (prefers-color-scheme: dark) {
+  .media::after { content: ''; position: absolute; inset: 0; border: 1px solid rgb(255 255 255 / 0.07); pointer-events: none; }
+  .media-hide:hover { background: rgb(255 255 255 / 0.08); }
+}
+
+/* Files dragged in from the desktop. */
+.file-drop {
+  position: fixed; inset: 0; z-index: 1000; pointer-events: none;
+  box-shadow: inset 0 0 0 3px var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  display: flex; justify-content: center; align-items: flex-start; padding-top: calc(var(--topbar-h) + 16px);
+}
+.file-drop > span { padding: 8px 14px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; }
 
 /* --- Shared bits --------------------------------------------------------- */
 

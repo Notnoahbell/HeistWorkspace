@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Canvas } from './canvas/Canvas';
 import { isTyping } from './canvas/input';
@@ -10,6 +10,8 @@ import { ColumnView } from './board/ColumnView';
 import { BoardView } from './board/BoardView';
 import { TodoView } from './board/TodoView';
 import { LinkView } from './board/LinkView';
+import { MediaView } from './board/MediaView';
+import { addMediaFiles } from './board/media';
 import {
   clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, zoomToFit,
 } from './board/actions';
@@ -35,6 +37,7 @@ function ItemLayer({ boardId }: { boardId: string }) {
   const notes = useIds(boardId, 'note');
   const todos = useIds(boardId, 'todo');
   const links = useIds(boardId, 'link');
+  const media = useIds(boardId, 'media');
   return (
     <>
       {columns.map((id) => <ColumnView key={id} id={id} />)}
@@ -42,6 +45,7 @@ function ItemLayer({ boardId }: { boardId: string }) {
       {notes.map((id) => <NoteView key={id} id={id} />)}
       {todos.map((id) => <TodoView key={id} id={id} />)}
       {links.map((id) => <LinkView key={id} id={id} />)}
+      {media.map((id) => <MediaView key={id} id={id} />)}
     </>
   );
 }
@@ -80,7 +84,7 @@ export function App() {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         const k = e.key.toLowerCase();
         const run: Record<string, () => unknown> = {
-          a: selectAll, c: copySelection, x: cutSelection, v: () => paste(), d: duplicateSelection,
+          a: selectAll, c: copySelection, x: cutSelection, d: duplicateSelection,
         };
         if (run[k]) {
           e.preventDefault();
@@ -120,6 +124,51 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [boardId]);
 
+  // Paste: image files from the system clipboard become photo cards;
+  // otherwise it's our own clipboard (copied cards).
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (isTyping(e)) return;
+      e.preventDefault();
+      const files = [...(e.clipboardData?.files ?? [])];
+      if (files.length) void addMediaFiles(files, viewportCenterWorld());
+      else paste();
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
+
+  // Drop photos/videos from the desktop anywhere on the board.
+  const [fileDrag, setFileDrag] = useState(false);
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+    const enter = (e: DragEvent) => { if (hasFiles(e)) { depth++; setFileDrag(true); } };
+    const leave = (e: DragEvent) => { if (hasFiles(e) && --depth <= 0) { depth = 0; setFileDrag(false); } };
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'copy';
+    };
+    const drop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setFileDrag(false);
+      void addMediaFiles([...e.dataTransfer!.files], camera.clientToWorld(e.clientX, e.clientY));
+    };
+    window.addEventListener('dragenter', enter);
+    window.addEventListener('dragleave', leave);
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragenter', enter);
+      window.removeEventListener('dragleave', leave);
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
+  }, []);
+
   return (
     <>
       <Canvas
@@ -147,6 +196,7 @@ export function App() {
       <Toast />
       <PeerCursors />
       <CursorChat />
+      {fileDrag && <div className="file-drop"><span>Drop photos or videos to add them</span></div>}
     </>
   );
 }

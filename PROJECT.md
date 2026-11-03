@@ -70,11 +70,11 @@ self-hosted.
 
 ### Phase 2 — Milanote parity (local)
 - [ ] Rich text in notes, headings
-- [ ] Images, files
+- [x] Photos, GIFs and videos (Upload button, drop from desktop, paste); files TBD
 - [ ] Column collapse
 - [ ] Lines/arrows connecting items
 - [ ] Labels/tags
-- [ ] Drag-and-drop upload from desktop
+- [x] Drag-and-drop upload from desktop
 - [ ] Board templates, search
 
 ### Phase 3 — Video review (where we surpass Milanote)
@@ -137,6 +137,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   redirect hop, times out at 6s and reads at most 768KB. When it moves to the
   backend, also pin the resolved IP for the request (DNS-rebinding), rate-limit it,
   and consider proxying preview images.
+- **2026-11-03: Photos/GIFs/videos** upload to `PUT /api/upload` (`server/uploads.ts`,
+  raw body, Content-Type = file type) and are stored in `data/uploads`, served from
+  `/uploads/<random id>.<ext>` with Range support so videos seek. PNG/JPEG/GIF/WebP/AVIF/
+  MP4/WebM/MOV only (no SVG — same-origin script), up to 1 GB, `nosniff`. A card appears
+  at once with a local blob preview and progress; the item's `src` is set when the upload
+  finishes, so other people only see it once it's on the server. No auth or cleanup of
+  orphaned files yet — swap for object storage + signed URLs with the real backend.
 - **2026-11-03: Board squares** are 64px with Figma-style 60% corner smoothing
   (`figma-squircle` clip-path; lift shadow drawn as a filter so it follows the curve).
 
@@ -202,6 +209,9 @@ npm run build      # typecheck + production build
   column title, open a board, open a link
 - Notes: double-click canvas or N; Enter also edits; Esc to stop
 - Links: L (type a URL, Enter); click it again to open it. To-dos: T; tick boxes any time
+- Photos/videos: Upload in the rail, drop files onto the board, or paste an image. Name
+  defaults to the filename — click the name of a selected card to rename; the arrow
+  hides/shows the name and details. Click a selected video (or ▶) to play/pause
 - Columns: C; double-click header to rename; double-click body to add a note
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
   follows the cursor and becomes a real item once it clears the sidebar

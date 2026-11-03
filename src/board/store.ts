@@ -11,7 +11,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import { newId } from '../lib/id';
 import type { Point } from '../canvas/camera';
 import { homeId } from '../session';
-import { BOARD_WIDTH, COLUMN_WIDTH, NOTE_WIDTH } from './constants';
+import { BOARD_WIDTH, COLUMN_WIDTH, MEDIA_WIDTH, NOTE_WIDTH } from './constants';
 
 interface ItemBase {
   id: string;
@@ -73,6 +73,31 @@ export interface Link extends ItemBase, Stacked {
   preview: LinkPreview | null;
 }
 
+/** Facts about an uploaded file, for the caption and layout. */
+export interface MediaMeta {
+  mime?: string;
+  size?: number;
+  width?: number;
+  height?: number;
+  /** Seconds (videos). */
+  duration?: number;
+}
+
+/** A photo, GIF or video. */
+export interface Media extends ItemBase, Stacked {
+  kind: 'media';
+  mediaType: 'image' | 'video';
+  /** Where the file lives once uploaded ('' while uploading). */
+  src: string;
+  /** Shown under the media; the filename to begin with. */
+  name: string;
+  meta: MediaMeta;
+  /** Name/subtitle tucked away behind an arrow. */
+  captionHidden: boolean;
+  /** Set while the upload is in progress, or if it failed. */
+  upload?: 'uploading' | 'failed';
+}
+
 export type ColumnDirection = 'vertical' | 'horizontal';
 
 /** A container that stacks items; columns can nest inside columns. */
@@ -105,7 +130,7 @@ export interface Board extends ItemBase, Stacked {
 /** The board a tile opens: itself, or what it's a shortcut to. */
 export const boardTarget = (b: Board) => b.linkTo ?? b.id;
 
-export type Item = Note | Todo | Link | Column | Board;
+export type Item = Note | Todo | Link | Media | Column | Board;
 /** Items that can be stacked in a column (everything, columns included). */
 export type Stackable = Item;
 export const isStackable = (it: Item | undefined): it is Stackable => !!it;
@@ -149,6 +174,7 @@ const DEFAULTS: { [K in ItemKind]: Omit<ItemOf<K>, 'id' | 'kind' | 'z' | 'x' | '
   },
   todo: { w: NOTE_WIDTH, color: null, entries: [], parentId: null },
   link: { w: NOTE_WIDTH, color: null, url: '', preview: null, parentId: null },
+  media: { w: MEDIA_WIDTH, mediaType: 'image', src: '', name: '', meta: {}, captionHidden: false, parentId: null },
   column: { w: COLUMN_WIDTH, title: '', color: null, strip: null, direction: 'vertical', childIds: [], parentId: null },
   board: { w: BOARD_WIDTH, title: '', color: null, icon: null, parentId: null },
 };

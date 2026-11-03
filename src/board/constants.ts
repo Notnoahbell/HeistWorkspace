@@ -2,6 +2,9 @@ import { GRID_SIZE } from '../canvas/grid';
 
 // Sizes are multiples of the grid so snapped items line up with the dots.
 export const NOTE_WIDTH = GRID_SIZE * 15; // 240
+/** Photos/videos: landscape ones a little wider than a note. */
+export const MEDIA_WIDTH = GRID_SIZE * 20; // 320
+export const MEDIA_WIDTH_PORTRAIT = NOTE_WIDTH;
 export const COLUMN_PAD = GRID_SIZE; // 16
 export const COLUMN_WIDTH = NOTE_WIDTH + COLUMN_PAD * 2; // 272 = 17 grid units
 export const COLUMN_HEADER = GRID_SIZE * 3.5; // 56: title + item count

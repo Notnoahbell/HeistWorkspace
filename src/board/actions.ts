@@ -372,11 +372,12 @@ const KIND_NOUN: Record<ItemKind, [string, string]> = {
   note: ['note', 'notes'],
   todo: ['to-do list', 'to-do lists'],
   link: ['link', 'links'],
+  media: ['photo or video', 'photos and videos'],
 };
 
 /** "2 boards, 5 notes" — what's on a board, by kind. */
 export function boardSummary(items: Record<string, Item>, boardId: string): string {
-  const n: Record<ItemKind, number> = { board: 0, column: 0, note: 0, todo: 0, link: 0 };
+  const n: Record<ItemKind, number> = { board: 0, column: 0, note: 0, todo: 0, link: 0, media: 0 };
   for (const it of Object.values(items)) if (it.boardId === boardId) n[it.kind]++;
   const parts = (Object.keys(KIND_NOUN) as ItemKind[])
     .filter((k) => n[k])
