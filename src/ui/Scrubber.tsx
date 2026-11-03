@@ -12,7 +12,18 @@ export const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(sec).padStart(2, '0')}`;
 };
-export const fmtFrames = (s: number) => String(Number.isFinite(s) && s > 0 ? Math.round(s * FPS) : 0);
+export const fmtFrames = (s: number) => String(Number.isFinite(s) && s > 0 ? Math.floor(s * FPS + 1e-6) : 0);
+
+/**
+ * Pause and move one frame back or forward. Lands mid-frame so decoders
+ * agree on which frame that is; a held key keeps stepping from the target.
+ */
+export function stepFrame(v: HTMLVideoElement, dir: 1 | -1) {
+  v.pause();
+  const frame = Math.floor(v.currentTime * FPS + 1e-6) + dir;
+  const last = Number.isFinite(v.duration) ? Math.floor(v.duration * FPS - 1e-6) : Infinity;
+  v.currentTime = (Math.max(0, Math.min(last, frame)) + 0.5) / FPS;
+}
 
 /** Calls `draw` every frame while the video plays, and once after any jump. */
 export function useVideoFrame(video: HTMLVideoElement | null, draw: (v: HTMLVideoElement) => void) {

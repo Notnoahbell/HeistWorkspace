@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type SyntheticEvent } from 'react';
+import { memo, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { ChevronDown, ChevronUp, Pause, Play, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard } from './store';
 import { useLayout } from './layout';
@@ -6,7 +6,8 @@ import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { mediaSubtitle, retryUpload, useLocalMedia } from './media';
-import { Scrubber, useContrastTone } from '../ui/Scrubber';
+import { Scrubber, stepFrame, useContrastTone } from '../ui/Scrubber';
+import { isTyping } from '../canvas/input';
 import { openViewer } from '../ui/MediaViewer';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
@@ -52,6 +53,19 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     }
   });
   useReportHeight(id, visRef);
+
+  // , and . step a selected video a frame at a time.
+  useEffect(() => {
+    if (!selected || !video) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e) || useUi.getState().viewer) return;
+      if (e.key !== ',' && e.key !== '.') return;
+      e.preventDefault();
+      stepFrame(video, e.key === '.' ? 1 : -1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, video]);
 
   if (!media) return null;
 

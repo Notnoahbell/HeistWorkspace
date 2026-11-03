@@ -213,8 +213,8 @@ npm run build      # typecheck + production build
   defaults to the filename — click the name of a selected card to rename; the arrow
   hides/shows the name and details. ▶ plays a video in place; drag its timeline to scrub.
   GIFs loop on their own. Double-click (or Enter) opens the full-size player: Space/K
-  play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Alt-click the
-  time readout to switch to frame numbers (assumes 24 fps until the backend reads the real rate)
+  play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Click the time
+  readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
 - Columns: C; double-click header to rename; double-click body to add a note
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
   follows the cursor and becomes a real item once it clears the sidebar

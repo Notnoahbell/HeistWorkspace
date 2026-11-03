@@ -3,7 +3,7 @@
 // the button at the lower left of the controls goes full screen.
 //
 // Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · F full screen · Esc close
-// Alt-click the time readout to switch between time and frame numbers.
+// Click the time readout to switch between time and frame numbers.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
@@ -11,7 +11,7 @@ import { ExternalLink, Maximize, Minimize, Pause, Play, Volume2, VolumeX, X } fr
 import { useBoard } from '../board/store';
 import { useUi } from '../board/ui';
 import { mediaSubtitle, useLocalMedia } from '../board/media';
-import { fmtFrames, fmtTime, FPS, Scrubber, useVideoFrame } from './Scrubber';
+import { fmtFrames, fmtTime, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
 
 const ICON = { size: 18, strokeWidth: 2, 'aria-hidden': true } as const;
 /** Controls fade out after this long without the mouse moving (while playing). */
@@ -19,6 +19,7 @@ const IDLE_MS = 2200;
 /** Matches the closing animation in styles.css. */
 const CLOSE_MS = 110;
 const UNITS_KEY = 'heist:timecode';
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 export const openViewer = (id: string, time = 0) => useUi.getState().set({ viewer: { id, time } });
 
@@ -45,6 +46,8 @@ function Player({ id, start }: { id: string; start: number }) {
   const [idle, setIdle] = useState(false);
   const [closing, setClosing] = useState(false);
   const [units, setUnits] = useState(readUnits);
+  const [rate, setRate] = useState(1);
+  const [speedMenu, setSpeedMenu] = useState(false);
 
   const dismiss = () => {
     if (closing) return;
@@ -58,6 +61,15 @@ function Player({ id, start }: { id: string; start: number }) {
   };
   useVideoFrame(video, drawTime);
   useEffect(() => { if (video) drawTime(video); });
+  useEffect(() => { if (video) video.playbackRate = rate; }, [video, rate]);
+
+  // Close the speed menu on any press outside it.
+  useEffect(() => {
+    if (!speedMenu) return;
+    const off = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.viewer-speed')) setSpeedMenu(false); };
+    window.addEventListener('pointerdown', off, true);
+    return () => window.removeEventListener('pointerdown', off, true);
+  }, [speedMenu]);
 
   // Start where the card left off, playing.
   useEffect(() => {
@@ -97,13 +109,12 @@ function Player({ id, start }: { id: string; start: number }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const v = video;
-      const step = (d: number) => { if (v) { v.pause(); v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + d)); } };
       const keys: Record<string, () => void> = {
-        Escape: () => { if (!document.fullscreenElement) dismiss(); },
+        Escape: () => { if (speedMenu) setSpeedMenu(false); else if (!document.fullscreenElement) dismiss(); },
         ' ': togglePlay, k: togglePlay,
         ArrowLeft: () => { if (v) v.currentTime = Math.max(0, v.currentTime - 5); },
         ArrowRight: () => { if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); },
-        ',': () => step(-1 / FPS), '.': () => step(1 / FPS),
+        ',': () => { if (v) stepFrame(v, -1); }, '.': () => { if (v) stepFrame(v, 1); },
         m: () => { if (v) v.muted = !v.muted; },
         f: toggleFull,
       };
@@ -166,9 +177,6 @@ function Player({ id, start }: { id: string; start: number }) {
           )}
 
           <div className="viewer-controls" data-video={isVideo || undefined}>
-            <button className="viewer-btn" onClick={toggleFull} title={full ? 'Exit full screen (F)' : 'Full screen (F)'} aria-label={full ? 'Exit full screen' : 'Full screen'}>
-              {full ? <Minimize {...ICON} /> : <Maximize {...ICON} />}
-            </button>
             {isVideo && (
               <>
                 <button className="viewer-btn" onClick={togglePlay} title={playing ? 'Pause (Space)' : 'Play (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
@@ -178,10 +186,30 @@ function Player({ id, start }: { id: string; start: number }) {
                   ref={timeRef}
                   className="viewer-time"
                   data-units={units}
-                  title={units === 'frames' ? `Frames at ${FPS} fps — Alt-click for time` : 'Alt-click for frames'}
-                  onClick={(e) => { if (e.altKey) toggleUnits(); }}
+                  title={units === 'frames' ? `Frames at ${FPS} fps — click for time` : 'Click for frames'}
+                  onClick={toggleUnits}
                 />
                 <Scrubber video={video} className="viewer-scrub" format={fmt} />
+                <div className="viewer-speed">
+                  <button
+                    className="viewer-btn viewer-rate"
+                    aria-haspopup="menu"
+                    aria-expanded={speedMenu}
+                    title="Playback speed"
+                    onClick={() => setSpeedMenu((o) => !o)}
+                  >
+                    {rate}×
+                  </button>
+                  {speedMenu && (
+                    <div className="viewer-speed-menu" role="menu">
+                      {[...SPEEDS].reverse().map((r) => (
+                        <button key={r} role="menuitemradio" aria-checked={r === rate} onClick={() => { setRate(r); setSpeedMenu(false); }}>
+                          {r === 1 ? 'Normal' : `${r}×`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   className="viewer-btn"
                   onClick={() => { if (video) video.muted = !video.muted; }}
@@ -192,6 +220,9 @@ function Player({ id, start }: { id: string; start: number }) {
                 </button>
               </>
             )}
+            <button className="viewer-btn viewer-full" onClick={toggleFull} title={full ? 'Exit full screen (F)' : 'Full screen (F)'} aria-label={full ? 'Exit full screen' : 'Full screen'}>
+              {full ? <Minimize {...ICON} /> : <Maximize {...ICON} />}
+            </button>
           </div>
         </div>
       </div>
