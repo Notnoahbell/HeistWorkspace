@@ -10,7 +10,7 @@ editing. Built with React, TypeScript and Vite.
 
 ## Run it
 
-Requires [Node.js](https://nodejs.org) 22 or newer.
+Requires [Node.js](https://nodejs.org) 22.18 or newer.
 
 ```sh
 npm install
