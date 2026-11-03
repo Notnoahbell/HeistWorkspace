@@ -8,7 +8,7 @@ import { useBoard, type Board } from '../board/store';
 import { useBoardId } from '../board/nav';
 import { isHome, session } from '../session';
 import { BOARD_ICONS } from '../lib/icons';
-import { usePresence, type Peer, type Profile } from '../sync/presence';
+import { useMyColor, usePresence, type Peer, type Profile } from '../sync/presence';
 import { camera } from '../canvas/camera';
 import { setProfile } from '../sync/client';
 
@@ -185,7 +185,7 @@ function ShareBoard() {
 function ProfileMenu() {
   const me = usePresence((s) => s.me);
   const status = usePresence((s) => s.status);
-  const color = usePresence((s) => s.myColor);
+  const color = useMyColor();
   const [name, setName] = useState(me?.name ?? '');
   useEffect(() => setName(me?.name ?? ''), [me?.name]);
   const profile = me ?? { id: session.userId, name: 'You', icon: null };

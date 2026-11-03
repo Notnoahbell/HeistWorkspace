@@ -7,7 +7,7 @@ import { camera } from '../canvas/camera';
 import { isTyping } from '../canvas/input';
 import { useBoardId } from '../board/nav';
 import { CURSOR_PATH } from '../lib/cursor';
-import { usePresence } from '../sync/presence';
+import { useMyColor, usePresence } from '../sync/presence';
 import { CHAT_LIMIT, setChat, setCursor } from '../sync/client';
 
 export function CursorShape({ color }: { color: string }) {
@@ -50,7 +50,7 @@ export function CursorChat() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const pointer = useRef({ x: 0, y: 0 });
   const closing = useRef(false);
-  const color = usePresence((s) => s.myColor);
+  const color = useMyColor();
   const online = usePresence((s) => s.status === 'online');
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export function CursorChat() {
       className="chat-bubble"
       // A hidden copy of the text sizes the box to exactly what's typed.
       data-value={text || 'Say something'}
-      style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, background: color ?? 'var(--accent)' }}
+      style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`, background: color }}
     >
       <input
         ref={(el) => el?.focus({ preventScroll: true })}

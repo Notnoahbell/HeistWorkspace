@@ -10,7 +10,7 @@ import { enterBoard } from '../board/actions';
 import { BoardIcon } from './BoardIcon';
 import { CollabBar } from './Collab';
 import { HeistLogo } from './HeistLogo';
-import { usePresence } from '../sync/presence';
+import { useMyColor } from '../sync/presence';
 
 /** Crumbs shown in full before the middle collapses into "…". */
 const MAX_CRUMBS = 4;
@@ -76,8 +76,8 @@ function Overflow({ hidden }: { hidden: Crumb[] }) {
 
 export function TopBar() {
   const boardId = useBoardId();
-  // The logo wears your colour (your cursor colour on this board).
-  const myColor = usePresence((s) => s.myColor);
+  // The logo wears your personal colour (the same everywhere, for you).
+  const myColor = useMyColor();
   // Serialise so we only re-render when the path itself changes.
   const pathKey = useBoard((s) => JSON.stringify(pathTo(boardId, s.items)));
   const path: Crumb[] = JSON.parse(pathKey);
@@ -93,7 +93,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="top-brand" title="Heist Workspace">
-        <HeistLogo color={myColor ?? 'var(--text)'} height={26} />
+        <HeistLogo color={myColor} height={26} />
       </div>
 
       <nav className="crumbs" aria-label="Board path">
