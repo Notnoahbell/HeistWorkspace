@@ -931,7 +931,8 @@ html, body, #root {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.1), 0 0.5px 1px rgb(0 0 0 / 0.08);
 }
 .media[data-selected='true'] { outline: 2px solid var(--accent); outline-offset: 2px; }
-.media-frame { position: relative; overflow: hidden; background: rgb(0 0 0 / 0.06); }
+/* Not clipped: the timeline's knob may overhang the frame's edges. */
+.media-frame { position: relative; background: rgb(0 0 0 / 0.06); }
 .media-frame > img,
 .media-frame > video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; }
 .media-pending {
@@ -944,9 +945,11 @@ html, body, #root {
 }
 .media-frame button:hover { background: rgb(0 0 0 / 0.75); }
 .media-play { left: 50%; top: 50%; width: 52px; height: 52px; transform: translate(-50%, -50%); border-radius: 50%; }
-.media-play svg { margin-left: 3px; }
-.media-pause { left: 8px; bottom: 24px; width: 28px; height: 28px; opacity: 0; transition: opacity 0.12s; }
-.media:hover .media-pause { opacity: 1; }
+.media-play:not([data-playing]) svg { margin-left: 3px; }
+/* Video controls (play/pause, timeline) only while hovering, or while scrubbing. */
+:is(.media-play, .media-scrub) { opacity: 0; transition: opacity 0.12s; }
+.media:hover :is(.media-play, .media-scrub),
+.media-frame:has(.scrub[data-dragging]) :is(.media-play, .media-scrub) { opacity: 1; }
 /* Timeline: a thin bar in a taller hit area, padded so the knob is never clipped.
    Light on dark footage, dark on light (data-tone, sampled from the frame). */
 .scrub {
@@ -968,7 +971,10 @@ html, body, #root {
   background: rgb(0 0 0 / 0.8); color: #fff; font-size: 12px; font-variant-numeric: tabular-nums;
   white-space: nowrap; pointer-events: none;
 }
-.media-scrub { position: absolute; left: 0; right: 0; bottom: 2px; }
+/* Flush with the bottom edge; the track grows upwards on hover and the knob overhangs. */
+.media-scrub { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; height: 14px; padding: 0; align-items: flex-end; }
+.media-scrub .scrub-track { box-shadow: none; }
+.media-frame:has(.media-scrub) .media-reveal { bottom: 20px; }
 
 /* Player: the board fades and blurs behind; the panel scales up quickly. */
 .viewer {

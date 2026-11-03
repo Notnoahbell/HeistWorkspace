@@ -92,16 +92,10 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
 
           {media.mediaType === 'video' && src && (
             <>
-              {!playing && (
-                <button className="media-play" aria-label="Play" {...keep} onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
-                  <Play size={22} fill="currentColor" {...ICON} />
-                </button>
-              )}
-              {playing && (
-                <button className="media-pause" aria-label="Pause" {...keep} onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
-                  <Pause size={14} fill="currentColor" {...ICON} />
-                </button>
-              )}
+              {/* One large button in the middle; like the timeline, it shows on hover. */}
+              <button className="media-play" data-playing={playing || undefined} aria-label={playing ? 'Pause' : 'Play'} {...keep} onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
+                {playing ? <Pause size={22} fill="currentColor" {...ICON} /> : <Play size={22} fill="currentColor" {...ICON} />}
+              </button>
               <Scrubber video={video} className="media-scrub" tone={tone} />
             </>
           )}
