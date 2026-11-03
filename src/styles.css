@@ -1344,11 +1344,22 @@ button, a, label { cursor: var(--cursor, default); }
   cursor: var(--cursor, default);
   touch-action: none;
 }
-.rail-add { width: 52px; height: 48px; }
+.rail-add {
+  grid-template-rows: auto auto;
+  gap: 5px;
+  width: 60px;
+  padding: 6px 0 4px;
+}
+.rail-label {
+  font-size: 10.5px;
+  line-height: 12px;
+  color: var(--text-dim);
+}
+.rail-add:hover .rail-label { color: var(--text); }
 .rail-add:focus-visible,
 .rail-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-/* Raised mini-versions of each item, so the add buttons read as objects. */
+/* Raised tiles, one per thing you can add, all in the same style. */
 .rail-tile {
   display: grid;
   place-items: center;
@@ -1369,29 +1380,17 @@ button, a, label { cursor: var(--cursor, default); }
 .tile-note i { display: block; width: 100%; height: 2px; background: currentColor; }
 .tile-note i:last-child { width: 70%; justify-self: start; }
 
-.tile-board {
-  width: 34px;
-  height: 34px;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: none;
-  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.14)) drop-shadow(0 3px 4px rgb(0 0 0 / 0.08));
-}
-.rail-add:hover .tile-board { box-shadow: none; }
 
-.tile-column {
-  width: 30px;
-  height: 36px;
-  align-content: start;
-  gap: 3px;
-  padding: 4px;
-  background: var(--column-default);
-}
-.tile-column i { display: block; width: 100%; height: 7px; background: var(--stacked-default); }
-.tile-column i:first-child { height: 3px; width: 60%; justify-self: center; background: currentColor; opacity: 0.55; }
 
 .rail-view { gap: 4px; }
 .rail-btn { width: 40px; height: 36px; color: var(--text-dim); }
+.rail-labelled {
+  grid-template-rows: auto auto;
+  gap: 3px;
+  width: 52px;
+  height: auto;
+  padding: 6px 0 5px;
+}
 .rail-btn:hover { background: var(--hover); color: var(--text); }
 .rail-btn:active { background: var(--accent-soft); }
 .rail-btn[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
@@ -1463,4 +1462,19 @@ button, a, label { cursor: var(--cursor, default); }
   font-weight: 700;
   text-align: center;
   color: var(--text-dim);
+}
+
+/* Dark mode: lift the tiles off the rail so they don't sink into it. */
+@media (prefers-color-scheme: dark) {
+  .rail-tile {
+    background: #3a3a42;
+    color: #f2f2f5;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 1px 2px rgb(0 0 0 / 0.5), 0 3px 8px rgb(0 0 0 / 0.35);
+  }
+  .rail-add:hover .rail-tile {
+    background: #44444d;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 2px 4px rgb(0 0 0 / 0.5), 0 6px 14px rgb(0 0 0 / 0.4);
+  }
+  .rail-label { color: #a6a6ae; }
+  .rail-btn { color: #b4b4bc; }
 }

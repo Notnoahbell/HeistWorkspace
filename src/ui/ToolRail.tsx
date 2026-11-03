@@ -1,11 +1,11 @@
-// Tool rail down the left: things to add (raised mini-versions of each item —
-// click, or drag one out onto the board) and view controls at the bottom.
-// Icons only; names and shortcuts in tooltips. It never changes state: item
-// settings live in the floating toolbar above whatever's selected.
+// Tool rail down the left: things to add (raised tiles — click, or drag one
+// out onto the board) and view controls at the bottom, each with a short
+// label. It never changes state: item settings live in the floating toolbar
+// above whatever's selected.
 
 import { useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus } from 'lucide-react';
+import { Columns3, LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus } from 'lucide-react';
 import { camera } from '../canvas/camera';
 import { ZOOM_STEP, zoomAtCenter } from '../canvas/input';
 import { useUi } from '../board/ui';
@@ -14,22 +14,18 @@ import {
   BOARD_HEIGHT, BOARD_SWATCH, BOARD_WIDTH, COLUMN_EMPTY, COLUMN_HEADER, COLUMN_WIDTH, NOTE_MIN_HEIGHT, NOTE_WIDTH,
 } from '../board/constants';
 import type { ItemKind } from '../board/store';
-import { squircleClip } from '../lib/squircle';
 import { BoardIcon } from './BoardIcon';
 
 const ICON = { size: 18, strokeWidth: 1.8, 'aria-hidden': true } as const;
 const TILE_ICON = { size: 18, strokeWidth: 2, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 
-/** Raised mini-versions of each item, so the add buttons read as objects. */
-const TOOLS: { kind: ItemKind; name: string; key: string; tile: ReactNode }[] = [
-  { kind: 'note', name: 'Note', key: 'N', tile: <span className="rail-tile tile-note"><i /><i /><i /></span> },
-  { kind: 'link', name: 'Link', key: 'L', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
-  { kind: 'todo', name: 'To-do list', key: 'T', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
-  {
-    kind: 'board', name: 'Board', key: 'B',
-    tile: <span className="rail-tile tile-board" style={{ clipPath: squircleClip(34) }}><LayoutGrid {...TILE_ICON} /></span>,
-  },
-  { kind: 'column', name: 'Column', key: 'C', tile: <span className="rail-tile tile-column"><i /><i /><i /></span> },
+/** One raised tile per thing you can add, all in the same style. */
+const TOOLS: { kind: ItemKind; name: string; label: string; key: string; tile: ReactNode }[] = [
+  { kind: 'note', name: 'Note', label: 'Note', key: 'N', tile: <span className="rail-tile tile-note"><i /><i /><i /></span> },
+  { kind: 'link', name: 'Link', label: 'Link', key: 'L', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
+  { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
+  { kind: 'board', name: 'Board', label: 'Board', key: 'B', tile: <span className="rail-tile"><LayoutGrid {...TILE_ICON} /></span> },
+  { kind: 'column', name: 'Column', label: 'Column', key: 'C', tile: <span className="rail-tile"><Columns3 {...TILE_ICON} /></span> },
 ];
 
 const SIZE: Record<ItemKind, { w: number; h: number }> = {
@@ -73,7 +69,9 @@ function Preview({ kind }: { kind: ItemKind }) {
  * Click to add at the centre of the view, or drag it out: a preview follows
  * the cursor and becomes a real, still-held item once it leaves the rail.
  */
-function AddButton({ kind, name, keyHint, tile, rail }: { kind: ItemKind; name: string; keyHint: string; tile: ReactNode; rail: () => HTMLElement | null }) {
+function AddButton({ kind, name, label, keyHint, tile, rail }: {
+  kind: ItemKind; name: string; label: string; keyHint: string; tile: ReactNode; rail: () => HTMLElement | null;
+}) {
   const press = useRef<{ x: number; y: number; dragging: boolean; spawned: boolean } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -123,6 +121,7 @@ function AddButton({ kind, name, keyHint, tile, rail }: { kind: ItemKind; name: 
         }}
       >
         {tile}
+        <span className="rail-label">{label}</span>
       </button>
       {createPortal(<div ref={previewRef} className="spawn-preview" aria-hidden="true"><Preview kind={kind} /></div>, document.body)}
     </>
@@ -137,21 +136,25 @@ export function ToolRail() {
   return (
     <nav className="tool-rail" ref={ref} aria-label="Tools">
       <div className="rail-group">
-        {TOOLS.map((t) => <AddButton key={t.kind} kind={t.kind} name={t.name} keyHint={t.key} tile={t.tile} rail={() => ref.current} />)}
+        {TOOLS.map((t) => (
+          <AddButton key={t.kind} kind={t.kind} name={t.name} label={t.label} keyHint={t.key} tile={t.tile} rail={() => ref.current} />
+        ))}
       </div>
       <div className="rail-spacer" />
       <div className="rail-group rail-view">
         <button
-          className="rail-btn"
+          className="rail-btn rail-labelled"
           aria-pressed={snap}
           title="Snap to grid (G) — hold Alt while dragging to place freely"
           aria-label="Snap to grid"
           onClick={() => useUi.getState().set({ snap: !snap })}
         >
           <Magnet {...ICON} />
+          <span className="rail-label">Snap</span>
         </button>
-        <button className="rail-btn" title="Zoom to fit (Shift+1)" aria-label="Zoom to fit" onClick={zoomToFit}>
+        <button className="rail-btn rail-labelled" title="Zoom to fit (Shift+1)" aria-label="Zoom to fit" onClick={zoomToFit}>
           <Maximize {...ICON} />
+          <span className="rail-label">Fit</span>
         </button>
         <div className="rail-zoom">
           <button className="rail-btn" title="Zoom in (Ctrl +)" aria-label="Zoom in" onClick={() => zoomAtCenter(camera.z * ZOOM_STEP)}>
