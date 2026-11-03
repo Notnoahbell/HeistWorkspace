@@ -1,0 +1,5 @@
+node_modules
+dist
+*.local
+# Server data (everyone's boards) stays on the machine running it
+data/
