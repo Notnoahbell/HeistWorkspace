@@ -5,7 +5,7 @@
 
 import { useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Columns3, LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus } from 'lucide-react';
+import { LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus, Rows3 } from 'lucide-react';
 import { camera } from '../canvas/camera';
 import { ZOOM_STEP, zoomAtCenter } from '../canvas/input';
 import { useUi } from '../board/ui';
@@ -25,7 +25,8 @@ const TOOLS: { kind: ItemKind; name: string; label: string; key: string; tile: R
   { kind: 'link', name: 'Link', label: 'Link', key: 'L', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
   { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
   { kind: 'board', name: 'Board', label: 'Board', key: 'B', tile: <span className="rail-tile"><LayoutGrid {...TILE_ICON} /></span> },
-  { kind: 'column', name: 'Column', label: 'Column', key: 'C', tile: <span className="rail-tile"><Columns3 {...TILE_ICON} /></span> },
+  // Stacked rows: a column's default (vertical) direction.
+  { kind: 'column', name: 'Column', label: 'Column', key: 'C', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
 ];
 
 const SIZE: Record<ItemKind, { w: number; h: number }> = {

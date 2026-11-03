@@ -1363,8 +1363,9 @@ button, a, label { cursor: var(--cursor, default); }
 .rail-tile {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   background: var(--note-default);
   color: var(--text);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 3px 8px rgb(0 0 0 / 0.07);
@@ -1377,6 +1378,7 @@ button, a, label { cursor: var(--cursor, default); }
 .rail-add:active .rail-tile { transform: translateY(0); }
 
 .tile-note { align-content: center; gap: 4px; padding: 0 9px; }
+.tile-note i { border-radius: 1px; }
 .tile-note i { display: block; width: 100%; height: 2px; background: currentColor; }
 .tile-note i:last-child { width: 70%; justify-self: start; }
 
