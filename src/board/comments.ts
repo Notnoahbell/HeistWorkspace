@@ -7,10 +7,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
-import { useBoard, type Comment, type Item } from './store';
+import { useBoard, type Comment, type Item, type Media } from './store';
 import { session, homeId, isHome } from '../session';
 import { usePresence, type Peer } from '../sync/presence';
 import { setTyping } from '../sync/client';
+import { commentVersion, versionOf } from './versions';
 
 const EMPTY: Comment[] = [];
 
@@ -52,11 +53,17 @@ export function toThreads(list: Comment[]): Thread[] {
  */
 export const isThreaded = (it: Item | undefined) => it?.kind === 'media' && it.mediaType === 'video';
 
-/** What the card's badge counts: open threads on a video, open comments on anything else. */
-export const useOpenCount = (targetId: string) =>
+/**
+ * What the card's badge counts: open threads on a video (its current version,
+ * or the one given), open comments on anything else.
+ */
+export const useOpenCount = (targetId: string, version?: number) =>
   useBoard((s) => {
-    const threaded = isThreaded(s.items[targetId]);
-    return (commentIndex(s.items).get(targetId) ?? EMPTY).reduce((n, c) => n + (!c.resolved && (!threaded || !c.replyTo) ? 1 : 0), 0);
+    const target = s.items[targetId];
+    const threaded = isThreaded(target);
+    const v = threaded ? version ?? versionOf(target as Media) : null;
+    return (commentIndex(s.items).get(targetId) ?? EMPTY).reduce(
+      (n, c) => n + (!c.resolved && (!threaded || (!c.replyTo && commentVersion(c) === v)) ? 1 : 0), 0);
   });
 
 /** Resolve (or reopen) a whole conversation at once. */
@@ -64,10 +71,16 @@ export function setAllResolved(list: Comment[], resolved: boolean) {
   for (const c of list) if (c.resolved !== resolved) setResolved(c.id, resolved);
 }
 
-export function addComment(targetId: string, text: string, opts: { time?: number | null; replyTo?: string | null } = {}) {
-  const target = useBoard.getState().items[targetId];
+export function addComment(targetId: string, text: string, opts: { time?: number | null; replyTo?: string | null; version?: number } = {}) {
+  const { items } = useBoard.getState();
+  const target = items[targetId];
   const body = text.trim();
   if (!target || !body) return;
+  // On a video: the version it's on (a reply follows its thread; otherwise the one being viewed, else the current one).
+  const root = opts.replyTo ? items[opts.replyTo] : undefined;
+  const version = !isThreaded(target) ? undefined
+    : root?.kind === 'comment' ? commentVersion(root)
+    : opts.version ?? versionOf(target as Media);
   const mentions = mentionsIn(body, membersOf(target.boardId));
   useBoard.getState().addItem('comment', {
     boardId: target.boardId, x: 0, y: 0,
@@ -79,6 +92,7 @@ export function addComment(targetId: string, text: string, opts: { time?: number
     time: !opts.replyTo && opts.time != null && Number.isFinite(opts.time) ? opts.time : null,
     replyTo: opts.replyTo ?? null,
     mentions,
+    ...(version != null ? { version } : {}),
   });
 }
 

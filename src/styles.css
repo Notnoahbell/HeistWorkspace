@@ -1017,7 +1017,7 @@ html, body, #root {
 .viewer-panel {
   --side: clamp(300px, 28vw, 420px);
   --vbg: #0b0b0d; --vbar: #141418; --vline: rgb(255 255 255 / 0.08); --vdim: #9a9aa6;
-  position: absolute; inset: 5vh 5vw;
+  position: absolute; inset: 3vh 3vw;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--side);
   grid-template-rows: 44px minmax(0, 1fr);
@@ -1050,6 +1050,36 @@ html, body, #root {
 .viewer-crumb::after { content: '/'; margin: 0 7px; opacity: 0.5; }
 .viewer-file { font-weight: 650; overflow: hidden; text-overflow: ellipsis; min-width: 40px; }
 .viewer-meta { margin-left: 10px; font-size: 11.5px; color: var(--vdim); flex: none; }
+/* Versions: "v3 ▾" and Compare, in the top bar. */
+.viewer-version .version-list { left: auto; right: 0; }
+.viewer-version .version-btn { height: 28px; padding: 0 8px 0 10px; border: 1px solid var(--vline); border-radius: 7px; color: #fff; }
+.viewer-compare {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--vline); border-radius: 7px;
+  background: none; color: #fff; font: 600 12.5px var(--font); cursor: pointer;
+}
+.viewer-compare:hover, .viewer-version .version-btn:hover { background: rgb(255 255 255 / 0.08); }
+.viewer-compare[aria-pressed='true'] { background: #6f7dff; border-color: #6f7dff; }
+.version-menu { position: relative; flex: none; }
+.version-btn {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: inherit;
+  font: 650 12.5px var(--font); font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.version-list {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; min-width: 240px; max-height: 50vh; overflow-y: auto; padding: 4px;
+  background: rgb(24 24 28 / 0.98); border: 1px solid var(--vline); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  animation: cmt-in 0.12s ease-out backwards;
+}
+.version-list button {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px;
+  background: none; color: #fff; text-align: left; cursor: pointer; font: inherit;
+}
+.version-list button:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.version-list button:disabled { opacity: 0.35; cursor: default; }
+.version-list button[aria-checked='true'] { background: rgb(111 125 255 / 0.18); }
+.version-n { flex: none; min-width: 26px; font: 700 12.5px var(--font); font-variant-numeric: tabular-nums; }
+.version-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.version-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.version-sub { font-size: 11px; color: var(--vdim); }
 .viewer-step { display: flex; align-items: center; gap: 2px; margin-left: 4px; padding: 0 2px; border: 1px solid var(--vline); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .viewer-step span { padding: 0 6px; }
 .viewer-step .viewer-btn { width: 26px; height: 26px; }
@@ -1057,8 +1087,21 @@ html, body, #root {
 /* Left: picture, timeline, controls (this is what goes full screen). */
 .viewer-main { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #000; }
 .viewer-picture { --pad: 16px; position: relative; flex: 1; min-height: 0; }
+/* One pane, or two side by side while comparing versions. */
+.viewer-pane { position: absolute; inset: 0; }
+.viewer-picture[data-compare] { --pad: 10px; }
+.viewer-picture[data-compare] > .viewer-pane:first-child { right: 50%; }
+.viewer-picture[data-compare] > .viewer-pane + .viewer-pane { left: 50%; border-left: 1px solid var(--vline); }
+.viewer-pane-tag {
+  position: absolute; left: calc(var(--pad) + 8px); top: calc(var(--pad) + 8px); z-index: 1;
+  padding: 4px 9px; border-radius: 7px; background: rgb(0 0 0 / 0.65); color: #fff;
+  font: 650 12px var(--font); font-variant-numeric: tabular-nums; pointer-events: none;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.viewer-pane-pick { padding: 0; pointer-events: auto; }
+.viewer-pane-pick .version-btn { padding: 4px 6px 4px 9px; color: #fff; }
 /* Pinned to the area (not sized from its own width), so a wide window can't push it over the controls. */
-.viewer-picture > :is(img, video) {
+.viewer-pane > :is(img, video) {
   position: absolute; left: var(--pad); top: var(--pad); width: calc(100% - 2 * var(--pad)); height: calc(100% - 2 * var(--pad));
   display: block; object-fit: contain; user-select: none;
 }
@@ -1142,6 +1185,18 @@ html, body, #root {
 .media-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(0 0 0 / 0.25); }
 .media-progress > span { display: block; height: 100%; background: var(--accent); transition: width 0.15s; }
 .media-retry { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 7px 12px !important; font-size: 13px; font-weight: 600; }
+/* Version tag (v2, v3…) in the top-left corner, and the "drop to add as v3" target. */
+.media-version {
+  position: absolute; left: 8px; top: 8px; z-index: 1; padding: 2px 7px; border-radius: 6px;
+  background: rgb(0 0 0 / 0.6); color: #fff; font: 700 11px/16px var(--font); font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.media-version-drop {
+  position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: rgb(61 90 254 / 0.55); color: #fff; font: 700 13px var(--font); text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  box-shadow: inset 0 0 0 3px #fff; animation: cmt-in 0.12s ease-out backwards; pointer-events: none;
+}
+.media[data-version-drop] { outline: 3px solid var(--accent); outline-offset: 2px; }
+
 /* Bottom-right corner: open in the player, and (when the name is hidden) show it again, just left of that. */
 .media-expand, .media-reveal { bottom: 6px; width: 26px; height: 26px; border-radius: 7px; opacity: 0; transition: opacity 0.12s; }
 .media-expand { right: 6px; }

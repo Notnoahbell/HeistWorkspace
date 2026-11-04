@@ -183,6 +183,14 @@ Sized for ~150 users; a single modest server handles this comfortably.
   with replies folded away. Same data either way (`isThreaded` decides how it's shown), so
   existing replies just flatten in. Another person's comment after yours in a conversation
   notifies you like a reply.
+- **2026-11-04: Video versions.** Drop a video card onto another to make it the new
+  version (v2, v3…). The target keeps its id, place and comments; earlier files go in
+  `versions` (oldest first) and the item itself is always the newest, so everything that
+  draws a card is unchanged. Comments carry `version` (unset = 1); the card and its panel
+  show the current version's, the player the one being viewed. The dragged card's own
+  history and comments are appended and renumbered. Compare in the player plays two
+  versions side by side, the right one following the left (muted). Not yet: removing a
+  version, or dropping a new file straight onto a card as a version.
 - **2026-11-03: Reactions.** Six fixed emoji (👍 🔥 ❤️ 😂 💯 👎) stored on the comment as
   `reactions: { emoji: userId[] }`. Whole-item last-write-wins means two people reacting
   to the same comment at the same instant can drop one; fine for now, worth a per-field
@@ -247,7 +255,9 @@ npm run build      # typecheck + production build
   hides/shows the name and details. ▶ plays a video in place; drag its timeline to scrub.
   GIFs loop on their own. Double-click, Enter or the ⤢ in the card's bottom-right corner
   opens the full-size player: Space/K play-pause, ←/→ 5s, , and . one frame, M mute,
-  C show/hide comments, Esc close; full screen only from its button. Click the time
+  C show/hide comments, Esc close; full screen only from its button. Drag a video onto
+  another to add it as the next version; the player's "v3 ▾" switches version and Compare
+  sets two side by side. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
 - Comments: the toolbar's comment button opens a comment box beside the item; once it has
   open comments, a panel beside it shows up to 5 whenever it's selected (Enter posts, Shift+Enter new line; "Show N more";

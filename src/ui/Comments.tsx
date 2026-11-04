@@ -6,7 +6,8 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ArrowUp, Check, ChevronDown, Clock, Pencil, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
-import { COMMENTABLE, useBoard, type Comment } from '../board/store';
+import { COMMENTABLE, useBoard, type Comment, type Media } from '../board/store';
+import { forVersion, isVideo, versionOf } from '../board/versions';
 import { useUi } from '../board/ui';
 import { useLayout } from '../board/layout';
 import { useBoardId } from '../board/nav';
@@ -36,6 +37,8 @@ export interface CommentLook {
   numbered: boolean;
   activeId: string | null;
   onPick?: (c: Comment) => void;
+  /** On a video: the version being looked at (else the current one). */
+  version?: number;
 }
 export const CommentLookContext = createContext<CommentLook>({ fmt: fmtTime, numbered: false, activeId: null });
 
@@ -492,7 +495,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
       launch = { targetId, box: box.current.getBoundingClientRect(), dock: from, dockTop: from.getBoundingClientRect().top, at: Date.now() };
     }
     if (onSubmit) onSubmit(text);
-    else addComment(targetId, text, { time: clock && timed ? clock() : null, replyTo });
+    else addComment(targetId, text, { time: clock && timed ? clock() : null, replyTo, version: look.version });
     setText('');
     setQuery(null);
     stopTyping(targetId);
@@ -599,7 +602,10 @@ export interface ThreadProps {
  */
 export function CommentList({ targetId, clock, onSeek }: ThreadProps) {
   const threaded = useBoard((s) => isThreaded(s.items[targetId]));
-  const all = useComments(targetId);
+  const look = useContext(CommentLookContext);
+  const current = useBoard((s) => (isVideo(s.items[targetId]) ? versionOf(s.items[targetId] as Media) : null));
+  const every = useComments(targetId);
+  const all = useMemo(() => forVersion(every, current == null ? null : look.version ?? current), [every, current, look.version]);
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const threads = useMemo(() => toThreads(all), [all]);
   const open = threads.filter((t) => !t.root.resolved);
@@ -693,7 +699,10 @@ export function CommentsPopover() {
 function Panel({ id, style, video }: { id: string; style: CSSProperties; video: boolean }) {
   const [showAll, setShowAll] = useState(false);
   const composing = useUi((s) => s.commenting === id);
-  const all = useComments(id);
+  // Beside the card: the current version's threads.
+  const current = useBoard((s) => (isVideo(s.items[id]) ? versionOf(s.items[id] as Media) : null));
+  const every = useComments(id);
+  const all = useMemo(() => forVersion(every, current), [every, current]);
   const threads = useMemo(() => toThreads(all), [all]);
   const open = threads.filter((t) => !t.root.resolved);
   // Timecoded threads read in timecode order; others show the latest few.

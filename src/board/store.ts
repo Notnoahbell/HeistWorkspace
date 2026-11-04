@@ -83,6 +83,16 @@ export interface MediaMeta {
   duration?: number;
 }
 
+/** An earlier version of a video (stacked over by a newer one). */
+export interface MediaVersion {
+  src: string;
+  name: string;
+  meta: MediaMeta;
+  /** When it became the current version, and who added it. */
+  addedAt: number;
+  addedBy?: string | null;
+}
+
 /** A photo, GIF or video. */
 export interface Media extends ItemBase, Stacked {
   kind: 'media';
@@ -96,6 +106,11 @@ export interface Media extends ItemBase, Stacked {
   captionHidden: boolean;
   /** Set while the upload is in progress, or if it failed. */
   upload?: 'uploading' | 'failed';
+  /** Earlier versions, oldest (v1) first; the item itself is the newest. */
+  versions?: MediaVersion[];
+  /** When the current version was added, and who added it (once there are versions). */
+  versionAt?: number | null;
+  versionBy?: string | null;
 }
 
 /** Before v5: sections stacked one way or the other. Read only to migrate. */
@@ -155,6 +170,8 @@ export interface Comment extends ItemBase, Stacked {
   resolvedAt?: number | null;
   /** When the author last changed the text. */
   editedAt?: number | null;
+  /** Which version of a video it's on (1 if unset). */
+  version?: number;
   /** Emoji → ids of the people who reacted with it. */
   reactions?: Record<string, string[]>;
 }

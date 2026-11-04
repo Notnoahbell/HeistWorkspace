@@ -33,6 +33,8 @@ interface UiState {
   drop: DropTarget | null;
   /** Board (tile on the canvas, or a crumb in the path) the drag would move things into. */
   boardDrop: string | null;
+  /** Video the dragged video would be stacked onto, as its new version. */
+  versionDrop: string | null;
   /** Brief confirmation at the bottom of the screen. */
   toast: { text: string; boardId?: string; at: number } | null;
   /** Everything selected. */
@@ -67,6 +69,7 @@ export const useUi = create<UiState>()(
       movingId: null,
       drop: null,
       boardDrop: null,
+      versionDrop: null,
       toast: null,
       selectedIds: [],
       selectedId: null,

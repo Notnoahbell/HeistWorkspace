@@ -9,6 +9,7 @@ import {
   columnContents, descendants, onCanvas, parentOf, stackZ, useBoard, type Column, type Item, type ItemKind,
 } from './store';
 import { currentBoardId, openBoard } from './nav';
+import { isVideo, stackVersion, videoTargetAt } from './versions';
 import { useUi } from './ui';
 import { COLOR_PRESETS } from '../lib/color';
 import { dismissShortcut } from '../sync/client';
@@ -194,6 +195,12 @@ export function itemHooks(id: string): BodyHooks {
       if (target !== ui().boardDrop) ui().set({ boardDrop: target, ...(target ? { drop: null } : {}) });
       if (target) return;
 
+      // A video over another video: it would become that one's new version.
+      const self = board().items[id];
+      const onto = !body.multi && isVideo(self) && self.src ? videoTargetAt(p, self.boardId, new Set([id])) : null;
+      if (onto !== ui().versionDrop) ui().set({ versionDrop: onto, ...(onto ? { drop: null } : {}) });
+      if (onto) return;
+
       if (body.multi) return; // groups move freely; dropping a group into a column isn't supported
       const col = columnAt(p, new Set([id, ...contentsOf(id)]));
       const current = ui().drop;
@@ -214,8 +221,18 @@ export function itemHooks(id: string): BodyHooks {
     release(body, land, moved) {
       const drop = ui().drop;
       const targetBoard = ui().boardDrop;
-      if (drop || targetBoard) ui().set({ drop: null, boardDrop: null });
+      const onto = ui().versionDrop;
+      if (drop || targetBoard || onto) ui().set({ drop: null, boardDrop: null, versionDrop: null });
       if (!moved) return null;
+
+      if (onto) {
+        const name = (board().items[id] as { name?: string } | undefined)?.name || 'Video';
+        const n = stackVersion(id, onto);
+        if (n) {
+          ui().set({ selectedIds: [onto], editingId: null, dragId: null, movingId: null, toast: { text: `${name} added as v${n}`, at: Date.now() } });
+          return null;
+        }
+      }
 
       if (targetBoard) {
         moveIntoBoard(body, id, targetBoard);

@@ -298,8 +298,9 @@ export class Body {
     this.rx = approach(this.rx, clamp(-sy * TILT_PER_PX_S, MAX_TILT), TILT_RESPONSE, dt);
     // Only lift once it's actually being dragged, so a plain click doesn't bounce.
     this.lift = approach(this.lift, this.mode === 'held' && this.moved ? 1 : 0, LIFT_RESPONSE, dt);
-    // Over a board it would drop into: get out of the way so the target shows.
-    const intoBoard = this.mode === 'held' && useUi.getState().boardDrop != null;
+    // Over a board it would drop into (or a video it would become the new version of): get out of the way so the target shows.
+    const ui = useUi.getState();
+    const intoBoard = this.mode === 'held' && (ui.boardDrop != null || ui.versionDrop != null);
     this.shrink = approach(this.shrink, intoBoard ? 1 : 0, SHRINK_RESPONSE, dt);
     if (!intoBoard && this.shrink < 0.004) this.shrink = 0;
 

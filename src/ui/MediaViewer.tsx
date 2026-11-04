@@ -1,8 +1,10 @@
 // Player for a photo, GIF or video, laid out like a review tool: a window
-// (about 90% of the screen) over the dimmed, blurred board with the picture on
-// the left, a full-width timeline with comment markers and the controls under
-// it, and every comment down the right (which can be hidden). Opens from a
+// (most of the screen) over the dimmed, blurred board with the picture on the
+// left, a full-width timeline with comment markers and the controls under it,
+// and every comment down the right (which can be hidden). Opens from a
 // double-click (or Enter) on a media card; ‹ › steps through the board's media.
+// A video with versions has a version menu (comments follow the version) and
+// Compare: two versions side by side, playing together.
 //
 // Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · C comments · Esc close
 // Full screen only from its button (a double-click or stray key shouldn't throw you into it).
@@ -12,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  ChevronLeft, ChevronRight, ExternalLink, Maximize, MessageSquare, Minimize, Pause, Play, Repeat, Volume1, Volume2, VolumeX,
+  ChevronLeft, ChevronRight, Columns2, ExternalLink, Maximize, MessageSquare, Minimize, Pause, Play, Repeat, Volume1, Volume2, VolumeX,
 } from 'lucide-react';
 import { onCanvas, useBoard } from '../board/store';
 import { useUi } from '../board/ui';
@@ -20,11 +22,13 @@ import { pathTo } from '../board/nav';
 import { posOf } from '../board/actions';
 import { mediaSubtitle, useLocalMedia } from '../board/media';
 import { commentIndex, useOpenCount } from '../board/comments';
+import { commentVersion, versionInfo, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
 import { personalColor, usePresence } from '../sync/presence';
 import { fmtFrames, fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
 import { CommentList, CommentLookContext, type CommentLook } from './Comments';
 import { Avatar } from './Collab';
+import { VersionMenu } from './VersionMenu';
 
 const ICON = { size: 18, strokeWidth: 2, 'aria-hidden': true } as const;
 /** In full screen, controls fade out after this long without the mouse moving (while playing). */
@@ -72,11 +76,20 @@ function Player({ id, start }: { id: string; start: number }) {
   const stage = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLButtonElement>(null);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  /** The version on the right while comparing. */
+  const [other, setOther] = useState<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  // Which version is showing (the current one to begin with, and again when a newer one arrives).
+  const current = item?.kind === 'media' ? versionOf(item) : 1;
+  const [version, setVersion] = useState(current);
+  const [compareWith, setCompareWith] = useState<number | null>(null);
+  useEffect(() => { setVersion(current); setCompareWith(null); }, [current]);
+  /** Where (and whether) to carry on when switching versions. */
+  const resume = useRef({ at: start, play: true });
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(readVolume);
   const [side, setSide] = useState(readSide);
-  const openCount = useOpenCount(id);
+  const openCount = useOpenCount(id, version);
   const [loop, setLoop] = useState(false);
   const [full, setFull] = useState(false);
   const [idle, setIdle] = useState(false);
@@ -88,7 +101,7 @@ function Player({ id, start }: { id: string; start: number }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const siblings = useSiblings(item?.boardId ?? '');
   const markers = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? [])
-    .filter((c) => !c.replyTo && !c.resolved && c.time != null)));
+    .filter((c) => !c.replyTo && !c.resolved && c.time != null && commentVersion(c) === version)));
   const users = usePresence((s) => s.users);
 
   const dismiss = () => {
@@ -120,12 +133,52 @@ function Player({ id, start }: { id: string; start: number }) {
     return () => window.removeEventListener('pointerdown', off, true);
   }, [speedMenu]);
 
-  // Start where the card left off, playing.
+  // Start where the card left off, playing; after switching versions, carry on from the same moment.
   useEffect(() => {
     if (!video) return;
-    const begin = () => { video.currentTime = start; void video.play().catch(() => {}); };
+    const { at, play } = resume.current;
+    const begin = () => { video.currentTime = at; if (play) void video.play().catch(() => {}); };
     if (video.readyState >= 1) begin(); else video.addEventListener('loadedmetadata', begin, { once: true });
-  }, [video, start]);
+  }, [video]);
+  const pickVersion = (n: number) => {
+    if (n === version) return;
+    resume.current = { at: video?.currentTime ?? 0, play: !!video && !video.paused };
+    setVersion(n);
+    if (compareWith === n) setCompareWith(null);
+    setActiveId(null);
+  };
+
+  // Comparing: the right-hand video follows the left one (play, pause, seek, speed, loop), muted.
+  useEffect(() => {
+    if (!video || !other) return;
+    other.muted = true;
+    const clampTo = () => Math.max(0, Math.min(video.currentTime, Number.isFinite(other.duration) ? other.duration - 0.05 : video.currentTime));
+    const align = (force = false) => {
+      const t = clampTo();
+      if (force || Math.abs(other.currentTime - t) > 0.12) other.currentTime = t;
+      if (!video.paused && other.paused && video.currentTime < (other.duration || Infinity)) void other.play().catch(() => {});
+      if (video.paused && !other.paused) other.pause();
+    };
+    const onPlay = () => align(true);
+    const onPause = () => { other.pause(); align(true); };
+    const onSeek = () => align(true);
+    const onRate = () => { other.playbackRate = video.playbackRate; };
+    const ready = () => { onRate(); other.loop = video.loop; align(true); };
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('seeking', onSeek);
+    video.addEventListener('ratechange', onRate);
+    if (other.readyState >= 1) ready(); else other.addEventListener('loadedmetadata', ready, { once: true });
+    const drift = setInterval(() => align(), 500);
+    return () => {
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('seeking', onSeek);
+      video.removeEventListener('ratechange', onRate);
+      clearInterval(drift);
+    };
+  }, [video, other]);
+  useEffect(() => { if (other) other.loop = loop; }, [other, loop]);
 
   useEffect(() => {
     const onFs = () => setFull(document.fullscreenElement === stage.current);
@@ -191,10 +244,16 @@ function Player({ id, start }: { id: string; start: number }) {
     numbered: true,
     activeId,
     onPick: (c) => { setActiveId(c.id); if (isVideo && c.time != null) seek(c.time); },
-  }), [activeId, isVideo, video]);
+    version,
+  }), [activeId, isVideo, video, version]);
 
   if (item?.kind !== 'media') return null;
-  const src = local?.url || item.src;
+  const shown = versionInfo(item, version);
+  const src = shown.current ? local?.url || item.src : shown.src;
+  const versioned = isVideo && current > 1;
+  const comparing = versioned && compareWith != null;
+  const otherInfo = comparing ? versionInfo(item, compareWith!) : null;
+  const startCompare = () => setCompareWith(comparing ? null : version > 1 ? version - 1 : version + 1);
   const crumbs = pathTo(item.boardId, items);
   const at = siblings.indexOf(id);
 
@@ -214,11 +273,24 @@ function Player({ id, start }: { id: string; start: number }) {
           </button>
           <nav className="viewer-path" aria-label="Where this is">
             {crumbs.map((c) => <span key={c.id} className="viewer-crumb">{c.title}</span>)}
-            <span className="viewer-file" title={item.name}>{item.name || 'Untitled'}</span>
-            <span className="viewer-meta">{mediaSubtitle(item.meta)}</span>
+            <span className="viewer-file" title={shown.name}>{shown.name || 'Untitled'}</span>
+            <span className="viewer-meta">{mediaSubtitle(shown.meta)}</span>
           </nav>
-          {item.src && (
-            <a className="viewer-btn" href={item.src} target="_blank" rel="noopener noreferrer" title="Open original" aria-label="Open original">
+          {versioned && (
+            <>
+              <VersionMenu media={item} value={version} onPick={pickVersion} className="viewer-version" />
+              <button
+                className="viewer-compare"
+                aria-pressed={comparing}
+                onClick={startCompare}
+                title={comparing ? 'Stop comparing' : 'Compare with another version, side by side'}
+              >
+                <Columns2 size={16} strokeWidth={2} aria-hidden="true" /> Compare
+              </button>
+            </>
+          )}
+          {src && (
+            <a className="viewer-btn" href={shown.current ? item.src : shown.src} target="_blank" rel="noopener noreferrer" title="Open original" aria-label="Open original">
               <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />
             </a>
           )}
@@ -236,9 +308,11 @@ function Player({ id, start }: { id: string; start: number }) {
         </header>
 
         <section ref={stage} className="viewer-main" data-idle={idle || undefined} data-full={full || undefined}>
-          <div className="viewer-picture">
+          <div className="viewer-picture" data-compare={comparing || undefined}>
+            <div className="viewer-pane">
             {isVideo ? (
               <video
+                key={src}
                 ref={setVideo}
                 src={src}
                 playsInline
@@ -254,6 +328,21 @@ function Player({ id, start }: { id: string; start: number }) {
             ) : (
               // Photos and GIFs (GIFs just loop, like on the card).
               <img src={src} alt={item.name} draggable={false} />
+            )}
+            {comparing && <span className="viewer-pane-tag">v{version}{shown.current ? ' · Current' : ''}</span>}
+            </div>
+            {comparing && otherInfo && (
+              <div className="viewer-pane">
+                <video key={otherInfo.src} ref={setOther} src={otherInfo.src} playsInline muted onClick={togglePlay} />
+                <VersionMenu
+                  media={item}
+                  value={otherInfo.n}
+                  onPick={(n) => setCompareWith(n)}
+                  disabled={[version]}
+                  className="viewer-pane-tag viewer-pane-pick"
+                  label={`v${otherInfo.n}${otherInfo.current ? ' · Current' : ''}`}
+                />
+              </div>
             )}
           </div>
 

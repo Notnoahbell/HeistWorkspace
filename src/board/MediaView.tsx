@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type SyntheticEvent } from 'react';
-import { ChevronDown, ChevronUp, Maximize2, Pause, Play, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { isTyping } from '../canvas/input';
 import { openViewer } from '../ui/MediaViewer';
 import { CommentBadge } from '../ui/Comments';
+import { commentVersion, versionOf } from './versions';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -38,8 +39,12 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   const nameRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const tone = useContrastTone(video);
-  // Open timecoded comments, as marks on the timeline.
-  const marks = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? []).flatMap((c) => (!c.resolved && c.time != null ? [c.time] : []))));
+  // Open timecoded comments on the current version, as marks on the timeline.
+  const version = media ? versionOf(media) : 1;
+  const marks = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? [])
+    .flatMap((c) => (!c.resolved && c.time != null && commentVersion(c) === version ? [c.time] : []))));
+  // Another video is being dragged over this one: it would become the next version.
+  const versionTarget = useUi((s) => s.versionDrop === id);
 
   // Let comments read and set this card's video time.
   useEffect(() => {
@@ -96,7 +101,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
       onContextMenu={onContextMenu}
       onClick={onClick}
     >
-      <div ref={visRef} className="media" data-selected={selected} data-stacked={stacked} style={{ width: fill ?? media.w }}>
+      <div ref={visRef} className="media" data-selected={selected} data-stacked={stacked} data-version-drop={versionTarget || undefined} style={{ width: fill ?? media.w }}>
         <div className="media-frame" style={{ aspectRatio: `${width} / ${height}` }}>
           {src ? (
             media.mediaType === 'video' ? (
@@ -124,6 +129,14 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
               </button>
               <Scrubber video={video} className="media-scrub" tone={tone} marks={marks} />
             </>
+          )}
+
+          {version > 1 && <span className="media-version" title={`Version ${version}`}>v{version}</span>}
+          {versionTarget && (
+            <div className="media-version-drop" aria-hidden="true">
+              <Layers size={20} {...ICON} />
+              Drop to add as v{version + 1}
+            </div>
           )}
 
           {uploading && local && (
