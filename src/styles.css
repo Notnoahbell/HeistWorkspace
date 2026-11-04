@@ -1002,7 +1002,7 @@ html, body, #root {
 /* Flush with the bottom edge; the track grows upwards on hover and the knob overhangs. */
 .media-scrub { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; height: 14px; padding: 0; align-items: flex-end; }
 .media-scrub .scrub-track { box-shadow: none; }
-.media-frame:has(.media-scrub) .media-reveal { bottom: 20px; }
+.media-frame:has(.media-scrub) :is(.media-expand, .media-reveal) { bottom: 20px; }
 
 /* Player: a large review window over the dimmed, blurred board. Picture and
    controls on the left (~70%), comments down the right. */
@@ -1142,9 +1142,12 @@ html, body, #root {
 .media-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(0 0 0 / 0.25); }
 .media-progress > span { display: block; height: 100%; background: var(--accent); transition: width 0.15s; }
 .media-retry { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 7px 12px !important; font-size: 13px; font-weight: 600; }
-.media-reveal { right: 6px; bottom: 6px; width: 24px; height: 24px; opacity: 0; transition: opacity 0.12s; }
-.media:hover .media-reveal,
-.media[data-selected='true'] .media-reveal { opacity: 1; }
+/* Bottom-right corner: open in the player, and (when the name is hidden) show it again, just left of that. */
+.media-expand, .media-reveal { bottom: 6px; width: 26px; height: 26px; border-radius: 7px; opacity: 0; transition: opacity 0.12s; }
+.media-expand { right: 6px; }
+.media-reveal { right: 38px; }
+.media:hover :is(.media-expand, .media-reveal),
+.media[data-selected='true'] :is(.media-expand, .media-reveal) { opacity: 1; }
 
 .media-caption { display: flex; align-items: flex-start; gap: 6px; padding: 9px 6px 10px 12px; }
 .media-text { flex: 1; min-width: 0; }

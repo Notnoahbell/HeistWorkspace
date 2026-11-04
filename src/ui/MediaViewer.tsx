@@ -4,7 +4,8 @@
 // it, and every comment down the right (which can be hidden). Opens from a
 // double-click (or Enter) on a media card; ‹ › steps through the board's media.
 //
-// Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · F full screen · C comments · Esc close
+// Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · C comments · Esc close
+// Full screen only from its button (a double-click or stray key shouldn't throw you into it).
 // Click the timecode to switch between timecode and frame numbers.
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
@@ -171,7 +172,6 @@ function Player({ id, start }: { id: string; start: number }) {
         ArrowRight: () => { if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); },
         ',': () => { if (v) stepFrame(v, -1); }, '.': () => { if (v) stepFrame(v, 1); },
         m: toggleMute,
-        f: toggleFull,
         c: toggleSide,
       };
       const run = keys[e.key] ?? keys[e.key.toLowerCase()];
@@ -243,7 +243,6 @@ function Player({ id, start }: { id: string; start: number }) {
                 src={src}
                 playsInline
                 onClick={togglePlay}
-                onDoubleClick={toggleFull}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
                 onVolumeChange={(e) => {
@@ -254,7 +253,7 @@ function Player({ id, start }: { id: string; start: number }) {
               />
             ) : (
               // Photos and GIFs (GIFs just loop, like on the card).
-              <img src={src} alt={item.name} onDoubleClick={toggleFull} draggable={false} />
+              <img src={src} alt={item.name} draggable={false} />
             )}
           </div>
 
@@ -361,7 +360,7 @@ function Player({ id, start }: { id: string; start: number }) {
                 <MessageSquare {...ICON} />
                 {!side && openCount > 0 && <span className="viewer-side-count">{openCount > 9 ? '9+' : openCount}</span>}
               </button>
-              <button className="viewer-btn" onClick={toggleFull} title={full ? 'Exit full screen (F)' : 'Full screen (F)'} aria-label={full ? 'Exit full screen' : 'Full screen'}>
+              <button className="viewer-btn" onClick={toggleFull} title={full ? 'Exit full screen' : 'Full screen'} aria-label={full ? 'Exit full screen' : 'Full screen'}>
                 {full ? <Minimize {...ICON} /> : <Maximize {...ICON} />}
               </button>
             </div>

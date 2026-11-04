@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type SyntheticEvent } from 'react';
-import { ChevronDown, ChevronUp, Pause, Play, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Pause, Play, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
@@ -135,6 +135,17 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </button>
           )}
 
+          {src && (
+            <button
+              className="media-expand"
+              title="Open in player"
+              aria-label="Open in player"
+              {...keep}
+              onClick={(e) => { e.stopPropagation(); openViewer(id, video?.currentTime ?? 0); }}
+            >
+              <Maximize2 size={14} {...ICON} />
+            </button>
+          )}
           {media.captionHidden && (
             <button
               className="media-reveal"

@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, ExternalLink, Link2, Maximize2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
 import { useUi, type PanelKey } from '../board/ui';
@@ -14,7 +14,6 @@ import { BOARD_ICONS, iconLabel } from '../lib/icons';
 import { ColorWheel } from './ColorWheel';
 import { BoardIcon } from './BoardIcon';
 import { gridCols, MAX_COLS } from '../board/layout';
-import { openViewer } from './MediaViewer';
 import { effectiveIcon, guessIcon } from '../lib/iconGuess';
 
 type Patch = Parameters<ReturnType<typeof useBoard.getState>['updateItem']>[1];
@@ -315,7 +314,6 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
         item.captionHidden
           ? { key: 'caption', label: 'Show name', glyph: <ChevronUp {...ICON_PROPS} size={18} />, run: () => update(item.id, { captionHidden: false }) }
           : { key: 'caption', label: 'Hide name', glyph: <ChevronDown {...ICON_PROPS} size={18} />, run: () => update(item.id, { captionHidden: true }) },
-        { key: 'open', label: 'Open', glyph: <Maximize2 {...ICON_PROPS} size={18} />, run: () => openViewer(item.id) },
         del,
       ];
     case 'link':

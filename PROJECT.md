@@ -245,8 +245,9 @@ npm run build      # typecheck + production build
 - Photos/videos: Upload in the rail, drop files onto the board, or paste an image. Name
   defaults to the filename — click the name of a selected card to rename; the arrow
   hides/shows the name and details. ▶ plays a video in place; drag its timeline to scrub.
-  GIFs loop on their own. Double-click (or Enter) opens the full-size player: Space/K
-  play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Click the time
+  GIFs loop on their own. Double-click, Enter or the ⤢ in the card's bottom-right corner
+  opens the full-size player: Space/K play-pause, ←/→ 5s, , and . one frame, M mute,
+  C show/hide comments, Esc close; full screen only from its button. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
 - Comments: the toolbar's comment button opens a comment box beside the item; once it has
   open comments, a panel beside it shows up to 5 whenever it's selected (Enter posts, Shift+Enter new line; "Show N more";
