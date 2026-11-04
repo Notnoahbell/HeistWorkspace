@@ -5,14 +5,14 @@
 
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, ChevronDown, Clock, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Clock, Pencil, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment } from '../board/store';
 import { useUi } from '../board/ui';
 import { useLayout } from '../board/layout';
 import { useBoardId } from '../board/nav';
 import { itemSize, posOf } from '../board/actions';
 import {
-  addComment, cardVideos, deleteComment, isThreaded, membersOf, noteTyping, REACTIONS, setResolved, stopTyping, timeAgo,
+  addComment, cardVideos, deleteComment, editComment, isThreaded, membersOf, noteTyping, REACTIONS, setResolved, stopTyping, timeAgo,
   toggleReaction, toThreads, useComments, useOpenCount, useTypers, type Thread,
 } from '../board/comments';
 import { camera } from '../canvas/camera';
@@ -108,56 +108,82 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
   const resolver = usePresence((s) => (c.resolvedBy ? s.users[c.resolvedBy]?.name : undefined));
   const name = profile?.name ?? c.authorName;
   const mine = c.authorId === session.userId;
-  const tools = resolvable || mine;
-  const reacted = REACTIONS.some((r) => c.reactions?.[r]?.length);
-  // The react button sits with Reply / the reaction chips; with neither, it moves up beside the name.
-  const reactUp = !onReply && !reacted;
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  // Delete takes a second click, so a slip off a reaction can't remove a comment.
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirming]);
   return (
-    <div className="cmt" data-reply={reply || undefined}>
+    <div className="cmt" data-reply={reply || undefined} data-editing={editing || undefined}>
       <Avatar profile={{ name, icon: profile?.icon ?? null }} color={personalColor(c.authorId)} size={reply ? 22 : 26} />
       <div className="cmt-body">
         <header className="cmt-meta">
           <span className="cmt-author" title={name}>{mine ? 'You' : name}</span>
-          <span className="cmt-when" title={new Date(c.createdAt).toLocaleString()}>{timeAgo(c.createdAt)}</span>
+          <span className="cmt-when" title={new Date(c.createdAt).toLocaleString()}>
+            {timeAgo(c.createdAt)}{c.editedAt ? ' · edited' : ''}
+          </span>
           {look.numbered && number != null && <span className="cmt-num">#{number}</span>}
-          <span className="cmt-meta-end">
-            {/* On hover: resolve, delete. */}
-            {tools && (
-              <span className="cmt-tools">
-                {resolvable && (c.resolved ? (
-                  <button className="cmt-tool" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
-                    <RotateCcw {...ICON} />
-                  </button>
-                ) : (
-                  <button className="cmt-tool cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
-                    <Check {...ICON} />
-                  </button>
-                ))}
-                {mine && (
-                  <button className="cmt-tool cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
-                    <Trash2 {...ICON} />
-                  </button>
-                )}
+          {/* React first; then, on your own comments, edit and delete (set apart). */}
+          <span className="cmt-tools">
+            <ReactButton c={c} />
+            {resolvable && (c.resolved ? (
+              <button className="cmt-tool" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
+                <RotateCcw {...ICON} />
+              </button>
+            ) : (
+              <button className="cmt-tool cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
+                <Check {...ICON} />
+              </button>
+            ))}
+            {mine && (
+              <span className="cmt-own">
+                <button className="cmt-tool" title="Edit" aria-label="Edit" aria-pressed={editing} onClick={() => setEditing((e) => !e)}>
+                  <Pencil {...ICON} />
+                </button>
+                <button
+                  className="cmt-tool cmt-delete"
+                  data-confirm={confirming || undefined}
+                  title={confirming ? 'Click again to delete' : reply ? 'Delete reply' : 'Delete comment'}
+                  aria-label={confirming ? 'Confirm delete' : 'Delete'}
+                  onClick={() => (confirming ? deleteComment(c.id) : setConfirming(true))}
+                  onBlur={() => setConfirming(false)}
+                >
+                  <Trash2 {...ICON} />
+                </button>
               </span>
             )}
-            {reactUp && <ReactButton c={c} />}
           </span>
         </header>
-        <p className="cmt-text">
-          {c.time != null && (
-            <button className="cmt-time" title="Jump to this moment" disabled={!onSeek} onClick={(e) => { e.stopPropagation(); onSeek?.(c.time!); }}>
-              {look.fmt(c.time)}
-            </button>
-          )}
-          <CommentText c={c} />
-        </p>
+        {editing ? (
+          <Composer
+            targetId={c.targetId}
+            initialText={c.text}
+            autoFocus
+            placeholder="Edit comment…"
+            submitLabel="Save"
+            onSubmit={(text) => editComment(c.id, text)}
+            onDone={() => setEditing(false)}
+            onCancel={() => setEditing(false)}
+          />
+        ) : (
+          <p className="cmt-text">
+            {c.time != null && (
+              <button className="cmt-time" title="Jump to this moment" disabled={!onSeek} onClick={(e) => { e.stopPropagation(); onSeek?.(c.time!); }}>
+                {look.fmt(c.time)}
+              </button>
+            )}
+            <CommentText c={c} />
+          </p>
+        )}
         {resolvable && c.resolved && <div className="cmt-resolved-by">Resolved{resolver ? ` by ${resolver}` : ''}</div>}
-        {/* Reactions, Reply, and the react button. */}
-        {!reactUp && (
+        {/* Reaction chips and Reply. */}
+        {(onReply || REACTIONS.some((r) => c.reactions?.[r]?.length)) && (
           <div className="cmt-foot">
             <Reactions c={c} />
             {onReply && <button className="cmt-reply-btn" onClick={onReply}>Reply</button>}
-            <ReactButton c={c} />
           </div>
         )}
       </div>
@@ -199,7 +225,13 @@ function ReactButton({ c }: { c: Comment }) {
         <SmilePlus size={16} strokeWidth={2} aria-hidden="true" />
       </button>
       {at && (
-        <div className="cmt-ring" role="group" aria-label="Reactions" style={{ left: at.x, top: at.y }}>
+        <div
+          className="cmt-ring"
+          role="group"
+          aria-label="Reactions"
+          style={{ left: at.x, top: at.y }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAt(null); }}
+        >
           {REACTIONS.map((r, i) => (
             <button
               key={r}
@@ -304,8 +336,12 @@ function ThreadCard({ t, targetId, onSeek, number }: {
 
 // --- Composer: one box, @mentions, timecode -----------------------------------------------
 
-function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a comment…', onDone, onCancel }: {
+function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a comment…', onDone, onCancel, initialText, onSubmit, submitLabel }: {
   targetId: string;
+  /** Editing: start from this text, and hand the result to onSubmit instead of posting. */
+  initialText?: string;
+  onSubmit?: (text: string) => void;
+  submitLabel?: string;
   /** Current video time, for timecoded comments (videos only). */
   clock?: () => number | null;
   replyTo?: string;
@@ -314,7 +350,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [timed, setTimed] = useState(true);
   const [now, setNow] = useState<number | null>(() => clock?.() ?? null);
   const [query, setQuery] = useState<{ start: number; q: string } | null>(null);
@@ -322,7 +358,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
   const look = useContext(CommentLookContext);
   const ref = useRef<HTMLTextAreaElement>(null);
   /** Where the caret goes once a picked mention is in the text. */
-  const caretTo = useRef<number | null>(null);
+  const caretTo = useRef<number | null>(initialText?.length ?? null);
   const boardId = useBoard((s) => s.items[targetId]?.boardId ?? '');
   const users = usePresence((s) => s.users);
   const members = useBoard(useShallow((s) => membersOf(boardId, s.items)));
@@ -374,7 +410,8 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
 
   const submit = () => {
     if (!text.trim()) return;
-    addComment(targetId, text, { time: clock && timed ? clock() : null, replyTo });
+    if (onSubmit) onSubmit(text);
+    else addComment(targetId, text, { time: clock && timed ? clock() : null, replyTo });
     setText('');
     setQuery(null);
     stopTyping(targetId);
@@ -403,7 +440,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
           )}
         </div>
       )}
-      {clock && !replyTo && now != null && (
+      {clock && !replyTo && !onSubmit && now != null && (
         <button
           className="cmt-chip"
           aria-pressed={timed}
@@ -424,7 +461,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
         onChange={(e) => {
           setText(e.target.value);
           findQuery(e.target.value, e.target.selectionStart);
-          noteTyping(targetId, !!e.target.value.trim());
+          if (!onSubmit) noteTyping(targetId, !!e.target.value.trim());
         }}
         onSelect={(e) => findQuery(e.currentTarget.value, e.currentTarget.selectionStart)}
         onBlur={() => { stopTyping(targetId); setTimeout(() => setQuery(null), 0); }}
@@ -444,7 +481,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
         }}
       />
-      {text.trim() && <button className="cmt-send" onClick={(e) => { e.stopPropagation(); submit(); }}>{replyTo ? 'Reply' : 'Post'}</button>}
+      {text.trim() && <button className="cmt-send" onClick={(e) => { e.stopPropagation(); submit(); }}>{submitLabel ?? (replyTo ? 'Reply' : 'Post')}</button>}
     </div>
   );
 }

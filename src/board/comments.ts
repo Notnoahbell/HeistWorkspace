@@ -87,6 +87,15 @@ export function setResolved(id: string, resolved: boolean) {
   useBoard.getState().updateItem(id, { resolved, resolvedBy: resolved ? session.userId : null, resolvedAt: resolved ? Date.now() : null });
 }
 
+/** Change your comment's text (mentions are worked out again). */
+export function editComment(id: string, text: string) {
+  const { items, updateItem } = useBoard.getState();
+  const c = items[id];
+  const body = text.trim();
+  if (c?.kind !== 'comment' || c.authorId !== session.userId || !body || body === c.text) return;
+  updateItem(id, { text: body, mentions: mentionsIn(body, membersOf(c.boardId)), editedAt: Date.now() });
+}
+
 /** The reactions anyone can leave on a comment. */
 export const REACTIONS = ['👍', '🔥', '❤️', '😂', '💯', '👎'] as const;
 

@@ -1208,9 +1208,9 @@ html, body, #root {
 .cmt-thread[data-resolved] > .cmt .cmt-text { color: var(--text-dim); }
 
 /* Hover tools over the corner of a comment: resolve, delete. */
-.cmt-meta-end { display: flex; align-items: center; gap: 2px; margin: -4px -6px -4px auto; }
-.cmt-tools { display: flex; gap: 1px; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
-.cmt:hover .cmt-tools, .cmt-tools:has(:focus-visible) { opacity: 1; pointer-events: auto; }
+/* Always there: react, then (yours) edit and delete, a little apart. */
+.cmt-tools { display: flex; align-items: center; gap: 2px; margin: -5px -6px -5px auto; }
+.cmt-own { display: flex; gap: 1px; margin-left: 6px; padding-left: 6px; border-left: 1px solid var(--panel-border); }
 .cmt-tool {
   display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
   background: none; color: var(--text-dim); cursor: pointer;
@@ -1218,7 +1218,10 @@ html, body, #root {
 .cmt-tool:hover { background: var(--hover); color: var(--text); }
 .cmt-check:hover { background: #30a46c; color: #fff; }
 .cmt-delete:hover { color: #e5484d; }
-@media (hover: none) { .cmt-tools { opacity: 1; pointer-events: auto; } }
+.cmt-delete[data-confirm] { background: #e5484d; color: #fff; }
+.cmt-delete[data-confirm]:hover { background: #d13438; color: #fff; }
+.cmt-tool[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+.cmt[data-editing] .cmt-composer { margin: 4px 0 2px; }
 
 /* Under the text: reaction chips, Reply, the react button (or the six emoji while picking). */
 .cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 -2px; min-height: 30px; }
@@ -1258,7 +1261,8 @@ html, body, #root {
 .cmt-ring-close:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .cmt-ring .cmt-emoji { animation: none; } }
 .cmt-react-add[aria-expanded='true'] { visibility: hidden; }
-.cmt:has(.cmt-react-add[aria-expanded='true']) .cmt-tools { opacity: 0; pointer-events: none; }
+/* While the reactions are out, clicks between the bubbles land on nothing underneath. */
+.cmt-ring::before { content: ''; position: absolute; left: -58px; top: -58px; width: 116px; height: 116px; border-radius: 50%; }
 /* "3 replies ⌄" — folds the replies away, like YouTube. */
 .cmt-fold {
   display: inline-flex; align-items: center; gap: 5px; margin: -4px 0 10px 40px; padding: 4px 10px 4px 8px; border: 0; border-radius: 999px;
