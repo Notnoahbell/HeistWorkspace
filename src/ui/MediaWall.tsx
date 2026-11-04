@@ -15,17 +15,21 @@
 // - Per frame only the timecode and the timeline fill are touched, straight in
 //   the DOM; React renders when the set of tiles or the controls change.
 // - Proxies (720p) play where the server has made them; only one tile has sound.
-// - Each file is downloaded whole first and kept on this device (lib/mediaCache),
-//   so playback and seeking come off the disk, and the next time is instant.
-//   Nothing can be played until every video is in and ready: a ring in the
-//   middle shows each one arriving.
+// - Loading, two ways (the header's "Download first" switch, remembered):
+//   Stream (default): every tile streams straight away, and playback starts once
+//   each has a couple of seconds buffered; if one runs dry later, the clock waits.
+//   Download first: each file is fetched whole and kept on this device
+//   (lib/mediaCache), so playback and seeking never wait, and the next time is
+//   instant. Copies kept earlier are used either way.
+//   Nothing can be played until every video is ready: a ring in the middle shows
+//   each one arriving.
 //
 // Keys: Space play-pause · K stop · ← → 5s · , . one frame · Home start · M sound · Esc close.
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { ChevronLeft, Maximize, Minimize, Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react';
+import { ChevronLeft, HardDriveDownload, Maximize, Minimize, Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react';
 import { useBoard, type Media } from '../board/store';
 import { useUi } from '../board/ui';
 import { pathTo } from '../board/nav';
@@ -33,7 +37,7 @@ import { posOf } from '../board/actions';
 import { playable, useLocalMedia } from '../board/media';
 import { versionInfo, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
-import { cachedUrl, isCached, warm } from '../lib/mediaCache';
+import { cacheable, cachedUrl, warm } from '../lib/mediaCache';
 import { fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
 
 /** Most tiles at once (5 × 5). Past that, decoding and bandwidth stop keeping up on an ordinary laptop. */
@@ -52,6 +56,22 @@ const SYNC_MS = 200;
 const VOLUME_KEY = 'heist:volume';
 /** After this long loading, offer to start with what's ready. */
 const IMPATIENT_MS = 10_000;
+/** Streaming: seconds each video needs buffered before they all start. */
+const START_BUFFER = 2.5;
+const MODE_KEY = 'heist:wall-mode';
+type LoadMode = 'stream' | 'download';
+function readMode(): LoadMode {
+  try { return localStorage.getItem(MODE_KEY) === 'download' ? 'download' : 'stream'; } catch { return 'stream'; }
+}
+
+/** Seconds buffered from where the video is now. */
+function bufferedAhead(v: HTMLVideoElement) {
+  const t = v.currentTime;
+  for (let i = 0; i < v.buffered.length; i++) {
+    if (v.buffered.start(i) <= t + 0.05 && v.buffered.end(i) >= t) return v.buffered.end(i) - t;
+  }
+  return 0;
+}
 
 /** Open these together (the media among them, in reading order, at most MAX_WALL). */
 export function openWall(ids: string[]) {
@@ -170,11 +190,13 @@ function readVolume(): number {
 
 export function MediaWall() {
   const ids = useUi((s) => s.wall);
+  const [mode, setMode] = useState(readMode);
   if (!ids?.length) return null;
-  return createPortal(<Wall key={ids.join()} ids={ids} />, document.body);
+  const pick = (m: LoadMode) => { setMode(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* fine */ } };
+  return createPortal(<Wall key={`${ids.join()}|${mode}`} ids={ids} mode={mode} onMode={pick} />, document.body);
 }
 
-function Wall({ ids }: { ids: string[] }) {
+function Wall({ ids, mode, onMode }: { ids: string[]; mode: LoadMode; onMode: (m: LoadMode) => void }) {
   const items = useBoard(useShallow((s) => ids.map((id) => s.items[id]).filter((it): it is Media => it?.kind === 'media')));
   const locals = useLocalMedia(useShallow((s) => ids.map((id) => s[id]?.url)));
   const single = useUi((s) => s.viewer != null);
@@ -314,25 +336,48 @@ function Wall({ ids }: { ids: string[] }) {
     return playable(info.src, info.meta, info.current ? locals[ids.indexOf(it.id)] : undefined);
   };
   const videoItems = items.filter((it) => it.mediaType === 'video');
-  // Fetch each video whole (kept on this device); only then does its tile get the file.
+  // Progress updates, batched to one render per frame.
+  const pending = useRef<Record<string, number>>({});
+  const flushRaf = useRef(0);
+  const report = (id: string, f: number) => {
+    pending.current[id] = f;
+    if (!flushRaf.current) flushRaf.current = requestAnimationFrame(() => {
+      flushRaf.current = 0;
+      const batch = pending.current;
+      pending.current = {};
+      setProgress((p) => ({ ...p, ...batch }));
+    });
+  };
+  // What each tile plays: a copy kept on this device if there is one; otherwise
+  // the network straight away (stream), or once it's been fetched whole (download first).
   useEffect(() => {
     let live = true;
-    const pending: Record<string, number> = {};
-    let raf = 0;
-    const flush = () => { raf = 0; if (live) setProgress((p) => ({ ...p, ...pending })); };
     for (const it of videoItems) {
       const src = srcOf(it);
-      void isCached(src).then((hit) => { if (hit && live) setFromCache((n) => n + 1); });
-      void warm(src, (f) => { pending[it.id] = f; if (!raf) raf = requestAnimationFrame(flush); })
-        .then(async (how) => {
-          const url = (how === 'cached' && (await cachedUrl(src))) || src;
-          if (live) setFetched((m) => ({ ...m, [it.id]: url }));
+      void cachedUrl(src).then((url) => {
+        if (!live) return;
+        if (url) { setFromCache((n) => n + 1); setFetched((m) => ({ ...m, [it.id]: url })); return; }
+        if (mode === 'stream') { setFetched((m) => ({ ...m, [it.id]: src })); return; }
+        void warm(src, (f) => report(it.id, f)).then(async (how) => {
+          const kept = (how === 'cached' && (await cachedUrl(src))) || src;
+          if (live) setFetched((m) => ({ ...m, [it.id]: kept }));
         });
+      });
     }
     const slow = setTimeout(() => setImpatient(true), IMPATIENT_MS);
-    return () => { live = false; cancelAnimationFrame(raf); clearTimeout(slow); };
+    return () => { live = false; cancelAnimationFrame(flushRaf.current); clearTimeout(slow); };
   }, [ids.join()]);
   const markPlayable = (id: string) => setCanPlay((m) => (m[id] ? m : { ...m, [id]: true }));
+  /** Streaming, before the start: is there enough buffered to begin? (Kept copies and downloads always are.) */
+  const checkBuffer = (id: string, v: HTMLVideoElement) => {
+    if (canPlay[id]) return;
+    if (v.error) { markPlayable(id); return; }
+    const length = lengthOf(v) ?? START_BUFFER;
+    const need = Math.min(START_BUFFER, Math.max(0.1, length - v.currentTime - 0.05));
+    const ahead = bufferedAhead(v);
+    if (v.readyState >= 4 || (v.readyState >= 3 && ahead >= need) || (v.src.startsWith('blob:') && v.readyState >= 3)) markPlayable(id);
+    else if (mode === 'stream') report(id, Math.min(0.99, ahead / need));
+  };
   const readyCount = videoItems.filter((it) => canPlay[it.id]).length;
   const ready = forced || readyCount === videoItems.length;
   /** 0-1 for each video: the download is most of it, the last bit is the browser being able to play it. */
@@ -467,6 +512,18 @@ function Wall({ ids }: { ids: string[] }) {
             <span className="viewer-file">Side by side</span>
             <span className="viewer-meta">{summary}</span>
           </nav>
+          {cacheable() && videoItems.length > 0 && (
+            <button
+              className="viewer-compare wall-mode"
+              aria-pressed={mode === 'download'}
+              onClick={() => onMode(mode === 'download' ? 'stream' : 'download')}
+              title={mode === 'download'
+                ? 'Downloading each video in full before playing (smoothest, and instant next time). Click to stream instead: starts sooner'
+                : 'Streaming: starts as soon as every video has a few seconds buffered. Click to download each in full first: slower to start, never stalls, instant next time'}
+            >
+              <HardDriveDownload size={16} strokeWidth={2} aria-hidden="true" /> Download first
+            </button>
+          )}
         </header>
 
         <section ref={stage} className="viewer-main" data-idle={idle || undefined} data-full={full || undefined} data-loading={!ready || undefined}>
@@ -505,7 +562,10 @@ function Wall({ ids }: { ids: string[] }) {
                       onLoadedMetadata={() => { measure(); syncRef.current(); }}
                       onDurationChange={measure}
                       onSeeked={() => { if (clock.paused) syncRef.current(); }}
-                      onCanPlay={() => { markPlayable(it.id); if (clock.waiting) syncRef.current(); }}
+                      onCanPlay={(e) => { checkBuffer(it.id, e.currentTarget); if (clock.waiting) syncRef.current(); }}
+                      onCanPlayThrough={(e) => checkBuffer(it.id, e.currentTarget)}
+                      onProgress={(e) => checkBuffer(it.id, e.currentTarget)}
+                      onLoadedData={(e) => checkBuffer(it.id, e.currentTarget)}
                       onError={() => markPlayable(it.id)}
                       onClick={togglePlay}
                     />
@@ -539,6 +599,7 @@ function Wall({ ids }: { ids: string[] }) {
                 ready={ready}
                 done={readyCount}
                 fromCache={fromCache}
+              mode={mode}
                 onStart={impatient && readyCount > 0 && !ready ? () => setForced(true) : undefined}
               />
             )}
@@ -603,8 +664,8 @@ function Wall({ ids }: { ids: string[] }) {
  * The loading ring: one segment per video, each filling as its file arrives,
  * with the overall percentage in the middle. Fades out once all can play.
  */
-function WallLoader({ shares, ready, done, fromCache, onStart }: {
-  shares: number[]; ready: boolean; done: number; fromCache: number; onStart?: () => void;
+function WallLoader({ shares, ready, done, fromCache, mode, onStart }: {
+  shares: number[]; ready: boolean; done: number; fromCache: number; mode: LoadMode; onStart?: () => void;
 }) {
   const n = shares.length;
   const R = 78, STROKE = 10, SIZE = (R + STROKE) * 2, MID = SIZE / 2;
@@ -639,7 +700,11 @@ function WallLoader({ shares, ready, done, fromCache, onStart }: {
         </div>
       </div>
       <p className="wall-loader-note">
-        {fromCache === n ? 'Already on this device' : fromCache > 0 ? `${fromCache} already on this device \u00b7 saving the rest for next time` : 'Saving to this device, so next time is instant'}
+        {fromCache === n
+          ? 'Already on this device'
+          : mode === 'stream'
+            ? `Buffering${fromCache ? ` \u00b7 ${fromCache} already on this device` : ''} \u00b7 starts when every video can play`
+            : fromCache > 0 ? `${fromCache} already on this device \u00b7 downloading the rest in full` : 'Downloading in full, so playback never waits and next time is instant'}
       </p>
       {onStart && <button className="wall-loader-start" onClick={onStart}>Start with {done} ready</button>}
     </div>

@@ -27,7 +27,7 @@ import { ensureDerived, mediaSubtitle, playable, useLocalMedia } from '../board/
 import { commentIndex, useOpenCount } from '../board/comments';
 import { commentVersion, setStatus, versionInfo, versionList, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
-import { useCachedSrc, warm } from '../lib/mediaCache';
+import { useCachedSrc } from '../lib/mediaCache';
 import { personalColor, usePresence } from '../sync/presence';
 import { fmtFrames, fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
 import { CommentList, CommentLookContext, type CommentLook } from './Comments';
@@ -337,12 +337,6 @@ function Player({ id, start }: { id: string; start: number }) {
   useEffect(() => {
     if (item?.kind === 'media' && item.mediaType === 'video') for (const v of versionList(item)) ensureDerived(v.src, v.meta);
   }, [item]);
-  // Keep what's being watched on this device, so going back to it (or seeking around) is instant.
-  useEffect(() => {
-    if (item?.kind !== 'media' || item.mediaType !== 'video') return;
-    const v = versionInfo(item, version);
-    if (v.src) void warm(playable(v.src, v.meta));
-  }, [item, version]);
 
   // The copy saved on this device when there is one (lib/mediaCache).
   const shown0 = item?.kind === 'media' ? versionInfo(item, version) : null;
