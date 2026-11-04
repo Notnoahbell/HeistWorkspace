@@ -164,7 +164,7 @@ export interface Comment extends ItemBase, Stacked {
   replyTo?: string | null;
   /** User ids @mentioned in the text. */
   mentions?: string[];
-  /** Ticked off: hidden from the item, kept under "Resolved". */
+  /** From when comments could be resolved; no longer used (every comment shows). */
   resolved: boolean;
   resolvedBy?: string | null;
   resolvedAt?: number | null;

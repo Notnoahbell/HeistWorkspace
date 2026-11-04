@@ -32,7 +32,7 @@ export function commentIndex(items: Record<string, Item>): Map<string, Comment[]
   return next;
 }
 
-/** Every comment on an item (open and resolved, replies included), in order. */
+/** Every comment on an item (replies included), in order. */
 export const useComments = (targetId: string) =>
   useBoard(useShallow((s) => commentIndex(s.items).get(targetId) ?? EMPTY));
 
@@ -63,13 +63,8 @@ export const useOpenCount = (targetId: string, version?: number) =>
     const threaded = isThreaded(target);
     const v = threaded ? version ?? versionOf(target as Media) : null;
     return (commentIndex(s.items).get(targetId) ?? EMPTY).reduce(
-      (n, c) => n + (!c.resolved && (!threaded || (!c.replyTo && commentVersion(c) === v)) ? 1 : 0), 0);
+      (n, c) => n + (!threaded || (!c.replyTo && commentVersion(c) === v) ? 1 : 0), 0);
   });
-
-/** Resolve (or reopen) a whole conversation at once. */
-export function setAllResolved(list: Comment[], resolved: boolean) {
-  for (const c of list) if (c.resolved !== resolved) setResolved(c.id, resolved);
-}
 
 export function addComment(targetId: string, text: string, opts: { time?: number | null; replyTo?: string | null; version?: number } = {}) {
   const { items } = useBoard.getState();
@@ -94,11 +89,6 @@ export function addComment(targetId: string, text: string, opts: { time?: number
     mentions,
     ...(version != null ? { version } : {}),
   });
-}
-
-/** Tick a thread off (it moves to "Resolved"), or reopen it. */
-export function setResolved(id: string, resolved: boolean) {
-  useBoard.getState().updateItem(id, { resolved, resolvedBy: resolved ? session.userId : null, resolvedAt: resolved ? Date.now() : null });
 }
 
 /** Change your comment's text (mentions are worked out again). */

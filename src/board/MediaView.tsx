@@ -42,7 +42,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   // Open timecoded comments on the current version, as marks on the timeline.
   const version = media ? versionOf(media) : 1;
   const marks = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? [])
-    .flatMap((c) => (!c.resolved && c.time != null && commentVersion(c) === version ? [c.time] : []))));
+    .flatMap((c) => (c.time != null && commentVersion(c) === version ? [c.time] : []))));
   // Another video is being dragged over this one: it would become the next version.
   const versionTarget = useUi((s) => s.versionDrop === id);
 

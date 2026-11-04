@@ -1,11 +1,10 @@
 // Comments UI: the count badge on a card, the panel beside a selected card
-// (one conversation, or a video's threads), the full list with
-// Open / Resolved tabs for the player, replies, reactions, @mentions and
-// typing indicators.
+// (one conversation, or a video's threads), the full list for the player,
+// replies, reactions, @mentions and typing indicators.
 
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ArrowUp, Check, ChevronDown, Clock, Pencil, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, Clock, Pencil, SmilePlus, Trash2, X } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment, type Media } from '../board/store';
 import { forVersion, isVideo, versionOf } from '../board/versions';
 import { useUi } from '../board/ui';
@@ -13,7 +12,7 @@ import { useLayout } from '../board/layout';
 import { useBoardId } from '../board/nav';
 import { itemSize, posOf } from '../board/actions';
 import {
-  addComment, cardVideos, deleteComment, editComment, isThreaded, membersOf, noteTyping, REACTIONS, setResolved, stopTyping, timeAgo,
+  addComment, cardVideos, deleteComment, editComment, isThreaded, membersOf, noteTyping, REACTIONS, stopTyping, timeAgo,
   toggleReaction, toThreads, useComments, useOpenCount, useTypers, type Thread,
 } from '../board/comments';
 import { camera } from '../canvas/camera';
@@ -96,11 +95,9 @@ function CommentText({ c }: { c: Comment }) {
 
 // --- One comment -------------------------------------------------------------------
 
-function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: {
+function CommentRow({ c, reply, onSeek, onReply, number }: {
   c: Comment;
   reply?: boolean;
-  /** Has its own resolve / reopen (a thread's first comment). */
-  resolvable?: boolean;
   onSeek?: (t: number) => void;
   /** Shows Reply in the footer. */
   onReply?: () => void;
@@ -108,7 +105,6 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
 }) {
   const look = useContext(CommentLookContext);
   const profile = usePresence((s) => s.users[c.authorId]);
-  const resolver = usePresence((s) => (c.resolvedBy ? s.users[c.resolvedBy]?.name : undefined));
   const name = profile?.name ?? c.authorName;
   const mine = c.authorId === session.userId;
   const [editing, setEditing] = useState(false);
@@ -142,15 +138,6 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
           {/* React first; then, on your own comments, edit and delete (set apart). */}
           <span className="cmt-tools">
             <ReactButton c={c} />
-            {resolvable && (c.resolved ? (
-              <button className="cmt-tool" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
-                <RotateCcw {...ICON} />
-              </button>
-            ) : (
-              <button className="cmt-tool cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
-                <Check {...ICON} />
-              </button>
-            ))}
             {mine && (
               <span className="cmt-own">
                 <button className="cmt-tool" title="Edit" aria-label="Edit" aria-pressed={editing} onMouseDown={(e) => e.preventDefault()} onClick={() => setEditing((e) => !e)}>
@@ -193,7 +180,6 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
             <CommentText c={c} />
           </p>
         )}
-        {resolvable && c.resolved && <div className="cmt-resolved-by">Resolved{resolver ? ` by ${resolver}` : ''}</div>}
         {/* Reaction chips and Reply. */}
         {(onReply || REACTIONS.some((r) => c.reactions?.[r]?.length)) && (
           <div className="cmt-foot">
@@ -384,14 +370,13 @@ function ThreadCard({ t, targetId, onSeek, number }: {
       className="cmt-thread"
       data-fresh={fresh || undefined}
       data-active={active || undefined}
-      data-resolved={t.root.resolved || undefined}
       onClick={look.onPick ? (e) => { if (!(e.target as Element).closest('button, textarea, a')) look.onPick!(t.root); } : undefined}
     >
       <CommentRow
         c={t.root}
         number={number}
         onSeek={onSeek}
-        onReply={!t.root.resolved && !replying ? () => { setReplying(true); setOpen(true); } : undefined}
+        onReply={!replying ? () => { setReplying(true); setOpen(true); } : undefined}
       />
       {n > 0 && (
         <button className="cmt-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
@@ -597,8 +582,8 @@ export interface ThreadProps {
 }
 
 /**
- * The full list (the player's sidebar): Open and Resolved tabs, scrolling,
- * composer under Open. Threads on a video; one conversation on anything else.
+ * The full list (the player's sidebar): a count, the comments (scrolling),
+ * and the comment box. Threads on a video; one conversation on anything else.
  */
 export function CommentList({ targetId, clock, onSeek }: ThreadProps) {
   const threaded = useBoard((s) => isThreaded(s.items[targetId]));
@@ -606,11 +591,7 @@ export function CommentList({ targetId, clock, onSeek }: ThreadProps) {
   const current = useBoard((s) => (isVideo(s.items[targetId]) ? versionOf(s.items[targetId] as Media) : null));
   const every = useComments(targetId);
   const all = useMemo(() => forVersion(every, current == null ? null : look.version ?? current), [every, current, look.version]);
-  const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const threads = useMemo(() => toThreads(all), [all]);
-  const open = threads.filter((t) => !t.root.resolved);
-  const resolved = threads.filter((t) => t.root.resolved).sort((a, b) => (b.root.resolvedAt ?? 0) - (a.root.resolvedAt ?? 0));
-  const shown = tab === 'open' ? open : resolved;
   // #1, #2… in the order threads were started.
   const numbers = useMemo(() => {
     const byAge = [...threads].sort((a, b) => a.root.createdAt - b.root.createdAt);
@@ -618,28 +599,19 @@ export function CommentList({ targetId, clock, onSeek }: ThreadProps) {
   }, [threads]);
   return (
     <div className="cmt-full">
-      <div className="cmt-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'open'} onClick={() => setTab('open')}>
-          Open <span>{open.length}</span>
-        </button>
-        <button role="tab" aria-selected={tab === 'resolved'} onClick={() => setTab('resolved')}>
-          Resolved <span>{resolved.length}</span>
-        </button>
-      </div>
+      <header className="cmt-head">
+        Comments <span>{threaded ? threads.length : all.length}</span>
+      </header>
       <div className="cmt-list">
         {threaded
-          ? shown.map((t) => <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} number={numbers.get(t.root.id)} />)
-          : flatten(shown).map((c) => <FlatComment key={c.id} c={c} />)}
-        {!shown.length && (
-          <p className="cmt-empty">{tab === 'open' ? 'No open comments.' : 'Nothing resolved yet. Tick a comment to file it here.'}</p>
-        )}
+          ? threads.map((t) => <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} number={numbers.get(t.root.id)} />)
+          : flatten(threads).map((c) => <FlatComment key={c.id} c={c} />)}
+        {!threads.length && <p className="cmt-empty">No comments yet.</p>}
       </div>
-      {tab === 'open' && (
-        <div className="cmt-full-compose">
-          <Typing targetId={targetId} />
-          <Composer targetId={targetId} clock={clock} />
-        </div>
-      )}
+      <div className="cmt-full-compose">
+        <Typing targetId={targetId} />
+        <Composer targetId={targetId} clock={clock} />
+      </div>
     </div>
   );
 }
@@ -657,8 +629,8 @@ function FlatComment({ c }: { c: Comment }) {
   });
   useDrop(ref, c, fresh);
   return (
-    <article ref={ref} className="cmt-thread" data-fresh={fresh || undefined} data-resolved={c.resolved || undefined}>
-      <CommentRow c={c} resolvable={c.resolved} />
+    <article ref={ref} className="cmt-thread" data-fresh={fresh || undefined}>
+      <CommentRow c={c} />
     </article>
   );
 }
@@ -704,7 +676,7 @@ function Panel({ id, style, video }: { id: string; style: CSSProperties; video: 
   const every = useComments(id);
   const all = useMemo(() => forVersion(every, current), [every, current]);
   const threads = useMemo(() => toThreads(all), [all]);
-  const open = threads.filter((t) => !t.root.resolved);
+  const open = threads;
   // Timecoded threads read in timecode order; others show the latest few.
   const timed = open.some((t) => t.root.time != null);
   const list = showAll ? open : timed ? open.slice(0, QUICK_MAX) : open.slice(-QUICK_MAX);
@@ -743,7 +715,7 @@ function Conversation({ id, style }: { id: string; style: CSSProperties }) {
   const [showAll, setShowAll] = useState(false);
   const composing = useUi((s) => s.commenting === id);
   const all = useComments(id);
-  const open = useMemo(() => all.filter((c) => !c.resolved).sort((a, b) => a.createdAt - b.createdAt), [all]);
+  const open = useMemo(() => [...all].sort((a, b) => a.createdAt - b.createdAt), [all]);
   const list = showAll ? open : open.slice(-QUICK_MAX);
   const earlier = open.length - list.length;
 

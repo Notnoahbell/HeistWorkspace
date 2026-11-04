@@ -167,8 +167,8 @@ Sized for ~150 users; a single modest server handles this comfortably.
   videos), on the same board as their target, so sync, sharing and per-comment
   last-write-wins come from the existing item sync. They're never drawn on the
   canvas (`onCanvas()` filters them from select-all, box select, bounds, counts),
-  are deleted with their target and follow it to other boards. Resolving keeps
-  them (`resolved`, `resolvedBy`) under a Resolved tab. With the real backend,
+  are deleted with their target and follow it to other boards. (Resolving was
+  dropped on 2026-11-04: every comment shows; old `resolved` flags are ignored.) With the real backend,
   consider a per-target index and comment-only permissions (comment without edit).
 - **2026-11-03: Replies, mentions, notifications, typing.** A reply is a comment with
   `replyTo` (its thread's first comment); resolving/deleting the first comment covers the
@@ -179,7 +179,7 @@ Sized for ~150 users; a single modest server handles this comfortably.
   presence (`typing: <itemId>`), so it's per board and never stored.
 - **2026-11-03: One conversation per item, threads only on video.** Notes, links, to-dos
   and photos have a single flat conversation like Milanote (oldest first, Reply at the end
-  opens the box; no header or Resolve beside the card for now — resolving lives in the player until we design its way back). Videos keep a thread per moment,
+  opens the box). Videos keep a thread per moment,
   with replies folded away. Same data either way (`isThreaded` decides how it's shown), so
   existing replies just flatten in. Another person's comment after yours in a conversation
   notifies you like a reply.
@@ -260,8 +260,8 @@ npm run build      # typecheck + production build
   sets two side by side. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
 - Comments: the toolbar's comment button opens a comment box beside the item; once it has
-  open comments, a panel beside it shows up to 5 whenever it's selected (Enter posts, Shift+Enter new line; "Show N more";
-  "N resolved" in its header). Hover a comment for react / resolve (tick) / delete; click a reaction chip to add or take back yours. On a video the comment is pinned to the card's current time
+  comments, a panel beside it shows up to 5 whenever it's selected (Enter posts, Shift+Enter new line; "Show N more").
+  Each comment has react, and on your own edit / delete; click a reaction chip to add or take back yours. On a video the comment is pinned to the card's current time
   (click the time chip for a whole-video comment); click a timecode to jump there. The
   player (a review window like Frame.io: picture ~70% wide, timeline with avatar markers,
   HH:MM:SS:FF timecode, ‹ n of m › through the board's media) lists every comment, numbered. Reply under any

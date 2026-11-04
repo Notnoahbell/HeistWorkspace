@@ -101,7 +101,7 @@ function Player({ id, start }: { id: string; start: number }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const siblings = useSiblings(item?.boardId ?? '');
   const markers = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? [])
-    .filter((c) => !c.replyTo && !c.resolved && c.time != null && commentVersion(c) === version)));
+    .filter((c) => !c.replyTo && c.time != null && commentVersion(c) === version)));
   const users = usePresence((s) => s.users);
 
   const dismiss = () => {
