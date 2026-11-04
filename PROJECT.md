@@ -258,7 +258,7 @@ Sized for ~150 users; a single modest server handles this comfortably.
   minute, read with ffprobe) get a 720p proxy, and proxies have a keyframe every second: in
   testing, the same footage went from 1–8s per jump to under 0.15s.
 - **2026-11-04: Toolbar hierarchy** (`itemActions` in `src/ui/panels.tsx`). Every toolbar is
-  the same groups in the same order, a divider between them: **primary** (filled accent
+  the same groups in the same order, a divider between them: **primary** (flat, accent icon
   button with a word: Open for boards and links, Play / View for videos and images, Play N
   for a selection) · **review** (status, comment) · **look** (colour, text, strip, icon) ·
   **organise** (rename, edit link, sort, columns, loop; frame / section for a selection) ·

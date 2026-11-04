@@ -757,13 +757,13 @@ html, body, #root {
 .toolbar-divider { flex: none; align-self: stretch; width: 1px; margin: 6px 3px; background: var(--panel-border); }
 .selection-toolbar button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
 .selection-toolbar button[data-danger='true'] { color: #e5484d; }
-/* The main action: filled, with a word, first. */
+/* The main action: first, and the only button with a word; flat and square like the rest,
+   its icon in the accent colour. */
 .selection-toolbar button[data-group='primary'] {
-  display: inline-flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; margin-right: 2px;
-  border-radius: 8px; background: var(--accent); color: #fff; font: 650 12.5px var(--font);
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 10px 0 8px;
+  color: var(--text); font: 650 12.5px var(--font);
 }
-.selection-toolbar button[data-group='primary']:hover { background: color-mix(in srgb, var(--accent) 86%, #000); }
-.selection-toolbar button[data-group='primary'] svg { width: 14px; height: 14px; }
+.selection-toolbar button[data-group='primary'] svg { width: 15px; height: 15px; color: var(--accent); }
 .toolbar-text { white-space: nowrap; }
 /* Comment stands out from the formatting buttons. */
 .selection-toolbar button[data-key='comment'] { color: var(--accent); }
