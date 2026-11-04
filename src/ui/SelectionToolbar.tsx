@@ -4,7 +4,8 @@
 
 import { Fragment, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Columns3, Copy, CopyPlus, Trash2 } from 'lucide-react';
+import { Copy, CopyPlus, Trash2 } from 'lucide-react';
+import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
 import { useBoard } from '../board/store';
 import { deleteSelection, groupIntoColumn, itemSize, posOf } from '../board/actions';
@@ -35,7 +36,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
   const copyable = items.some((it) => it.kind !== 'board');
   const actions = [
-    { key: 'column', label: 'Gather into a new section', icon: <Columns3 {...ICON_PROPS} />, run: () => groupIntoColumn() },
+    { key: 'column', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
     ...(copyable ? [
       { key: 'copy', label: 'Copy (Ctrl+C)', icon: <Copy {...ICON_PROPS} />, run: copySelection },
       { key: 'dup', label: 'Duplicate (Ctrl+D)', icon: <CopyPlus {...ICON_PROPS} />, run: duplicateSelection },

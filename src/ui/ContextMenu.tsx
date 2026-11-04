@@ -1,11 +1,12 @@
 // Right-click menu: actions on the selection, or "add here" on empty canvas.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ClipboardPaste, Columns3, Copy, CopyPlus, LayoutGrid, Link2, ListChecks, Scissors, StickyNote, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, CopyPlus, LayoutGrid, Link2, ListChecks, Scissors, StickyNote, Trash2 } from 'lucide-react';
 import { useUi } from '../board/ui';
 import { useBoard, type ItemKind } from '../board/store';
 import { createItem, deleteSelection, groupIntoColumn } from '../board/actions';
 import { copySelection, cutSelection, duplicateSelection, hasClipboard, paste } from '../board/clipboard';
+import { SectionIcon } from './SectionIcon';
 
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 
@@ -31,7 +32,7 @@ const ADD: { kind: ItemKind; label: string; icon: ReactNode; hint: string }[] = 
   { kind: 'link', label: 'Link', icon: <Link2 {...ICON} />, hint: 'L' },
   { kind: 'todo', label: 'To-do list', icon: <ListChecks {...ICON} />, hint: 'T' },
   { kind: 'board', label: 'Board', icon: <LayoutGrid {...ICON} />, hint: 'B' },
-  { kind: 'column', label: 'Section', icon: <Columns3 {...ICON} />, hint: 'S' },
+  { kind: 'column', label: 'Section', icon: <SectionIcon size={ICON.size} />, hint: 'S' },
 ];
 
 export function ContextMenu() {
@@ -99,7 +100,7 @@ export function ContextMenu() {
         </>
       ) : (
         <>
-          <Entry icon={<Columns3 {...ICON} />} label={`New section from ${count === 1 ? 'item' : 'selection'}`} onClick={() => groupIntoColumn()} />
+          <Entry icon={<SectionIcon size={ICON.size} />} label={`New section from ${count === 1 ? 'item' : 'selection'}`} onClick={() => groupIntoColumn()} />
           <div className="menu-sep" />
           <Entry icon={<Copy {...ICON} />} label="Copy" hint={`${MOD}C`} disabled={!canCopy} onClick={copySelection} />
           <Entry icon={<Scissors {...ICON} />} label="Cut" hint={`${MOD}X`} disabled={!canCopy} onClick={cutSelection} />

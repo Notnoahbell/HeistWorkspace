@@ -5,7 +5,7 @@
 
 import { Fragment, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageUp, LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus, Rows3 } from 'lucide-react';
+import { ImageUp, LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus } from 'lucide-react';
 import { camera } from '../canvas/camera';
 import { ZOOM_STEP, zoomAtCenter } from '../canvas/input';
 import { useUi } from '../board/ui';
@@ -15,6 +15,7 @@ import {
 } from '../board/constants';
 import type { ItemKind } from '../board/store';
 import { BoardIcon } from './BoardIcon';
+import { SectionIcon } from './SectionIcon';
 import { ACCEPT, addMediaFiles } from '../board/media';
 
 /** Kinds made from the rail's add tiles (media comes from files instead). */
@@ -29,8 +30,8 @@ const TOOLS: { kind: AddKind; name: string; label: string; key: string; tile: Re
   { kind: 'link', name: 'Link', label: 'Link', key: 'L', group: 'cards', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
   { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', group: 'cards', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
   { kind: 'board', name: 'Board', label: 'Board', key: 'B', group: 'containers', tile: <span className="rail-tile"><LayoutGrid {...TILE_ICON} /></span> },
-  // Stacked rows: a section's default single column.
-  { kind: 'column', name: 'Section', label: 'Section', key: 'S', group: 'containers', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
+  // A column with cards in it: a section's default single column.
+  { kind: 'column', name: 'Section', label: 'Section', key: 'S', group: 'containers', tile: <span className="rail-tile"><SectionIcon /></span> },
 ];
 
 const SIZE: Record<AddKind, { w: number; h: number }> = {
