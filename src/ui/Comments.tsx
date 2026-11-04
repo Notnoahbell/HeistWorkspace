@@ -3,7 +3,7 @@
 // Resolved tabs, replies, @mentions and typing indicators. The video player
 // reuses the full list.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Check, ChevronLeft, Clock, RotateCcw, Trash2 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment } from '../board/store';
@@ -28,6 +28,18 @@ const QUICK_MAX = 5;
 const QUICK_REPLIES = 2;
 const POP_WIDTH = 240;
 const GAP = 14;
+
+/**
+ * How comments are shown: the time format, whether threads are numbered (#1,
+ * #2…), and which one is picked. The player sets this; cards use the defaults.
+ */
+export interface CommentLook {
+  fmt: (seconds: number) => string;
+  numbered: boolean;
+  activeId: string | null;
+  onPick?: (c: Comment) => void;
+}
+export const CommentLookContext = createContext<CommentLook>({ fmt: fmtTime, numbered: false, activeId: null });
 
 // --- Badge on the card ------------------------------------------------------------
 
@@ -83,7 +95,8 @@ function CommentText({ c }: { c: Comment }) {
 
 // --- One comment -------------------------------------------------------------------
 
-function CommentRow({ c, reply, onSeek, footer }: { c: Comment; reply?: boolean; onSeek?: (t: number) => void; footer?: ReactNode }) {
+function CommentRow({ c, reply, onSeek, footer, number }: { c: Comment; reply?: boolean; onSeek?: (t: number) => void; footer?: ReactNode; number?: number }) {
+  const look = useContext(CommentLookContext);
   const profile = usePresence((s) => s.users[c.authorId]);
   const resolver = usePresence((s) => (c.resolvedBy ? s.users[c.resolvedBy]?.name : undefined));
   const name = profile?.name ?? c.authorName;
@@ -95,6 +108,7 @@ function CommentRow({ c, reply, onSeek, footer }: { c: Comment; reply?: boolean;
         <header className="cmt-meta">
           <span className="cmt-author" title={name}>{mine ? 'You' : name}</span>
           <span className="cmt-when" title={new Date(c.createdAt).toLocaleString()}>{timeAgo(c.createdAt)}</span>
+          {look.numbered && number != null && <span className="cmt-num">#{number}</span>}
           {mine && (
             <button className="cmt-act cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
               <Trash2 size={13} strokeWidth={2.2} aria-hidden="true" />
@@ -103,8 +117,8 @@ function CommentRow({ c, reply, onSeek, footer }: { c: Comment; reply?: boolean;
         </header>
         <p className="cmt-text">
           {c.time != null && (
-            <button className="cmt-time" title="Jump to this moment" disabled={!onSeek} onClick={() => onSeek?.(c.time!)}>
-              {fmtTime(c.time)}
+            <button className="cmt-time" title="Jump to this moment" disabled={!onSeek} onClick={(e) => { e.stopPropagation(); onSeek?.(c.time!); }}>
+              {look.fmt(c.time)}
             </button>
           )}
           <CommentText c={c} />
@@ -133,8 +147,9 @@ function CommentRow({ c, reply, onSeek, footer }: { c: Comment; reply?: boolean;
 const seenThreads = new Set<string>();
 
 /** A thread: the first comment, its replies, and a reply box on demand. */
-function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index }: {
+function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index, number }: {
   t: Thread;
+  number?: number;
   targetId: string;
   onSeek?: (t: number) => void;
   /** Show only the latest few replies (beside a card); the rest via onMore. */
@@ -143,6 +158,10 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index }: {
   index: number;
 }) {
   const [replying, setReplying] = useState(false);
+  const look = useContext(CommentLookContext);
+  const active = look.activeId === t.root.id;
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => { if (active) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [active]);
   // Plays the settle once, for a comment that's just been posted (not on every reselect).
   const [fresh] = useState(() => {
     const isNew = !seenThreads.has(t.root.id) && Date.now() - t.root.createdAt < 1500;
@@ -152,9 +171,17 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index }: {
   const hidden = maxReplies != null ? Math.max(0, t.replies.length - maxReplies) : 0;
   const replies = hidden ? t.replies.slice(-maxReplies!) : t.replies;
   return (
-    <article className="cmt-thread" data-fresh={fresh || undefined} style={{ '--i': index } as CSSProperties}>
+    <article
+      ref={ref}
+      className="cmt-thread"
+      data-fresh={fresh || undefined}
+      data-active={active || undefined}
+      style={{ '--i': index } as CSSProperties}
+      onClick={look.onPick ? (e) => { if (!(e.target as Element).closest('button, textarea, a')) look.onPick!(t.root); } : undefined}
+    >
       <CommentRow
         c={t.root}
+        number={number}
         onSeek={onSeek}
         footer={!t.root.resolved && !replying && (
           <button className="cmt-reply-btn" onClick={() => setReplying(true)}>Reply</button>
@@ -192,6 +219,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
   const [now, setNow] = useState<number | null>(() => clock?.() ?? null);
   const [query, setQuery] = useState<{ start: number; q: string } | null>(null);
   const [active, setActive] = useState(0);
+  const look = useContext(CommentLookContext);
   const ref = useRef<HTMLTextAreaElement>(null);
   /** Where the caret goes once a picked mention is in the text. */
   const caretTo = useRef<number | null>(null);
@@ -283,7 +311,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
           onClick={(e) => { e.stopPropagation(); setTimed((t) => !t); }}
         >
           <Clock size={11} strokeWidth={2.4} aria-hidden="true" />
-          {timed ? fmtTime(now) : 'Whole video'}
+          {timed ? look.fmt(now) : 'Whole video'}
         </button>
       )}
       <textarea
@@ -340,6 +368,11 @@ export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'ope
   const open = threads.filter((t) => !t.root.resolved);
   const resolved = threads.filter((t) => t.root.resolved).sort((a, b) => (b.root.resolvedAt ?? 0) - (a.root.resolvedAt ?? 0));
   const shown = tab === 'open' ? open : resolved;
+  // #1, #2… in the order threads were started.
+  const numbers = useMemo(() => {
+    const byAge = [...threads].sort((a, b) => a.root.createdAt - b.root.createdAt);
+    return new Map(byAge.map((t, i) => [t.root.id, i + 1]));
+  }, [threads]);
   return (
     <div className="cmt-full">
       <div className="cmt-tabs" role="tablist">
@@ -356,7 +389,7 @@ export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'ope
         </button>
       </div>
       <div className="cmt-list">
-        {shown.map((t, i) => <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} index={Math.min(i, 8)} />)}
+        {shown.map((t, i) => <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} index={Math.min(i, 8)} number={numbers.get(t.root.id)} />)}
         {!shown.length && (
           <p className="cmt-empty">{tab === 'open' ? 'No open comments.' : 'Nothing resolved yet. Tick a comment to file it here.'}</p>
         )}

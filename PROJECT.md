@@ -242,7 +242,8 @@ npm run build      # typecheck + production build
   comments, up to 5 open ones show beside it whenever it's selected (Enter posts, Shift+Enter new line); "Show all" opens Open/Resolved tabs; the
   tick resolves, ↺ reopens. On a video the comment is pinned to the card's current time
   (click the time chip for a whole-video comment); click a timecode to jump there. The
-  player lists every comment beside the video, with marks on the timeline. Reply under any
+  player (a review window like Frame.io: picture ~70% wide, timeline with avatar markers,
+  HH:MM:SS:FF timecode, ‹ n of m › through the board's media) lists every comment, numbered. Reply under any
   comment; type @ to mention someone who can see the board (↑/↓, Enter). The bell (top
   right) lists mentions and replies; clicking one opens the board and selects the item
 - Sections: S (or C); double-click header to rename; double-click body to add a note;

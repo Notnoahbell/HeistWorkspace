@@ -12,6 +12,12 @@ export const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(sec).padStart(2, '0')}`;
 };
+/** HH:MM:SS:FF at the assumed frame rate, e.g. 00:00:01:25. */
+export const fmtTimecode = (s: number) => {
+  const f = Number.isFinite(s) && s > 0 ? Math.floor(s * FPS + 1e-6) : 0;
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(Math.floor(f / (FPS * 3600)))}:${p(Math.floor(f / (FPS * 60)) % 60)}:${p(Math.floor(f / FPS) % 60)}:${p(f % FPS)}`;
+};
 export const fmtFrames = (s: number) => String(Number.isFinite(s) && s > 0 ? Math.floor(s * FPS + 1e-6) : 0);
 
 /**
