@@ -1,18 +1,18 @@
 // Comments UI: the count badge on a card, the panel beside a selected card
-// (open threads, a way into Resolved, the comment box), the full list with
+// (one conversation, or a video's threads), the full list with
 // Open / Resolved tabs for the player, replies, reactions, @mentions and
 // typing indicators.
 
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, ChevronDown, ChevronLeft, Clock, RotateCcw, SmilePlus, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Clock, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment } from '../board/store';
 import { useUi } from '../board/ui';
 import { useLayout } from '../board/layout';
 import { useBoardId } from '../board/nav';
 import { itemSize, posOf } from '../board/actions';
 import {
-  addComment, cardVideos, deleteComment, isThreaded, membersOf, noteTyping, REACTIONS, setAllResolved, setResolved, stopTyping, timeAgo,
+  addComment, cardVideos, deleteComment, isThreaded, membersOf, noteTyping, REACTIONS, setResolved, stopTyping, timeAgo,
   toggleReaction, toThreads, useComments, useOpenCount, useTypers, type Thread,
 } from '../board/comments';
 import { camera } from '../canvas/camera';
@@ -108,18 +108,12 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
   const resolver = usePresence((s) => (c.resolvedBy ? s.users[c.resolvedBy]?.name : undefined));
   const name = profile?.name ?? c.authorName;
   const mine = c.authorId === session.userId;
-  const [picking, setPicking] = useState(false);
   const tools = resolvable || mine;
   const reacted = REACTIONS.some((r) => c.reactions?.[r]?.length);
   // The react button sits with Reply / the reaction chips; with neither, it moves up beside the name.
-  const reactUp = !onReply && !reacted && !picking;
-  const react = (
-    <button className="cmt-tool cmt-react-add" title="React" aria-label="React" onClick={() => setPicking(true)}>
-      <SmilePlus size={16} strokeWidth={2} aria-hidden="true" />
-    </button>
-  );
+  const reactUp = !onReply && !reacted;
   return (
-    <div className="cmt" data-reply={reply || undefined} onMouseLeave={() => setPicking(false)}>
+    <div className="cmt" data-reply={reply || undefined}>
       <Avatar profile={{ name, icon: profile?.icon ?? null }} color={personalColor(c.authorId)} size={reply ? 22 : 26} />
       <div className="cmt-body">
         <header className="cmt-meta">
@@ -146,7 +140,7 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
                 )}
               </span>
             )}
-            {reactUp && react}
+            {reactUp && <ReactButton c={c} />}
           </span>
         </header>
         <p className="cmt-text">
@@ -158,28 +152,73 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
           <CommentText c={c} />
         </p>
         {resolvable && c.resolved && <div className="cmt-resolved-by">Resolved{resolver ? ` by ${resolver}` : ''}</div>}
-        {/* Reactions, Reply, and the react button; picking swaps in the six emoji. */}
+        {/* Reactions, Reply, and the react button. */}
         {!reactUp && (
-          <div className="cmt-foot" onKeyDown={(e) => { if (e.key === 'Escape') setPicking(false); }}>
-            {picking ? (
-              <span className="cmt-picker" role="group" aria-label="Reactions">
-                {REACTIONS.map((r) => (
-                  <button key={r} className="cmt-emoji" title={`React ${r}`} aria-label={`React ${r}`} onClick={() => { toggleReaction(c.id, r); setPicking(false); }}>
-                    {r}
-                  </button>
-                ))}
-              </span>
-            ) : (
-              <>
-                <Reactions c={c} />
-                {onReply && <button className="cmt-reply-btn" onClick={onReply}>Reply</button>}
-                {react}
-              </>
-            )}
+          <div className="cmt-foot">
+            <Reactions c={c} />
+            {onReply && <button className="cmt-reply-btn" onClick={onReply}>Reply</button>}
+            <ReactButton c={c} />
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The react button. Pressing it pops the six emoji out in a ring around it
+ * (fixed to the screen, so nothing clips it); pick one, press the middle,
+ * click away, scroll or Escape to close.
+ */
+function ReactButton({ c }: { c: Comment }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!at) return;
+    const close = () => setAt(null);
+    const away = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.cmt-ring')) close(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    window.addEventListener('pointerdown', away, true);
+    window.addEventListener('keydown', key, true);
+    window.addEventListener('wheel', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('pointerdown', away, true);
+      window.removeEventListener('keydown', key, true);
+      window.removeEventListener('wheel', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [at]);
+  const open = () => {
+    const r = ref.current!.getBoundingClientRect();
+    setAt({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  };
+  return (
+    <>
+      <button ref={ref} className="cmt-tool cmt-react-add" title="React" aria-label="React" aria-expanded={!!at} onClick={open}>
+        <SmilePlus size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+      {at && (
+        <div className="cmt-ring" role="group" aria-label="Reactions" style={{ left: at.x, top: at.y }}>
+          {REACTIONS.map((r, i) => (
+            <button
+              key={r}
+              className="cmt-emoji"
+              style={{ '--a': `${i * 60 - 90}deg`, '--i': i } as CSSProperties}
+              title={`React ${r}`}
+              aria-label={`React ${r}`}
+              aria-pressed={!!c.reactions?.[r]?.includes(session.userId)}
+              onClick={() => { toggleReaction(c.id, r); setAt(null); }}
+            >
+              {r}
+            </button>
+          ))}
+          <button className="cmt-ring-close" title="Close" aria-label="Close reactions" onClick={() => setAt(null)}>
+            <X size={15} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -512,23 +551,17 @@ export function CommentsPopover() {
     : <Conversation key={item.id} id={item.id} style={style} />;
 }
 
-/**
- * One rounded panel: a header (count, and a way into Resolved), the open
- * threads (five, then "Show N more"), and the comment box at the bottom.
- */
+/** Beside a video: its open threads (five, then "Show N more") and the comment box. */
 function Panel({ id, style, video }: { id: string; style: CSSProperties; video: boolean }) {
-  const [tab, setView] = useState<'open' | 'resolved'>('open');
   const [showAll, setShowAll] = useState(false);
   const composing = useUi((s) => s.commenting === id);
   const all = useComments(id);
   const threads = useMemo(() => toThreads(all), [all]);
   const open = threads.filter((t) => !t.root.resolved);
-  const resolved = threads.filter((t) => t.root.resolved).sort((a, b) => (b.root.resolvedAt ?? 0) - (a.root.resolvedAt ?? 0));
-  const view = tab === 'resolved' && resolved.length ? 'resolved' : 'open'; // back to Open once Resolved is empty
   // Timecoded threads read in timecode order; others show the latest few.
   const timed = open.some((t) => t.root.time != null);
-  const list = view === 'resolved' ? resolved : showAll ? open : timed ? open.slice(0, QUICK_MAX) : open.slice(-QUICK_MAX);
-  const more = view === 'open' ? open.length - list.length : 0;
+  const list = showAll ? open : timed ? open.slice(0, QUICK_MAX) : open.slice(-QUICK_MAX);
+  const more = open.length - list.length;
   const clock = video ? () => cardVideos.get(id)?.currentTime ?? null : undefined;
   const onSeek = video
     ? (t: number) => { const v = cardVideos.get(id); if (v) { v.pause(); v.currentTime = t; } }
@@ -536,123 +569,65 @@ function Panel({ id, style, video }: { id: string; style: CSSProperties; video: 
 
   return (
     <div className="cmt-pop" style={style} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
-      {threads.length > 0 && (
-        <header className="cmt-pop-head">
-          {view === 'resolved' ? (
-            <button className="cmt-pop-back" onClick={() => setView('open')}>
-              <ChevronLeft size={15} strokeWidth={2.2} aria-hidden="true" /> Resolved <span>{resolved.length}</span>
-            </button>
-          ) : (
-            <>
-              <h3>Comments {open.length > 0 && <span>{open.length}</span>}</h3>
-              {resolved.length > 0 && (
-                <button className="cmt-pop-link" title="Show resolved comments" onClick={() => setView('resolved')}>
-                  <Check size={12} strokeWidth={2.6} aria-hidden="true" /> {resolved.length} resolved
-                </button>
-              )}
-            </>
-          )}
-        </header>
-      )}
       {list.length > 0 && (
         <div className="cmt-list">
           {list.map((t) => <ThreadCard key={t.root.id} t={t} targetId={id} onSeek={onSeek} />)}
           {more > 0 && <button className="cmt-show-more" onClick={() => setShowAll(true)}>Show {more} more</button>}
         </div>
       )}
-      {view === 'open' && (
-        <div className="cmt-pop-compose">
-          <Typing targetId={id} />
-          {(composing || open.length > 0) && (
-            <Composer
-              key={composing ? 'opened' : 'idle'}
-              targetId={id}
-              clock={clock}
-              autoFocus={composing}
-              onCancel={composing ? () => useUi.getState().set({ commenting: null }) : undefined}
-            />
-          )}
-        </div>
-      )}
+      <div className="cmt-pop-compose">
+        <Typing targetId={id} />
+        {(composing || open.length > 0) && (
+          <Composer
+            key={composing ? 'opened' : 'idle'}
+            targetId={id}
+            clock={clock}
+            autoFocus={composing}
+            onCancel={composing ? () => useUi.getState().set({ commenting: null }) : undefined}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
 /**
  * Beside a note, link, to-do or photo: one conversation, oldest first. No box
- * until you press Reply (or the toolbar's comment button); Resolve files the
- * whole conversation away.
+ * until you press Reply (or the toolbar's comment button).
  */
 function Conversation({ id, style }: { id: string; style: CSSProperties }) {
-  const [tab, setView] = useState<'open' | 'resolved'>('open');
   const [showAll, setShowAll] = useState(false);
   const [replying, setReplying] = useState(false);
   const composing = useUi((s) => s.commenting === id);
   const all = useComments(id);
-  const sorted = useMemo(() => [...all].sort((a, b) => a.createdAt - b.createdAt), [all]);
-  const open = sorted.filter((c) => !c.resolved);
-  const resolved = sorted.filter((c) => c.resolved);
-  const view = tab === 'resolved' && resolved.length ? 'resolved' : 'open';
-  const shown = view === 'resolved' ? resolved : open;
-  const list = showAll ? shown : shown.slice(-QUICK_MAX);
-  const earlier = shown.length - list.length;
-  const writing = view === 'open' && (replying || composing);
+  const open = useMemo(() => all.filter((c) => !c.resolved).sort((a, b) => a.createdAt - b.createdAt), [all]);
+  const list = showAll ? open : open.slice(-QUICK_MAX);
+  const earlier = open.length - list.length;
+  const writing = replying || composing;
   const close = () => { setReplying(false); if (composing) useUi.getState().set({ commenting: null }); };
 
   return (
     <div className="cmt-pop" style={style} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
-      {all.length > 0 && (
-        <header className="cmt-pop-head">
-          {view === 'resolved' ? (
-            <>
-              <button className="cmt-pop-back" onClick={() => setView('open')}>
-                <ChevronLeft size={15} strokeWidth={2.2} aria-hidden="true" /> Resolved <span>{resolved.length}</span>
-              </button>
-              <button className="cmt-pop-link" onClick={() => { setAllResolved(resolved, false); setView('open'); }}>
-                <RotateCcw size={12} strokeWidth={2.4} aria-hidden="true" /> Reopen
-              </button>
-            </>
-          ) : (
-            <>
-              <h3>Comments {open.length > 0 && <span>{open.length}</span>}</h3>
-              <span className="cmt-pop-actions">
-                {resolved.length > 0 && (
-                  <button className="cmt-pop-link" title="Show resolved comments" onClick={() => setView('resolved')}>
-                    {resolved.length} resolved
-                  </button>
-                )}
-                {open.length > 0 && (
-                  <button className="cmt-pop-link cmt-resolve-all" title="Resolve this conversation" onClick={() => setAllResolved(open, true)}>
-                    <Check size={13} strokeWidth={2.6} aria-hidden="true" /> Resolve
-                  </button>
-                )}
-              </span>
-            </>
-          )}
-        </header>
-      )}
       {list.length > 0 && (
         <div className="cmt-list">
           {earlier > 0 && <button className="cmt-show-more" onClick={() => setShowAll(true)}>Show {earlier} earlier</button>}
           {list.map((c) => <FlatComment key={c.id} c={c} />)}
         </div>
       )}
-      {view === 'open' && (
-        <div className="cmt-pop-compose">
-          <Typing targetId={id} />
-          {writing ? (
-            <Composer
-              targetId={id}
-              autoFocus
-              placeholder={open.length ? 'Reply…' : 'Write a comment…'}
-              onDone={close}
-              onCancel={close}
-            />
-          ) : (
-            open.length > 0 && <button className="cmt-reply-open" onClick={() => setReplying(true)}>Reply</button>
-          )}
-        </div>
-      )}
+      <div className="cmt-pop-compose">
+        <Typing targetId={id} />
+        {writing ? (
+          <Composer
+            targetId={id}
+            autoFocus
+            placeholder={open.length ? 'Reply…' : 'Write a comment…'}
+            onDone={close}
+            onCancel={close}
+          />
+        ) : (
+          open.length > 0 && <button className="cmt-reply-open" onClick={() => setReplying(true)}>Reply</button>
+        )}
+      </div>
     </div>
   );
 }

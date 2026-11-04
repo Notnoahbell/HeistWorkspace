@@ -1164,43 +1164,29 @@ html, body, #root {
 .cmt-pop {
   position: fixed; z-index: 14; display: flex; flex-direction: column; max-height: min(72vh, 640px);
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; box-shadow: var(--panel-shadow);
-  overflow: hidden; animation: cmt-in 0.12s ease-out both;
+  overflow: hidden; animation: cmt-in 0.12s ease-out backwards;
 }
-.cmt-pop-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 8px 10px 4px 16px; }
-.cmt-pop-head h3 { margin: 0; font: 650 13px var(--font); color: var(--text); }
-.cmt-pop-head h3 span, .cmt-pop-back span {
-  margin-left: 3px; padding: 1px 6px; border-radius: 8px; background: var(--hover); color: var(--text-dim); font-size: 11px; font-weight: 600;
-}
-.cmt-pop-link, .cmt-pop-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; cursor: pointer; }
-.cmt-pop-link { height: 28px; padding: 0 10px; border-radius: 999px; color: var(--text-dim); font: 600 12px var(--font); }
-.cmt-pop-link:hover { background: var(--hover); color: var(--text); }
-.cmt-pop-actions { display: flex; align-items: center; gap: 2px; }
-.cmt-resolve-all { color: var(--text); border: 1px solid var(--panel-border); }
-.cmt-resolve-all:hover { background: #30a46c; border-color: #30a46c; color: #fff; }
-.cmt-pop-back { margin-left: -8px; padding: 4px 8px 4px 3px; border-radius: 8px; color: var(--text); font: 650 12.5px var(--font); }
-.cmt-pop-back:hover { background: var(--hover); }
-/* Each thread is its own soft, rounded card. */
-.cmt-pop .cmt-list { flex: 0 1 auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 10px; }
-.cmt-pop .cmt-thread { flex: none; border-radius: 12px; background: var(--hover); }
-.cmt-pop-compose { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px; }
+/* One stack: comments run on with no cards or rules between them. */
+.cmt-pop .cmt-list { flex: 0 1 auto; display: flex; flex-direction: column; padding: 6px 4px 0; }
+.cmt-pop-compose { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 12px 14px; }
 .cmt-pop-compose:empty { display: none; }
-.cmt-pop .cmt-list + .cmt-pop-compose { border-top: 1px solid var(--panel-border); }
-.cmt-pop .cmt-typing { padding: 2px 8px; }
+.cmt-pop .cmt-typing { padding: 2px 0; }
+.cmt-pop-compose > .cmt-composer { margin-left: -4px; }
 .cmt-pop-compose > .cmt-composer:not(:focus-within) { background: var(--hover); border-color: transparent; }
 .cmt-show-more {
-  flex: none; display: block; width: 100%; padding: 8px; border: 1px dashed var(--panel-border); border-radius: 12px;
-  background: none; color: var(--text-dim); font: 600 12px var(--font); cursor: pointer;
+  flex: none; align-self: flex-start; margin: 4px 0 2px 10px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px;
+  background: var(--hover); color: var(--text-dim); font: 600 12px var(--font); cursor: pointer;
 }
 .cmt-show-more:hover { color: var(--accent); }
 .cmt-reply-open {
-  align-self: flex-start; height: 34px; padding: 0 14px; border: 0; border-radius: 999px;
+  align-self: flex-start; margin-left: 33px; height: 34px; padding: 0 14px; border: 0; border-radius: 999px;
   background: var(--accent-soft); color: var(--accent); font: 700 13px var(--font); cursor: pointer;
 }
 .cmt-reply-open:hover { background: var(--accent); color: #fff; }
 
 /* New comments drop in quickly. */
 @keyframes cmt-in { from { opacity: 0; transform: translateY(-4px); } }
-.cmt-thread[data-fresh] { animation: cmt-in 0.16s ease-out both; }
+.cmt-thread[data-fresh] { animation: cmt-in 0.16s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) { .cmt-pop, .cmt-thread[data-fresh] { animation: none; } }
 
 .cmt { position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 11px; padding: 14px 14px 12px; color: var(--text); }
@@ -1255,15 +1241,31 @@ html, body, #root {
 .cmt-foot > .cmt-reply-btn:first-child { margin-left: -10px; }
 .cmt-reply-btn:hover { background: var(--accent-soft); }
 .cmt-react-add { width: 30px; height: 30px; border-radius: 999px; }
-.cmt-picker {
-  display: inline-flex; gap: 0; margin-left: -2px; padding: 1px; border: 1px solid var(--panel-border); border-radius: 999px;
-  background: var(--panel); box-shadow: 0 2px 10px rgb(0 0 0 / 0.12); animation: cmt-in 0.1s ease-out both;
+/* The reaction ring: six emoji around the react button, popping out from it. */
+.cmt-ring { position: fixed; z-index: 1000; width: 0; height: 0; }
+.cmt-ring::before {
+  content: ''; position: absolute; left: -62px; top: -62px; width: 124px; height: 124px; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--panel-border); box-shadow: 0 10px 32px rgb(0 0 0 / 0.22);
+  animation: ring-in 0.14s ease-out backwards;
 }
-.cmt-emoji {
-  display: grid; place-items: center; width: 28px; height: 30px; padding: 0; border: 0; border-radius: 50%;
-  background: none; font-size: 16px; line-height: 1; cursor: pointer; transition: transform 0.08s;
+@keyframes ring-in { from { opacity: 0; transform: scale(0.3); } }
+.cmt-ring .cmt-emoji {
+  position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; background: none; font-size: 19px; line-height: 1; cursor: pointer;
+  transform: rotate(var(--a)) translate(40px) rotate(calc(-1 * var(--a)));
+  transition: scale 0.08s, background 0.08s;
+  animation: ring-pop 0.2s calc(var(--i) * 18ms) cubic-bezier(0.2, 0.9, 0.3, 1.35) backwards;
 }
-.cmt-emoji:hover { background: var(--hover); transform: scale(1.2); }
+@keyframes ring-pop { from { opacity: 0; transform: rotate(var(--a)) translate(0) rotate(calc(-1 * var(--a))); scale: 0.4; } }
+.cmt-ring .cmt-emoji:hover { scale: 1.25; background: var(--hover); }
+.cmt-ring .cmt-emoji[aria-pressed='true'] { background: var(--accent-soft); }
+.cmt-ring-close {
+  position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; background: var(--hover); color: var(--text-dim); cursor: pointer;
+}
+.cmt-ring-close:hover { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .cmt-ring::before, .cmt-ring .cmt-emoji { animation: none; } }
+.cmt-react-add[aria-expanded='true'] { visibility: hidden; }
 /* "3 replies ⌄" — folds the replies away, like YouTube. */
 .cmt-fold {
   display: inline-flex; align-items: center; gap: 5px; margin: -4px 0 10px 40px; padding: 4px 10px 4px 8px; border: 0; border-radius: 999px;

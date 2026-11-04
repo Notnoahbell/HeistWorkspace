@@ -179,7 +179,7 @@ Sized for ~150 users; a single modest server handles this comfortably.
   presence (`typing: <itemId>`), so it's per board and never stored.
 - **2026-11-03: One conversation per item, threads only on video.** Notes, links, to-dos
   and photos have a single flat conversation like Milanote (oldest first, Reply at the end
-  opens the box, Resolve files the whole conversation). Videos keep a thread per moment,
+  opens the box; no header or Resolve beside the card for now — resolving lives in the player until we design its way back). Videos keep a thread per moment,
   with replies folded away. Same data either way (`isThreaded` decides how it's shown), so
   existing replies just flatten in. Another person's comment after yours in a conversation
   notifies you like a reply.
