@@ -309,7 +309,8 @@ function Player({ id, start }: { id: string; start: number }) {
 
         <section ref={stage} className="viewer-main" data-idle={idle || undefined} data-full={full || undefined}>
           <div className="viewer-picture" data-compare={comparing || undefined}>
-            <div className="viewer-pane">
+            {/* Comparing: older version on the left, newer on the right, whichever one leads. */}
+            <div className="viewer-pane" data-side={comparing ? (version > compareWith! ? 'right' : 'left') : undefined}>
             {isVideo ? (
               <video
                 key={src}
@@ -332,7 +333,7 @@ function Player({ id, start }: { id: string; start: number }) {
             {comparing && <span className="viewer-pane-tag">v{version}{shown.current ? ' · Current' : ''}</span>}
             </div>
             {comparing && otherInfo && (
-              <div className="viewer-pane">
+              <div className="viewer-pane" data-side={otherInfo.n > version ? 'right' : 'left'}>
                 <video key={otherInfo.src} ref={setOther} src={otherInfo.src} playsInline muted onClick={togglePlay} />
                 <VersionMenu
                   media={item}

@@ -1090,8 +1090,8 @@ html, body, #root {
 /* One pane, or two side by side while comparing versions. */
 .viewer-pane { position: absolute; inset: 0; }
 .viewer-picture[data-compare] { --pad: 10px; }
-.viewer-picture[data-compare] > .viewer-pane:first-child { right: 50%; }
-.viewer-picture[data-compare] > .viewer-pane + .viewer-pane { left: 50%; border-left: 1px solid var(--vline); }
+.viewer-pane[data-side='left'] { right: 50%; }
+.viewer-pane[data-side='right'] { left: 50%; border-left: 1px solid var(--vline); }
 .viewer-pane-tag {
   position: absolute; left: calc(var(--pad) + 8px); top: calc(var(--pad) + 8px); z-index: 1;
   padding: 4px 9px; border-radius: 7px; background: rgb(0 0 0 / 0.65); color: #fff;
