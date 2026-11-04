@@ -301,6 +301,14 @@ npm run build      # typecheck + production build
   to rename; drag its background to move it with what's inside; drag its bottom-right corner to resize.
   The strip beside a multi-selection lines things up, spaces them out or tidies them into a
   grid (hover a button to preview)
+- Selecting: click; Ctrl/⌘-click adds or removes; Shift-click adds or removes on the
+  canvas, but inside a section selects the run from the last card you picked (like a file
+  list). Drag on empty canvas to box-select (Shift adds); Shift-drag inside a section or
+  frame boxes what's inside it instead of moving it (Ctrl/⌘+Shift keeps the selection).
+  Ctrl/⌘+A selects the section you're in, again for the whole board. Arrows: in a section
+  move to the next card (↑/↓ a row, Shift extends); elsewhere nudge a grid step (Shift ×4;
+  1px / 10px with snapping off) — a frame brings its contents. The right-click menu also
+  has Play together and Wrap in a frame
 - Side by side: select several photos / videos → Play together (group toolbar) or Enter.
   Up to 25 in a grid on one timeline (Space, K, ←/→ 5s, , and . a frame, Home, M sound,
   Esc close); a tile's speaker picks whose sound you hear; double-click a tile to open it

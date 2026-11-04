@@ -1,10 +1,11 @@
 // Right-click menu: actions on the selection, or "add here" on empty canvas.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ClipboardPaste, Copy, CopyPlus, LayoutGrid, Link2, ListChecks, Scissors, StickyNote, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, CopyPlus, Frame, LayoutGrid, Link2, ListChecks, Play, Scissors, StickyNote, Trash2 } from 'lucide-react';
 import { useUi } from '../board/ui';
 import { useBoard, type ItemKind } from '../board/store';
-import { createItem, deleteSelection, groupIntoColumn } from '../board/actions';
+import { createItem, deleteSelection, groupIntoColumn, wrapInFrame } from '../board/actions';
+import { MAX_WALL, openWall } from './MediaWall';
 import { copySelection, cutSelection, duplicateSelection, hasClipboard, paste } from '../board/clipboard';
 import { SectionIcon } from './SectionIcon';
 
@@ -42,6 +43,7 @@ export function ContextMenu() {
   const hasItems = useBoard((s) => ids.some((id) => s.items[id]));
   // Boards can't be copied; only offer copying when something else is selected.
   const canCopy = useBoard((s) => ids.some((id) => s.items[id] && s.items[id].kind !== 'board'));
+  const media = useBoard((s) => ids.filter((id) => s.items[id]?.kind === 'media').length);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: 0, top: 0 });
 
@@ -100,7 +102,14 @@ export function ContextMenu() {
         </>
       ) : (
         <>
+          {media >= 2 && (
+            <>
+              <Entry icon={<Play {...ICON} />} label={`Play ${Math.min(media, MAX_WALL)} together`} hint="Enter" onClick={() => openWall(ids)} />
+              <div className="menu-sep" />
+            </>
+          )}
           <Entry icon={<SectionIcon size={ICON.size} />} label={`New section from ${count === 1 ? 'item' : 'selection'}`} onClick={() => groupIntoColumn()} />
+          <Entry icon={<Frame {...ICON} />} label="Wrap in a frame" hint={`${MOD}G`} onClick={() => wrapInFrame()} />
           <div className="menu-sep" />
           <Entry icon={<Copy {...ICON} />} label="Copy" hint={`${MOD}C`} disabled={!canCopy} onClick={copySelection} />
           <Entry icon={<Scissors {...ICON} />} label="Cut" hint={`${MOD}X`} disabled={!canCopy} onClick={cutSelection} />

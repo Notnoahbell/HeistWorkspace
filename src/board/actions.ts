@@ -5,7 +5,7 @@ import { camera, type Point, type Rect } from '../canvas/camera';
 import { GRID_SIZE } from '../canvas/grid';
 import { bodies, type Body, type BodyHooks } from './body';
 import { BOARD_HEIGHT, COLUMN_HEADER, COLUMN_WIDTH, NOTE_MIN_HEIGHT, NOTE_WIDTH } from './constants';
-import { dropIndex, snap, stackedSize, useLayout, type Size } from './layout';
+import { dropIndex, gridCols, snap, stackedSize, useLayout, type Size } from './layout';
 import {
   columnContents, descendants, onCanvas, parentOf, stackZ, useBoard, type Column, type Item, type ItemKind,
 } from './store';
@@ -24,26 +24,130 @@ const layout = useLayout.getState;
 /** Item being dragged out of the sidebar; selected only once dropped. */
 let spawningId: string | null = null;
 
+/**
+ * Where a Shift-click or Shift+arrow range starts (the last thing picked on its
+ * own), and where it currently ends.
+ */
+let anchorId: string | null = null;
+let cursorId: string | null = null;
+const pin = (id: string | null) => { anchorId = cursorId = id; };
+
 function select(id: string) {
   if (spawningId === id) return;
   const { editingId } = ui();
+  pin(id);
   ui().set({ selectedIds: [id], editingId: editingId === id ? id : null });
   board().bringToFront(id);
 }
 
-export const selectOnly = (id: string) => ui().set({ selectedIds: [id], editingId: null });
-export const clearSelection = () => ui().set({ selectedIds: [], editingId: null, contextMenu: null });
+export const selectOnly = (id: string) => { pin(id); ui().set({ selectedIds: [id], editingId: null }); };
+export const clearSelection = () => { pin(null); ui().set({ selectedIds: [], editingId: null, contextMenu: null }); };
 
-/** Shift-click: add to or remove from the selection. */
+/** Ctrl/⌘-click (and Shift-click outside sections): add to or remove from the selection. */
 export function toggleSelect(id: string) {
   const ids = ui().selectedIds;
-  ui().set({ selectedIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id], editingId: null });
+  const adding = !ids.includes(id);
+  if (adding) pin(id);
+  ui().set({ selectedIds: adding ? [...ids, id] : ids.filter((x) => x !== id), editingId: null });
 }
 
+/** The section holding `id`, if it's a card in one. */
+function sectionOf(id: string | null) {
+  if (!id) return null;
+  const { items } = board();
+  const p = parentOf(items[id]);
+  const col = p ? items[p] : undefined;
+  return col?.kind === 'column' ? col : null;
+}
+
+/** Select the run of cards from the anchor to `id` in their section (what's selected elsewhere stays). */
+function selectRun(id: string) {
+  const col = sectionOf(id);
+  if (!col || !anchorId) return;
+  const kids = col.childIds;
+  const a = kids.indexOf(anchorId), b = kids.indexOf(id);
+  const run = kids.slice(Math.min(a, b), Math.max(a, b) + 1);
+  const others = ui().selectedIds.filter((s) => !kids.includes(s));
+  cursorId = id;
+  ui().set({ selectedIds: [...others, ...run], editingId: null });
+}
+
+/**
+ * Shift-click: in a section, everything from the last card you picked to this
+ * one (like a file list); anywhere else, add it to or take it out of the selection.
+ */
+export function shiftSelect(id: string) {
+  const col = sectionOf(id);
+  const anchored = anchorId && ui().selectedIds.includes(anchorId) && sectionOf(anchorId)?.id === col?.id;
+  if (col && anchored) selectRun(id);
+  else toggleSelect(id);
+}
+
+/** Ctrl/⌘+A: every card in the section you're in, or everything on the board. */
 export function selectAll() {
+  const sel = ui().selectedIds;
+  const col = sectionOf(sel[0] ?? null);
+  if (col && sel.every((id) => sectionOf(id)?.id === col.id) && sel.length < col.childIds.length) {
+    anchorId = col.childIds[0];
+    cursorId = col.childIds[col.childIds.length - 1];
+    ui().set({ selectedIds: [...col.childIds], editingId: null });
+    return;
+  }
   const boardId = currentBoardId();
   const ids = Object.values(board().items).filter((i) => i.boardId === boardId && !parentOf(i) && onCanvas(i)).map((i) => i.id);
   ui().set({ selectedIds: ids, editingId: null });
+}
+
+/**
+ * Arrow keys. Cards in a section: move to the next one (←/→ one place, ↑/↓
+ * one row), Shift to extend the selection. Anything else: nudge it one grid
+ * step (Shift: four), or a pixel (Shift: ten) with snapping off.
+ */
+export function arrowKey(dx: number, dy: number, shift: boolean): boolean {
+  const sel = ui().selectedIds;
+  if (!sel.length) return false;
+  const { items } = board();
+  const at = cursorId && sel.includes(cursorId) ? cursorId : sel[sel.length - 1];
+  const col = sectionOf(at);
+  if (col && sel.every((id) => sectionOf(id)?.id === col.id)) {
+    const kids = col.childIds;
+    const step = dy ? gridCols(col) * dy : dx;
+    const next = kids[Math.max(0, Math.min(kids.length - 1, kids.indexOf(at) + step))];
+    if (!next) return true;
+    if (shift) { if (!anchorId || !kids.includes(anchorId)) anchorId = at; selectRun(next); }
+    else selectOnly(next);
+    return true;
+  }
+  const by = ui().snap ? GRID_SIZE * (shift ? 4 : 1) : shift ? 10 : 1;
+  const moving = new Set<string>();
+  for (const id of sel) {
+    const it = items[id];
+    if (!it || parentOf(it) || it.boardId !== currentBoardId()) continue;
+    moving.add(id);
+    // A frame takes what's inside it along.
+    if (it.kind === 'frame') for (const m of frameMembers(id)) moving.add(m);
+  }
+  if (!moving.size) return false;
+  for (const id of moving) board().updateItem(id, { x: items[id].x + dx * by, y: items[id].y + dy * by });
+  return true;
+}
+
+/**
+ * What a box drawn from inside a section or frame picks: a section's cards
+ * the box touches, or what it touches inside a frame (not the frame).
+ */
+export function itemsInRectWithin(r: Rect, containerId: string): string[] {
+  const { items } = board();
+  const c = items[containerId];
+  if (c?.kind === 'column') {
+    return c.childIds.filter((id) => {
+      const it = items[id];
+      if (!it) return false;
+      const o = posOf(it), { w, h } = itemSize(it);
+      return o.x < r.x1 && o.x + w > r.x0 && o.y < r.y1 && o.y + h > r.y0;
+    });
+  }
+  return itemsInRect(r).filter((id) => id !== containerId);
 }
 
 // --- Geometry --------------------------------------------------------------------

@@ -16,7 +16,7 @@ import { addMediaFiles, addVersionFile } from './board/media';
 import { videoTargetAt } from './board/versions';
 import { currentBoardId } from './board/nav';
 import {
-  clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, wrapInFrame, zoomToFit,
+  arrowKey, clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, wrapInFrame, zoomToFit,
 } from './board/actions';
 import { ToolRail } from './ui/ToolRail';
 import { TopBar } from './ui/TopBar';
@@ -126,6 +126,9 @@ export function App() {
         else if (selected.kind !== 'board') ui.set({ editingId: selected.id });
       } else if (e.key === 'Escape') {
         clearSelection();
+      } else if (e.key.startsWith('Arrow') && ui.selectedIds.length) {
+        const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+        if (d && arrowKey(d[0], d[1], e.shiftKey)) e.preventDefault();
       } else if (e.shiftKey && e.code === 'Digit1') {
         zoomToFit();
       } else if (key in ADD_KEYS) {
@@ -138,6 +141,17 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [boardId]);
+
+  // While Shift is held, sections and frames show they can be box-selected inside.
+  useEffect(() => {
+    const root = document.documentElement;
+    const set = (e: KeyboardEvent) => root.toggleAttribute('data-shift', e.shiftKey);
+    const clear = () => root.removeAttribute('data-shift');
+    window.addEventListener('keydown', set);
+    window.addEventListener('keyup', set);
+    window.addEventListener('blur', clear);
+    return () => { window.removeEventListener('keydown', set); window.removeEventListener('keyup', set); window.removeEventListener('blur', clear); };
+  }, []);
 
   // Paste: image files from the system clipboard become photo cards;
   // otherwise it's our own clipboard (copied cards).

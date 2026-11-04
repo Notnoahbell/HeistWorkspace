@@ -6,7 +6,7 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Frame, Grid2x2, LayoutGrid, Trash2,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Frame, LayoutGrid, Play, Trash2,
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
@@ -44,7 +44,12 @@ function GroupToolbar({ ids }: { ids: string[] }) {
     ...(media >= 2 ? [{
       key: 'wall',
       label: media > MAX_WALL ? `Play together (Enter) — the first ${MAX_WALL} of ${media}` : `Play ${media} together (Enter)`,
-      icon: <Grid2x2 {...ICON_PROPS} />,
+      icon: (
+        <span className="toolbar-play">
+          <Play {...ICON_PROPS} fill="currentColor" />
+          <span className="toolbar-badge">{Math.min(media, MAX_WALL)}</span>
+        </span>
+      ),
       run: () => openWall(ids),
     }] : []),
     { key: 'frame', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },

@@ -4,7 +4,8 @@ import { Body, bodies, type BodyHooks } from './body';
 import { useUi } from './ui';
 import { parentOf, stackDepth, useBoard } from './store';
 import { useLayout } from './layout';
-import { selectOnly, toggleSelect } from './actions';
+import { selectOnly, shiftSelect, toggleSelect } from './actions';
+import { startMarquee } from '../ui/Marquee';
 
 /**
  * Attach a physics Body to an item's elements. `rest` is where the item
@@ -67,8 +68,15 @@ export function useBody(
     // Let text fields inside the item behave normally while editing.
     if (ui.editingId === id && (e.target as Element).closest('textarea, input')) return;
     e.stopPropagation();
-    // Shift-click adds to / removes from the selection instead of dragging.
-    if (e.shiftKey) { toggleSelect(id); return; }
+    // Shift: box-select inside a section or frame, a run of cards in a section, or add / remove.
+    if (e.shiftKey) {
+      const kind = useBoard.getState().items[id]?.kind;
+      if (kind === 'column' || kind === 'frame') startMarquee(e, id);
+      else shiftSelect(id);
+      return;
+    }
+    // Ctrl/⌘-click adds to / removes from the selection.
+    if (e.ctrlKey || e.metaKey) { toggleSelect(id); return; }
     const sel = ui.selectedIds;
     press.current = { wasSelected: sel.includes(id), inGroup: sel.length > 1 && sel.includes(id) };
     body.grab(e.pointerId, e.clientX, e.clientY);
