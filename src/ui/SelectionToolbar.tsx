@@ -2,7 +2,7 @@
 // panels, or group actions when several things are selected. Rendered in
 // screen space so it stays a constant size.
 
-import { useSyncExternalStore } from 'react';
+import { Fragment, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Columns3, Copy, CopyPlus, Trash2 } from 'lucide-react';
 import { camera } from '../canvas/camera';
@@ -50,14 +50,22 @@ function GroupToolbar({ ids }: { ids: string[] }) {
       onPointerDown={(e) => e.stopPropagation()}
     >
       <span className="toolbar-count">{items.length}</span>
-      {actions.map((act) => (
-        <button key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
-          {act.icon}
-        </button>
+      <span className="toolbar-divider" role="separator" />
+      {actions.map((act, i) => (
+        <Fragment key={act.key}>
+          {i > 0 && (act.danger || act.key === 'copy') && <span className="toolbar-divider" role="separator" />}
+          <button title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
+            {act.icon}
+          </button>
+        </Fragment>
       ))}
     </div>
   );
 }
+
+/** How it looks · what it does · delete — a divider goes between groups. */
+const LOOK = new Set(['color', 'strip', 'text', 'icon']);
+const actionGroup = (a: { key: string; danger?: boolean }) => (a.danger ? 'danger' : LOOK.has(a.key) ? 'look' : 'do');
 
 export function SelectionToolbar() {
   const ids = useUi((s) => s.selectedIds);
@@ -96,9 +104,10 @@ function SingleToolbar() {
         style={{ left: left + width / 2, top: Math.max(camera.origin.y + 8, top - GAP) }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {itemActions(item).map((a) => (
+        {itemActions(item).map((a, i, all) => (
+          <Fragment key={a.key}>
+          {i > 0 && actionGroup(all[i - 1]) !== actionGroup(a) && <span className="toolbar-divider" role="separator" />}
           <button
-            key={a.key}
             data-flyout-trigger
             data-danger={a.danger}
             title={a.label}
@@ -112,6 +121,7 @@ function SingleToolbar() {
           >
             {a.glyph}
           </button>
+          </Fragment>
         ))}
       </div>
 

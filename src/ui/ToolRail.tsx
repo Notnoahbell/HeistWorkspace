@@ -3,7 +3,7 @@
 // label. It never changes state: item settings live in the floating toolbar
 // above whatever's selected.
 
-import { useRef, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ImageUp, LayoutGrid, Link2, ListChecks, Magnet, Maximize, Minus, Plus, Rows3 } from 'lucide-react';
 import { camera } from '../canvas/camera';
@@ -24,13 +24,13 @@ const ICON = { size: 18, strokeWidth: 1.8, 'aria-hidden': true } as const;
 const TILE_ICON = { size: 18, strokeWidth: 2, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 
 /** One raised tile per thing you can add, all in the same style. */
-const TOOLS: { kind: AddKind; name: string; label: string; key: string; tile: ReactNode }[] = [
-  { kind: 'note', name: 'Note', label: 'Note', key: 'N', tile: <span className="rail-tile tile-note"><i /><i /><i /></span> },
-  { kind: 'link', name: 'Link', label: 'Link', key: 'L', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
-  { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
-  { kind: 'board', name: 'Board', label: 'Board', key: 'B', tile: <span className="rail-tile"><LayoutGrid {...TILE_ICON} /></span> },
+const TOOLS: { kind: AddKind; name: string; label: string; key: string; tile: ReactNode; group: 'cards' | 'containers' }[] = [
+  { kind: 'note', name: 'Note', label: 'Note', key: 'N', group: 'cards', tile: <span className="rail-tile tile-note"><i /><i /><i /></span> },
+  { kind: 'link', name: 'Link', label: 'Link', key: 'L', group: 'cards', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
+  { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', group: 'cards', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
+  { kind: 'board', name: 'Board', label: 'Board', key: 'B', group: 'containers', tile: <span className="rail-tile"><LayoutGrid {...TILE_ICON} /></span> },
   // Stacked rows: a section's default single column.
-  { kind: 'column', name: 'Section', label: 'Section', key: 'S', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
+  { kind: 'column', name: 'Section', label: 'Section', key: 'S', group: 'containers', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
 ];
 
 const SIZE: Record<AddKind, { w: number; h: number }> = {
@@ -133,18 +133,21 @@ function AddButton({ kind, name, label, keyHint, tile, rail }: {
   );
 }
 
-/** Pick photos/videos to add at the centre of the view. */
+/**
+ * Pick photos/videos to add at the centre of the view. An inset button rather
+ * than a raised tile: it opens a file picker, it isn't something you drag out.
+ */
 function UploadButton() {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
       <button
-        className="rail-add"
+        className="rail-add rail-upload"
         title="Upload photos, GIFs or videos — or drop files onto the board"
         aria-label="Upload photos or videos"
         onClick={() => input.current?.click()}
       >
-        <span className="rail-tile"><ImageUp {...TILE_ICON} /></span>
+        <span className="rail-inset"><ImageUp {...TILE_ICON} /></span>
         <span className="rail-label">Upload</span>
       </button>
       <input
@@ -171,9 +174,13 @@ export function ToolRail() {
   return (
     <nav className="tool-rail" ref={ref} aria-label="Tools">
       <div className="rail-group">
-        {TOOLS.map((t) => (
-          <AddButton key={t.kind} kind={t.kind} name={t.name} label={t.label} keyHint={t.key} tile={t.tile} rail={() => ref.current} />
+        {TOOLS.map((t, i) => (
+          <Fragment key={t.kind}>
+            {i > 0 && TOOLS[i - 1].group !== t.group && <div className="rail-divider" role="separator" />}
+            <AddButton kind={t.kind} name={t.name} label={t.label} keyHint={t.key} tile={t.tile} rail={() => ref.current} />
+          </Fragment>
         ))}
+        <div className="rail-divider" role="separator" />
         <UploadButton />
       </div>
       <div className="rail-spacer" />
