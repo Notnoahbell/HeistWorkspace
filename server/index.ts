@@ -13,6 +13,7 @@ import { handleUnfurl } from './unfurl.ts';
 import { createSyncServer } from './sync.ts';
 import { createUploads } from './uploads.ts';
 import { createDerive } from './derive.ts';
+import { createAdmin } from './admin.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = resolve(import.meta.dirname, '..');
@@ -21,8 +22,9 @@ const DIST = join(ROOT, 'dist');
 // tier) this resets on restart; browsers re-upload their own boards on connect.
 const DATA_DIR = process.env.DATA_DIR ?? join(ROOT, 'data');
 const sync = createSyncServer({ dataFile: join(DATA_DIR, 'server-db.json') });
-const uploads = createUploads(join(DATA_DIR, 'uploads'));
+const uploads = createUploads(join(DATA_DIR, 'uploads'), sync.userIdFor);
 const derive = createDerive(join(DATA_DIR, 'uploads'));
+const admin = createAdmin(join(DATA_DIR, 'uploads'), sync);
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -41,6 +43,7 @@ const server = createServer((req, res) => {
   if (url.pathname === '/api/upload') return uploads.upload(req, res);
   if (url.pathname.startsWith('/uploads/')) return uploads.serve(req, res);
   if (url.pathname === '/api/derive') return derive.handle(req, res);
+  if (url.pathname.startsWith('/api/admin/')) return void admin.handle(req, res);
 
   // Static files from dist/, falling back to index.html (the app routes itself).
   const path = normalize(join(DIST, decodeURIComponent(url.pathname)));

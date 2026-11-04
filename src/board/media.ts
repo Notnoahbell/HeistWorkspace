@@ -11,6 +11,7 @@ import { currentBoardId } from './nav';
 import { snap } from './layout';
 import { MEDIA_WIDTH, MEDIA_WIDTH_PORTRAIT } from './constants';
 import { addVersion } from './versions';
+import { withIdentity } from '../sync/client';
 
 /** File types the server accepts (no SVG: it can carry script). */
 export const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,video/mp4,video/webm,video/quicktime';
@@ -44,7 +45,10 @@ function readMeta(file: File, url: string): Promise<MediaMeta> {
 function uploadFile(file: File, onProgress: (p: number) => void): Promise<string | null> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', '/api/upload');
+    // Who's uploading and the original name go along, for the admin file manager.
+    const url = withIdentity(new URL('/api/upload', location.href));
+    url.searchParams.set('name', file.name);
+    xhr.open('PUT', url.pathname + url.search);
     xhr.setRequestHeader('Content-Type', file.type);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
     xhr.onerror = () => resolve(null);

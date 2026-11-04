@@ -41,11 +41,17 @@ const PROFILE_KEY = 'heist:profile';
 function socketUrl() {
   const url = new URL('/sync', location.href);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  withIdentity(url);
+  return url.href;
+}
+
+/** Who you are, on a URL to the server (how the socket and uploads say who's asking). */
+export function withIdentity(url: URL) {
   url.searchParams.set('device', deviceId());
   // Testing aid: ?as=<name> makes this tab a different user in the same browser.
   const as = new URLSearchParams(location.search).get('as');
   if (as) url.searchParams.set('as', as);
-  return url.href;
+  return url;
 }
 
 /** This browser's anonymous id (no logins yet). */

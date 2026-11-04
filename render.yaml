@@ -16,3 +16,7 @@ services:
       # boards when they reconnect.
       - key: DATA_DIR
         value: /tmp/heist-data
+      # Key for the admin file manager (click the logo 5 times). Render makes a
+      # random one; see it under the service's Environment tab.
+      - key: ADMIN_KEY
+        generateValue: true

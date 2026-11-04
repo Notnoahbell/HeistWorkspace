@@ -218,6 +218,17 @@ Sized for ~150 users; a single modest server handles this comfortably.
   leaves its contents. Arrange (align / spread / grid) never stacks things on top of
   each other: aligning on a vertical line also makes a column, on a horizontal line a row.
   Frames are square-cornered and resize from the bottom-right corner only.
+- **2026-11-04: Admin file manager** (`#/admin`, opened by clicking the logo 5 times
+  quickly; `src/ui/AdminPage.tsx`, API in `server/admin.ts`). Lists every uploaded file with
+  who uploaded it and when, its size (plus posters / proxy), and every card and version using
+  it, by board; filter by board or "not on any board", search, sort, preview, open, download,
+  delete (single or bulk). Deleting takes the file off the boards too: an older version is
+  dropped, a current version falls back to the one before, a card with nothing left is
+  deleted with its comments. Uploads now write `<id>.meta.json` (uploader, time, original
+  name; never served). Older files have no uploader on record: the board owner is shown,
+  marked as a guess. Protected by a key checked server-side (`x-admin-key`, 10 wrong tries
+  per minute per address): `ADMIN_KEY` env var (Render generates one, see its Environment
+  tab), else one generated once, kept in `server-db.json` and printed at startup.
 - **2026-11-04: Videos are kept on the device.** `src/lib/mediaCache.ts` downloads a whole
   video once into Cache Storage (4 at a time, with progress; files over 400 MB just stream;
   least recently used dropped past 3 GB) and players get a disk-backed blob: URL for the saved

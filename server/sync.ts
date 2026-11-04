@@ -36,6 +36,8 @@ interface Db {
   salt: string;
   items: Record<string, Item>;
   profiles: Record<string, Profile>;
+  /** Key for the admin pages when ADMIN_KEY isn't set (made once, kept here). */
+  adminKey?: string;
 }
 
 interface Conn {
@@ -76,6 +78,12 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
   const db: Db = load();
   const wss = new WebSocketServer({ noServer: true });
   const conns = new Map<WebSocket, Conn>();
+  // The admin key: ADMIN_KEY if set, else one made once and kept with the data.
+  const adminKey = process.env.ADMIN_KEY || (db.adminKey ??= randomBytes(9).toString('base64url'));
+  if (!process.env.ADMIN_KEY) {
+    setTimeout(save);
+    console.log(`[admin] key: ${adminKey}  (open the app, click the logo 5 times; set ADMIN_KEY to choose your own)`);
+  }
 
   function load(): Db {
     try {
@@ -337,5 +345,45 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     return true;
   }
 
-  return { handleUpgrade };
+  /**
+   * Admin edits (no access checks: the admin API checked the key). Each change
+   * goes to whoever can see the item, like an ordinary edit.
+   */
+  function adminApply(upserts: Item[], deletes: string[]) {
+    const out = new Map<WebSocket, { upserts: Item[]; deletes: string[] }>();
+    const queue = (users: Set<string>, kind: 'upserts' | 'deletes', value: Item | string) => {
+      for (const [ws, c] of conns) {
+        if (!users.has(c.userId)) continue;
+        const o = out.get(ws) ?? { upserts: [], deletes: [] };
+        (o[kind] as unknown[]).push(value);
+        out.set(ws, o);
+      }
+    };
+    for (const next of upserts) {
+      db.items[next.id] = next;
+      queue(accessOf(next), 'upserts', next);
+    }
+    for (const id of deletes) {
+      const old = db.items[id];
+      if (!old) continue;
+      const users = accessOf(old);
+      delete db.items[id];
+      queue(users, 'deletes', id);
+    }
+    for (const [ws, o] of out) send(ws, { t: 'ops', ...o });
+    save();
+  }
+
+  return {
+    handleUpgrade,
+    /** Who's asking, the same way the socket works it out (device id / ?as=). */
+    userIdFor,
+    adminKey: () => adminKey,
+    /** Read-only view of everything, for the admin pages. */
+    adminView: () => ({ items: db.items, profiles: db.profiles }),
+    ownerOf,
+    adminApply,
+  };
 }
+
+export type SyncServer = ReturnType<typeof createSyncServer>;

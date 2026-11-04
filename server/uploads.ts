@@ -4,10 +4,13 @@
 //   PUT /api/upload?name=<filename>   body: the file   → { url: "/uploads/<id>.<ext>" }
 //   GET /uploads/<id>.<ext>
 //
+// Each upload also gets <id>.meta.json beside it: who uploaded it, when, and
+// its original name (for the admin file manager; never served).
+//
 // Only common image/video types are accepted. SVG is refused: served from our
 // own origin it could run script.
 
-import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlink } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlink, writeFile } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -32,7 +35,10 @@ const json = (res: ServerResponse, status: number, body: unknown) => {
   res.end(JSON.stringify(body));
 };
 
-export function createUploads(dir: string) {
+/** Written beside each upload. */
+export interface UploadRecord { name: string; by: string | null; at: number; mime: string; size: number }
+
+export function createUploads(dir: string, identify?: (req: IncomingMessage) => string) {
   mkdirSync(dir, { recursive: true });
 
   function upload(req: IncomingMessage, res: ServerResponse) {
@@ -61,7 +67,19 @@ export function createUploads(dir: string) {
     });
     req.on('error', () => fail(400, 'Upload interrupted.'));
     out.on('error', () => fail(500, 'Could not save the file.'));
-    out.on('finish', () => { if (!failed) json(res, 200, { url: `/uploads/${file}`, size }); });
+    out.on('finish', () => {
+      if (failed) return;
+      const params = new URL(req.url ?? '/', 'http://local').searchParams;
+      const record: UploadRecord = {
+        name: (params.get('name') ?? '').slice(0, 200) || file,
+        by: identify ? identify(req) : null,
+        at: Date.now(),
+        mime,
+        size,
+      };
+      writeFile(join(dir, `${file.split('.')[0]}.meta.json`), JSON.stringify(record), () => {});
+      json(res, 200, { url: `/uploads/${file}`, size });
+    });
     req.pipe(out);
   }
 

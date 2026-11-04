@@ -10,6 +10,7 @@ import { enterBoard } from '../board/actions';
 import { BoardIcon } from './BoardIcon';
 import { CollabBar } from './Collab';
 import { HeistLogo } from './HeistLogo';
+import { useSecretClicks } from './AdminPage';
 import { useMyColor } from '../sync/presence';
 
 /** Crumbs shown in full before the middle collapses into "…". */
@@ -78,6 +79,7 @@ export function TopBar() {
   const boardId = useBoardId();
   // The logo wears your personal colour (the same everywhere, for you).
   const myColor = useMyColor();
+  const secret = useSecretClicks();
   // Serialise so we only re-render when the path itself changes.
   const pathKey = useBoard((s) => JSON.stringify(pathTo(boardId, s.items)));
   const path: Crumb[] = JSON.parse(pathKey);
@@ -92,7 +94,8 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <div className="top-brand" title="Heist Workspace">
+      {/* Five quick clicks on the logo open the admin file manager. */}
+      <div className="top-brand" title="Heist Workspace" onClick={secret}>
         <HeistLogo color={myColor} height={26} />
       </div>
 

@@ -27,6 +27,7 @@ import { Toast } from './ui/Toast';
 import { CursorChat, PeerCursors, PeerSelections } from './ui/Presence';
 import { MediaViewer, openViewer } from './ui/MediaViewer';
 import { MediaWall, openWall } from './ui/MediaWall';
+import { AdminPage, isAdminOpen } from './ui/AdminPage';
 import { CommentsPopover } from './ui/Comments';
 import { copySelection, cutSelection, duplicateSelection, paste } from './board/clipboard';
 import { camera } from './canvas/camera';
@@ -87,7 +88,7 @@ export function App() {
         return;
       }
       // The player has its own keys.
-      if (isTyping(e) || ui.viewer || ui.wall) return;
+      if (isTyping(e) || ui.viewer || ui.wall || isAdminOpen()) return;
       const selected = ui.selectedId ? useBoard.getState().items[ui.selectedId] : undefined;
 
       // Ctrl/Cmd shortcuts: select all, copy, cut, paste, duplicate.
@@ -157,7 +158,7 @@ export function App() {
   // otherwise it's our own clipboard (copied cards).
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (isTyping(e) || useUi.getState().viewer || useUi.getState().wall) return;
+      if (isTyping(e) || useUi.getState().viewer || useUi.getState().wall || isAdminOpen()) return;
       e.preventDefault();
       const files = [...(e.clipboardData?.files ?? [])];
       if (files.length) void addMediaFiles(files, viewportCenterWorld());
@@ -243,6 +244,7 @@ export function App() {
       <PeerCursors />
       <CursorChat />
       <MediaWall />
+      <AdminPage />
       <MediaViewer />
       {fileDrag && <FileDropHint />}
     </>

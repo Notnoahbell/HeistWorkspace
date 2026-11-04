@@ -17,6 +17,8 @@ let current = parse();
 const listeners = new Set<() => void>();
 
 function refresh() {
+  // Pages over the board (#/admin) leave the board as it was.
+  if (location.hash.startsWith('#/admin')) return;
   const next = parse();
   if (next === current) return;
   current = next;
