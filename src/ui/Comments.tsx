@@ -1,19 +1,19 @@
-// Comments UI: the count badge on a card, the threads that slide in beside a
-// selected card (up to five, with "Show all"), the full list with Open /
-// Resolved tabs, replies, @mentions and typing indicators. The video player
-// reuses the full list.
+// Comments UI: the count badge on a card, the panel beside a selected card
+// (open threads, a way into Resolved, the comment box), the full list with
+// Open / Resolved tabs for the player, replies, reactions, @mentions and
+// typing indicators.
 
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, ChevronLeft, Clock, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, ChevronLeft, Clock, RotateCcw, SmilePlus, Trash2 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment } from '../board/store';
 import { useUi } from '../board/ui';
 import { useLayout } from '../board/layout';
 import { useBoardId } from '../board/nav';
 import { itemSize, posOf } from '../board/actions';
 import {
-  addComment, cardVideos, deleteComment, membersOf, noteTyping, setResolved, stopTyping, timeAgo, toThreads,
-  useComments, useOpenCount, useTypers, type Thread,
+  addComment, cardVideos, deleteComment, membersOf, noteTyping, REACTIONS, setResolved, stopTyping, timeAgo,
+  toggleReaction, toThreads, useComments, useOpenCount, useTypers, type Thread,
 } from '../board/comments';
 import { camera } from '../canvas/camera';
 import { session } from '../session';
@@ -22,11 +22,11 @@ import { Avatar } from './Collab';
 import { fmtTime } from './Scrubber';
 
 const ICON = { size: 14, strokeWidth: 2.2, 'aria-hidden': true } as const;
-/** Threads shown beside a card before "Show all". */
+/** Threads shown beside a card before "Show N more". */
 const QUICK_MAX = 5;
-/** Replies shown per thread beside a card (the rest are in "Show all"). */
+/** Replies shown per thread beside a card before "N earlier replies". */
 const QUICK_REPLIES = 2;
-const POP_WIDTH = 240;
+const POP_WIDTH = 248;
 const GAP = 14;
 
 /**
@@ -101,19 +101,16 @@ function CommentRow({ c, reply, onSeek, footer, number }: { c: Comment; reply?: 
   const resolver = usePresence((s) => (c.resolvedBy ? s.users[c.resolvedBy]?.name : undefined));
   const name = profile?.name ?? c.authorName;
   const mine = c.authorId === session.userId;
+  const [picking, setPicking] = useState(false);
+  const reacted = REACTIONS.some((r) => c.reactions?.[r]?.length);
   return (
-    <div className="cmt" data-reply={reply || undefined}>
+    <div className="cmt" data-reply={reply || undefined} data-picking={picking || undefined} onMouseLeave={() => setPicking(false)}>
       <Avatar profile={{ name, icon: profile?.icon ?? null }} color={personalColor(c.authorId)} size={reply ? 20 : 24} />
       <div className="cmt-body">
         <header className="cmt-meta">
           <span className="cmt-author" title={name}>{mine ? 'You' : name}</span>
           <span className="cmt-when" title={new Date(c.createdAt).toLocaleString()}>{timeAgo(c.createdAt)}</span>
           {look.numbered && number != null && <span className="cmt-num">#{number}</span>}
-          {mine && (
-            <button className="cmt-act cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
-              <Trash2 size={13} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          )}
         </header>
         <p className="cmt-text">
           {c.time != null && (
@@ -124,22 +121,68 @@ function CommentRow({ c, reply, onSeek, footer, number }: { c: Comment; reply?: 
           <CommentText c={c} />
         </p>
         {!reply && c.resolved && <div className="cmt-resolved-by">Resolved{resolver ? ` by ${resolver}` : ''}</div>}
-        {footer}
+        {(reacted || footer) && (
+          <div className="cmt-foot">
+            <Reactions c={c} />
+            {footer}
+          </div>
+        )}
       </div>
-      {!reply && (
-        <div className="cmt-actions">
-          {c.resolved ? (
-            <button className="cmt-act" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
-              <RotateCcw {...ICON} />
+      {/* On hover: react, resolve, delete. */}
+      <div className="cmt-tools" onKeyDown={(e) => { if (e.key === 'Escape') setPicking(false); }}>
+        {picking ? (
+          REACTIONS.map((r) => (
+            <button key={r} className="cmt-tool cmt-emoji" title={`React ${r}`} aria-label={`React ${r}`} onClick={() => { toggleReaction(c.id, r); setPicking(false); }}>
+              {r}
             </button>
-          ) : (
-            <button className="cmt-act cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
-              <Check {...ICON} />
+          ))
+        ) : (
+          <>
+            <button className="cmt-tool" title="React" aria-label="React" onClick={() => setPicking(true)}>
+              <SmilePlus {...ICON} />
             </button>
-          )}
-        </div>
-      )}
+            {!reply && (c.resolved ? (
+              <button className="cmt-tool" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
+                <RotateCcw {...ICON} />
+              </button>
+            ) : (
+              <button className="cmt-tool cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
+                <Check {...ICON} />
+              </button>
+            ))}
+            {mine && (
+              <button className="cmt-tool cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
+                <Trash2 {...ICON} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** Reaction chips under a comment: click one to add yours, or take it back. */
+function Reactions({ c }: { c: Comment }) {
+  const users = usePresence((s) => s.users);
+  return (
+    <>
+      {REACTIONS.filter((r) => c.reactions?.[r]?.length).map((r) => {
+        const who = c.reactions![r];
+        const names = who.map((id) => (id === session.userId ? 'You' : users[id]?.name ?? 'Someone'));
+        return (
+          <button
+            key={r}
+            className="cmt-react"
+            aria-pressed={who.includes(session.userId)}
+            title={names.join(', ')}
+            onClick={(e) => { e.stopPropagation(); toggleReaction(c.id, r); }}
+          >
+            <span aria-hidden="true">{r}</span>{who.length}
+          </button>
+        );
+      })}
+    </>
   );
 }
 
@@ -147,28 +190,27 @@ function CommentRow({ c, reply, onSeek, footer, number }: { c: Comment; reply?: 
 const seenThreads = new Set<string>();
 
 /** A thread: the first comment, its replies, and a reply box on demand. */
-function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index, number }: {
+function ThreadCard({ t, targetId, onSeek, maxReplies, number }: {
   t: Thread;
   number?: number;
   targetId: string;
   onSeek?: (t: number) => void;
-  /** Show only the latest few replies (beside a card); the rest via onMore. */
+  /** Show only the latest few replies until "N earlier replies" is clicked. */
   maxReplies?: number;
-  onMore?: () => void;
-  index: number;
 }) {
   const [replying, setReplying] = useState(false);
+  const [allReplies, setAllReplies] = useState(false);
   const look = useContext(CommentLookContext);
   const active = look.activeId === t.root.id;
   const ref = useRef<HTMLElement>(null);
   useEffect(() => { if (active) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [active]);
-  // Plays the settle once, for a comment that's just been posted (not on every reselect).
+  // Slides in once, for a comment that's just been posted (not on every reselect).
   const [fresh] = useState(() => {
     const isNew = !seenThreads.has(t.root.id) && Date.now() - t.root.createdAt < 1500;
     seenThreads.add(t.root.id);
     return isNew;
   });
-  const hidden = maxReplies != null ? Math.max(0, t.replies.length - maxReplies) : 0;
+  const hidden = maxReplies != null && !allReplies ? Math.max(0, t.replies.length - maxReplies) : 0;
   const replies = hidden ? t.replies.slice(-maxReplies!) : t.replies;
   return (
     <article
@@ -176,7 +218,7 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index, number }: 
       className="cmt-thread"
       data-fresh={fresh || undefined}
       data-active={active || undefined}
-      style={{ '--i': index } as CSSProperties}
+      data-resolved={t.root.resolved || undefined}
       onClick={look.onPick ? (e) => { if (!(e.target as Element).closest('button, textarea, a')) look.onPick!(t.root); } : undefined}
     >
       <CommentRow
@@ -190,7 +232,7 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index, number }: 
       {(replies.length > 0 || hidden > 0 || replying) && (
         <div className="cmt-replies">
           {hidden > 0 && (
-            <button className="cmt-earlier" onClick={onMore}>{hidden} earlier {hidden === 1 ? 'reply' : 'replies'}</button>
+            <button className="cmt-earlier" onClick={() => setAllReplies(true)}>{hidden} earlier {hidden === 1 ? 'reply' : 'replies'}</button>
           )}
           {replies.map((r) => <CommentRow key={r.id} c={r} reply />)}
           {replying && (
@@ -357,13 +399,10 @@ export interface ThreadProps {
   onSeek?: (t: number) => void;
 }
 
-/** The full list: Open and Resolved tabs, scrolling, composer under Open. */
-export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'open' }: ThreadProps & {
-  onBack?: () => void;
-  initialTab?: 'open' | 'resolved';
-}) {
+/** The full list (the player's sidebar): Open and Resolved tabs, scrolling, composer under Open. */
+export function CommentList({ targetId, clock, onSeek }: ThreadProps) {
   const all = useComments(targetId);
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const threads = useMemo(() => toThreads(all), [all]);
   const open = threads.filter((t) => !t.root.resolved);
   const resolved = threads.filter((t) => t.root.resolved).sort((a, b) => (b.root.resolvedAt ?? 0) - (a.root.resolvedAt ?? 0));
@@ -376,11 +415,6 @@ export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'ope
   return (
     <div className="cmt-full">
       <div className="cmt-tabs" role="tablist">
-        {onBack && (
-          <button className="cmt-back" title="Show fewer" aria-label="Show fewer" onClick={onBack}>
-            <ChevronLeft size={16} strokeWidth={2.2} aria-hidden="true" />
-          </button>
-        )}
         <button role="tab" aria-selected={tab === 'open'} onClick={() => setTab('open')}>
           Open <span>{open.length}</span>
         </button>
@@ -389,7 +423,7 @@ export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'ope
         </button>
       </div>
       <div className="cmt-list">
-        {shown.map((t, i) => <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} index={Math.min(i, 8)} number={numbers.get(t.root.id)} />)}
+        {shown.map((t) => <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} number={numbers.get(t.root.id)} />)}
         {!shown.length && (
           <p className="cmt-empty">{tab === 'open' ? 'No open comments.' : 'Nothing resolved yet. Tick a comment to file it here.'}</p>
         )}
@@ -404,49 +438,7 @@ export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'ope
   );
 }
 
-/** Beside a selected card: up to five open threads, then "Show all", and the comment box. */
-function QuickThread({ targetId, clock, onSeek, onExpand, composing }: ThreadProps & {
-  onExpand: (tab: 'open' | 'resolved') => void;
-  /** Opened from the toolbar: show the box (even with no comments yet) with the caret in it. */
-  composing: boolean;
-}) {
-  const all = useComments(targetId);
-  const threads = useMemo(() => toThreads(all), [all]);
-  const open = threads.filter((t) => !t.root.resolved);
-  const resolvedCount = threads.length - open.length;
-  // Timecoded threads read in timecode order; others show the latest few.
-  const timed = open.some((t) => t.root.time != null);
-  const shown = timed ? open.slice(0, QUICK_MAX) : open.slice(-QUICK_MAX);
-  const hidden = open.length - shown.length;
-
-  return (
-    <div className="cmt-quick" style={{ '--n': shown.length + 1 } as CSSProperties}>
-      {shown.map((t, i) => (
-        <ThreadCard key={t.root.id} t={t} targetId={targetId} onSeek={onSeek} index={i} maxReplies={QUICK_REPLIES} onMore={() => onExpand('open')} />
-      ))}
-      {(hidden > 0 || resolvedCount > 0) && (
-        <button className="cmt-more" style={{ '--i': shown.length } as CSSProperties} onClick={() => onExpand(hidden > 0 || !resolvedCount ? 'open' : 'resolved')}>
-          {hidden > 0 ? `Show all ${open.length} comments` : `${resolvedCount} resolved`}
-        </button>
-      )}
-      {(composing || open.length > 0) && (
-        <div className="cmt-quick-compose">
-          <Typing targetId={targetId} />
-          <Composer
-            key={composing ? 'opened' : 'idle'}
-            targetId={targetId}
-            clock={clock}
-            autoFocus={composing}
-            onCancel={composing ? () => useUi.getState().set({ commenting: null }) : undefined}
-          />
-        </div>
-      )}
-      {!composing && !open.length && <Typing targetId={targetId} />}
-    </div>
-  );
-}
-
-// --- Popover beside the selected card -----------------------------------------------------
+// --- Panel beside the selected card -----------------------------------------------------
 
 export function CommentsPopover() {
   const boardId = useBoardId();
@@ -455,12 +447,13 @@ export function CommentsPopover() {
   const item = useBoard((s) => (id ? s.items[id] : undefined));
   const slot = useLayout((s) => (id ? s.slots[id] : undefined));
   const commenting = useUi((s) => s.commenting);
-  const hasComments = useComments(id ?? '').length > 0;
+  const hasOpen = useOpenCount(id ?? '') > 0;
   const typing = useTypers(id ?? '').length > 0;
   useSyncExternalStore(camera.subscribe, () => camera.version);
   if (!item || hidden || item.boardId !== boardId || !COMMENTABLE.has(item.kind)) return null;
   void slot; // follow the card when its place in a section changes
-  if (!hasComments && commenting !== item.id && !typing) return null;
+  // Only when there's something to read, someone's writing, or the box was asked for.
+  if (!hasOpen && commenting !== item.id && !typing) return null;
 
   const at = posOf(item);
   const tl = camera.worldToScreen(at.x, at.y);
@@ -471,28 +464,70 @@ export function CommentsPopover() {
   const x = right ? left + width + GAP : Math.max(8, left - GAP - POP_WIDTH);
   const isVideo = item.kind === 'media' && item.mediaType === 'video';
 
-  return <Popover key={item.id} id={item.id} style={{ left: x, top, width: POP_WIDTH }} video={isVideo} />;
+  return <Panel key={item.id} id={item.id} style={{ left: x, top, width: POP_WIDTH }} video={isVideo} />;
 }
 
-function Popover({ id, style, video }: { id: string; style: CSSProperties; video: boolean }) {
-  const [expanded, setExpanded] = useState<null | 'open' | 'resolved'>(null);
+/**
+ * One rounded panel: a header (count, and a way into Resolved), the open
+ * threads (five, then "Show N more"), and the comment box at the bottom.
+ */
+function Panel({ id, style, video }: { id: string; style: CSSProperties; video: boolean }) {
+  const [tab, setView] = useState<'open' | 'resolved'>('open');
+  const [showAll, setShowAll] = useState(false);
   const composing = useUi((s) => s.commenting === id);
+  const all = useComments(id);
+  const threads = useMemo(() => toThreads(all), [all]);
+  const open = threads.filter((t) => !t.root.resolved);
+  const resolved = threads.filter((t) => t.root.resolved).sort((a, b) => (b.root.resolvedAt ?? 0) - (a.root.resolvedAt ?? 0));
+  const view = tab === 'resolved' && resolved.length ? 'resolved' : 'open'; // back to Open once Resolved is empty
+  // Timecoded threads read in timecode order; others show the latest few.
+  const timed = open.some((t) => t.root.time != null);
+  const list = view === 'resolved' ? resolved : showAll ? open : timed ? open.slice(0, QUICK_MAX) : open.slice(-QUICK_MAX);
+  const more = view === 'open' ? open.length - list.length : 0;
   const clock = video ? () => cardVideos.get(id)?.currentTime ?? null : undefined;
   const onSeek = video
     ? (t: number) => { const v = cardVideos.get(id); if (v) { v.pause(); v.currentTime = t; } }
     : undefined;
+
   return (
-    <div
-      className="cmt-pop"
-      data-expanded={expanded ? 'true' : undefined}
-      style={style}
-      onPointerDown={(e) => e.stopPropagation()}
-      onWheel={(e) => e.stopPropagation()}
-    >
-      {expanded ? (
-        <CommentList targetId={id} clock={clock} onSeek={onSeek} initialTab={expanded} onBack={() => setExpanded(null)} />
-      ) : (
-        <QuickThread targetId={id} clock={clock} onSeek={onSeek} onExpand={setExpanded} composing={composing} />
+    <div className="cmt-pop" style={style} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
+      {threads.length > 0 && (
+        <header className="cmt-pop-head">
+          {view === 'resolved' ? (
+            <button className="cmt-pop-back" onClick={() => setView('open')}>
+              <ChevronLeft size={15} strokeWidth={2.2} aria-hidden="true" /> Resolved <span>{resolved.length}</span>
+            </button>
+          ) : (
+            <>
+              <h3>Comments {open.length > 0 && <span>{open.length}</span>}</h3>
+              {resolved.length > 0 && (
+                <button className="cmt-pop-link" title="Show resolved comments" onClick={() => setView('resolved')}>
+                  <Check size={12} strokeWidth={2.6} aria-hidden="true" /> {resolved.length} resolved
+                </button>
+              )}
+            </>
+          )}
+        </header>
+      )}
+      {list.length > 0 && (
+        <div className="cmt-list">
+          {list.map((t) => <ThreadCard key={t.root.id} t={t} targetId={id} onSeek={onSeek} maxReplies={QUICK_REPLIES} />)}
+          {more > 0 && <button className="cmt-show-more" onClick={() => setShowAll(true)}>Show {more} more</button>}
+        </div>
+      )}
+      {view === 'open' && (
+        <div className="cmt-pop-compose">
+          <Typing targetId={id} />
+          {(composing || open.length > 0) && (
+            <Composer
+              key={composing ? 'opened' : 'idle'}
+              targetId={id}
+              clock={clock}
+              autoFocus={composing}
+              onCancel={composing ? () => useUi.getState().set({ commenting: null }) : undefined}
+            />
+          )}
+        </div>
       )}
     </div>
   );

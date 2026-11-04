@@ -1160,24 +1160,40 @@ html, body, #root {
 .dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-2.5px); opacity: 1; } }
 
-.cmt-pop { position: fixed; z-index: 14; display: flex; flex-direction: column; }
-.cmt-quick { display: flex; flex-direction: column; gap: 6px; }
-.cmt-quick > .cmt-thread,
-.cmt-pop[data-expanded] {
-  background: var(--panel); border: 1px solid var(--panel-border); box-shadow: var(--panel-shadow);
+/* Beside a selected card: one rounded panel — header, threads, comment box. */
+.cmt-pop {
+  position: fixed; z-index: 14; display: flex; flex-direction: column; max-height: min(72vh, 640px);
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; box-shadow: var(--panel-shadow);
+  overflow: hidden; animation: cmt-in 0.12s ease-out both;
 }
-.cmt-pop[data-expanded] { max-height: min(72vh, 640px); }
+.cmt-pop-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 4px 8px 0 14px; }
+.cmt-pop-head h3 { margin: 0; font: 650 12.5px var(--font); color: var(--text); }
+.cmt-pop-head h3 span, .cmt-pop-back span {
+  margin-left: 3px; padding: 1px 6px; border-radius: 8px; background: var(--hover); color: var(--text-dim); font-size: 11px; font-weight: 600;
+}
+.cmt-pop-link, .cmt-pop-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; cursor: pointer; }
+.cmt-pop-link { padding: 4px 9px; border-radius: 999px; color: var(--text-dim); font: 600 11.5px var(--font); }
+.cmt-pop-link:hover { background: var(--hover); color: var(--text); }
+.cmt-pop-back { margin-left: -8px; padding: 4px 8px 4px 3px; border-radius: 8px; color: var(--text); font: 650 12.5px var(--font); }
+.cmt-pop-back:hover { background: var(--hover); }
+.cmt-pop .cmt-list { flex: 0 1 auto; padding: 0 4px; }
+.cmt-pop .cmt-thread + .cmt-thread { border-top: 1px solid var(--panel-border); }
+.cmt-pop-compose { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+.cmt-pop-compose:empty { display: none; }
+.cmt-pop .cmt-list + .cmt-pop-compose { border-top: 1px solid var(--panel-border); }
+.cmt-pop .cmt-typing { padding: 2px 6px; }
+.cmt-show-more {
+  display: block; width: calc(100% - 8px); margin: 2px 4px 6px; padding: 7px; border: 0; border-radius: 9px;
+  background: var(--hover); color: var(--text); font: 600 12px var(--font); cursor: pointer;
+}
+.cmt-show-more:hover { color: var(--accent); }
 
-/* Threads drop in together, quickly. */
+/* New comments drop in quickly. */
 @keyframes cmt-in { from { opacity: 0; transform: translateY(-4px); } }
-.cmt-quick > * { animation: cmt-in 0.12s ease-out both; }
-/* A comment just posted leaves the rounded box and settles into a square card. */
-@keyframes cmt-settle { from { border-radius: 12px; } }
-.cmt-thread[data-fresh] { animation: cmt-settle 0.35s 0.05s ease-out both; }
-.cmt-quick > .cmt-thread[data-fresh] { animation: cmt-in 0.12s ease-out both, cmt-settle 0.35s 0.05s ease-out both; }
-@media (prefers-reduced-motion: reduce) { .cmt-quick > * { animation: none; } }
+.cmt-thread[data-fresh] { animation: cmt-in 0.16s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .cmt-pop, .cmt-thread[data-fresh] { animation: none; } }
 
-.cmt { display: grid; grid-template-columns: 24px 1fr auto; gap: 9px; padding: 10px 10px 10px 11px; color: var(--text); }
+.cmt { position: relative; display: grid; grid-template-columns: 24px 1fr; gap: 9px; padding: 10px 10px 10px 10px; color: var(--text); }
 .cmt[data-reply] { grid-template-columns: 20px 1fr; gap: 8px; padding: 7px 10px 7px 0; }
 .cmt .avatar { font-size: 9.5px; }
 .cmt[data-reply] .avatar { font-size: 8px; }
@@ -1188,51 +1204,63 @@ html, body, #root {
 .cmt-text { margin: 0; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .cmt[data-reply] .cmt-text { font-size: 13px; }
 .cmt-mention { color: var(--accent); font-weight: 600; }
-.cmt-mention[data-me] { background: var(--accent-soft); padding: 0 2px; }
+.cmt-mention[data-me] { background: var(--accent-soft); padding: 0 2px; border-radius: 4px; }
 .cmt-time {
-  display: inline-block; margin-right: 6px; padding: 0 5px; border: 0;
+  display: inline-block; margin-right: 6px; padding: 0 6px; border: 0; border-radius: 6px;
   background: var(--accent-soft); color: var(--accent);
   font: 600 12px/18px var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; vertical-align: 1px;
 }
 .cmt-time:hover:not(:disabled) { background: var(--accent); color: #fff; }
 .cmt-time:disabled { cursor: default; }
 .cmt-resolved-by { margin-top: 4px; font-size: 11.5px; color: var(--text-dim); }
-.cmt-thread:has(> .cmt [aria-label='Reopen']) .cmt-text { color: var(--text-dim); }
+.cmt-thread[data-resolved] > .cmt .cmt-text { color: var(--text-dim); }
 
-.cmt-actions { display: flex; flex-direction: column; gap: 4px; }
-.cmt-act {
-  display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
-  border: 1.5px solid var(--panel-border); border-radius: 50%; background: none; color: var(--text-dim); cursor: pointer;
+/* Hover tools over the corner of a comment: react, resolve, delete (the six emoji when reacting). */
+.cmt-tools {
+  position: absolute; top: 5px; right: 6px; z-index: 1; display: flex; gap: 1px; padding: 2px;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 9px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.14);
+  opacity: 0; pointer-events: none; transition: opacity 0.1s;
 }
-.cmt-act:hover { color: var(--text); border-color: var(--text-dim); }
-.cmt-check:hover { background: #30a46c; border-color: #30a46c; color: #fff; }
-.cmt-delete { width: 20px; height: 20px; margin: -3px -2px -3px auto; align-self: center; border-color: transparent; opacity: 0; }
-.cmt:hover > .cmt-body > .cmt-meta > .cmt-delete { opacity: 1; }
-.cmt-delete:hover { color: #e5484d; border-color: transparent; }
+.cmt:hover > .cmt-tools, .cmt:has(> .cmt-tools :focus-visible) > .cmt-tools, .cmt[data-picking] > .cmt-tools { opacity: 1; pointer-events: auto; }
+.cmt-tool {
+  display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
+  background: none; color: var(--text-dim); cursor: pointer;
+}
+.cmt-tool:hover { background: var(--hover); color: var(--text); }
+.cmt-check:hover { background: #30a46c; color: #fff; }
+.cmt-delete:hover { color: #e5484d; }
+.cmt-emoji { width: 26px; font-size: 15px; line-height: 1; transition: transform 0.08s; }
+.cmt-emoji:hover { background: var(--hover); transform: scale(1.18); }
+@media (hover: none) { .cmt-tools { opacity: 1; pointer-events: auto; position: static; grid-column: 2; justify-self: start; box-shadow: none; } }
 
+/* Reactions and Reply under the text. */
+.cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.cmt-react {
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px 0 6px;
+  border: 1px solid var(--panel-border); border-radius: 999px; background: none; color: var(--text-dim);
+  font: 600 11.5px var(--font); font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.cmt-react span { font-size: 12.5px; line-height: 1; }
+.cmt-react:hover { border-color: var(--text-dim); color: var(--text); }
+.cmt-react[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .cmt-reply-btn, .cmt-earlier {
-  margin-top: 4px; padding: 0; border: 0; background: none; color: var(--text-dim);
+  padding: 0; border: 0; background: none; color: var(--text-dim);
   font: 600 12px var(--font); cursor: pointer;
 }
+.cmt-reply-btn { height: 22px; padding: 0 4px; margin-left: -4px; border-radius: 6px; }
+.cmt-react + .cmt-reply-btn { margin-left: 2px; }
 .cmt-reply-btn:hover, .cmt-earlier:hover { color: var(--accent); }
 .cmt-earlier { margin: 2px 0 4px; }
 /* Replies sit under the first comment, indented to its text. */
-.cmt-replies { margin: -4px 10px 8px 44px; padding-left: 10px; border-left: 2px solid var(--panel-border); }
-
-.cmt-more {
-  align-self: flex-start; padding: 6px 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--accent);
-  font: 600 12.5px var(--font); box-shadow: var(--panel-shadow); cursor: pointer;
-}
-.cmt-more:hover { background: var(--hover); }
+.cmt-replies { margin: -4px 10px 8px 43px; padding-left: 10px; border-left: 2px solid var(--panel-border); }
 
 /* The composer is one text box: optional timecode chip, the text, and Post once there's something to send. */
-.cmt-quick-compose { display: flex; flex-direction: column; gap: 4px; }
 .cmt-composer {
   position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 6px;
   padding: 10.5px 7px 10.5px 12px; background: var(--panel); border: 1px solid var(--panel-border); cursor: text;
-  border-radius: 12px;
+  border-radius: 10px;
 }
-.cmt-quick .cmt-composer { box-shadow: var(--panel-shadow); }
+.cmt-pop-compose > .cmt-composer:not(:focus-within) { background: var(--hover); border-color: transparent; }
 .cmt-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .cmt-composer textarea {
   flex: 1; min-width: 0; min-height: 24px; padding: 3px 0; resize: none; overflow: hidden;
@@ -1281,10 +1309,7 @@ html, body, #root {
 }
 .cmt-tabs [role='tab'] span { margin-left: 4px; padding: 1px 6px; border-radius: 8px; background: var(--hover); font-size: 11px; }
 .cmt-tabs [role='tab'][aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
-.cmt-back { flex: none; width: 34px; border: 0; background: none; color: var(--text-dim); cursor: pointer; }
-.cmt-back:hover { color: var(--text); background: var(--hover); }
 .cmt-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.cmt-list > .cmt-thread { border-bottom: 1px solid var(--panel-border); }
 .cmt-empty { margin: 0; padding: 18px 14px; font-size: 13px; color: var(--text-dim); text-align: center; }
 
 /* Notifications (bell in the top bar). */
@@ -1322,17 +1347,16 @@ html, body, #root {
   --hover: rgb(255 255 255 / 0.07); --bg: #0b0b0d; --accent: #7b8cff; --accent-soft: rgb(123 140 255 / 0.18);
   background: var(--panel); color: var(--text);
 }
-.viewer-side .cmt-tabs { margin: 10px 10px 4px; padding: 3px; border: 0; background: rgb(255 255 255 / 0.05); gap: 3px; }
-.viewer-side .cmt-tabs [role='tab'] { padding: 7px 8px; border: 0; margin: 0; }
+.viewer-side .cmt-tabs { margin: 10px 10px 4px; padding: 3px; border: 0; border-radius: 10px; background: rgb(255 255 255 / 0.05); gap: 3px; }
+.viewer-side .cmt-tabs [role='tab'] { padding: 7px 8px; border: 0; margin: 0; border-radius: 7px; }
 .viewer-side .cmt-tabs [role='tab'][aria-selected='true'] { background: rgb(255 255 255 / 0.1); }
 .viewer-side .cmt-list { padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
-.viewer-side .cmt-list > .cmt-thread { border: 1px solid var(--panel-border); background: rgb(255 255 255 / 0.025); cursor: pointer; }
+.viewer-side .cmt-list > .cmt-thread { border: 1px solid var(--panel-border); border-radius: 12px; background: rgb(255 255 255 / 0.025); cursor: pointer; }
 .viewer-side .cmt-list > .cmt-thread:hover { border-color: rgb(255 255 255 / 0.16); }
 .viewer-side .cmt-list > .cmt-thread[data-active] { border-color: rgb(255 255 255 / 0.4); background: rgb(255 255 255 / 0.06); }
 .viewer-side .cmt-time { background: rgb(245 190 50 / 0.16); color: #f5c542; }
 .viewer-side .cmt-time:hover:not(:disabled) { background: #f5c542; color: #111; }
 .cmt-num { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.cmt-num + .cmt-delete { margin-left: 2px; }
 .viewer-side .cmt-full-compose { padding: 8px 10px 10px; }
 /* Timecode chip sits in line before the text, like a prefix. */
 .viewer-side .cmt-chip { flex-basis: auto; align-self: center; }

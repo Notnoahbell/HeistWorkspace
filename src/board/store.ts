@@ -153,6 +153,8 @@ export interface Comment extends ItemBase, Stacked {
   resolved: boolean;
   resolvedBy?: string | null;
   resolvedAt?: number | null;
+  /** Emoji → ids of the people who reacted with it. */
+  reactions?: Record<string, string[]>;
 }
 
 /** Things drawn on the canvas (everything but comments). */

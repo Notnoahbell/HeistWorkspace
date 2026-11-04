@@ -177,6 +177,10 @@ Sized for ~150 users; a single modest server handles this comfortably.
   on each client from the comments it can see (mentions of you, replies in threads you
   wrote in); read state is per browser for now (`heist:notices`). "Typing" rides on
   presence (`typing: <itemId>`), so it's per board and never stored.
+- **2026-11-03: Reactions.** Six fixed emoji (👍 🔥 ❤️ 😂 💯 👎) stored on the comment as
+  `reactions: { emoji: userId[] }`. Whole-item last-write-wins means two people reacting
+  to the same comment at the same instant can drop one; fine for now, worth a per-field
+  merge on the real backend.
 - **2026-11-03: Columns → sections (grid).** The vertical/horizontal switch is gone;
   a section has `cols` (1 = a plain column) and fills left to right, wrapping, each
   row as tall as its tallest item. Cells are one card wide, or as wide as the widest
@@ -239,8 +243,8 @@ npm run build      # typecheck + production build
   play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
 - Comments: the toolbar's comment button opens a comment box beside the item; once it has
-  comments, up to 5 open ones show beside it whenever it's selected (Enter posts, Shift+Enter new line); "Show all" opens Open/Resolved tabs; the
-  tick resolves, ↺ reopens. On a video the comment is pinned to the card's current time
+  open comments, a panel beside it shows up to 5 whenever it's selected (Enter posts, Shift+Enter new line; "Show N more";
+  "N resolved" in its header). Hover a comment for react / resolve (tick) / delete; click a reaction chip to add or take back yours. On a video the comment is pinned to the card's current time
   (click the time chip for a whole-video comment); click a timecode to jump there. The
   player (a review window like Frame.io: picture ~70% wide, timeline with avatar markers,
   HH:MM:SS:FF timecode, ‹ n of m › through the board's media) lists every comment, numbered. Reply under any

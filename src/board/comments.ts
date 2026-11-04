@@ -73,6 +73,20 @@ export function setResolved(id: string, resolved: boolean) {
   useBoard.getState().updateItem(id, { resolved, resolvedBy: resolved ? session.userId : null, resolvedAt: resolved ? Date.now() : null });
 }
 
+/** The reactions anyone can leave on a comment. */
+export const REACTIONS = ['👍', '🔥', '❤️', '😂', '💯', '👎'] as const;
+
+/** Add your reaction to a comment, or take it back. */
+export function toggleReaction(id: string, emoji: string) {
+  const c = useBoard.getState().items[id];
+  if (c?.kind !== 'comment') return;
+  const next = { ...c.reactions };
+  const who = next[emoji] ?? [];
+  next[emoji] = who.includes(session.userId) ? who.filter((u) => u !== session.userId) : [...who, session.userId];
+  if (!next[emoji].length) delete next[emoji];
+  useBoard.getState().updateItem(id, { reactions: next });
+}
+
 /** Delete a comment; deleting a thread's first comment takes its replies too. */
 export function deleteComment(id: string) {
   const { items, removeItem } = useBoard.getState();
