@@ -169,6 +169,18 @@ export interface Board extends ItemBase, Stacked {
 }
 
 /**
+ * A frame: a titled, coloured box drawn behind things to group them loosely.
+ * Nothing is stored inside it; whatever sits wholly within its bounds moves
+ * with it when it's dragged.
+ */
+export interface Frame extends ItemBase, Stacked {
+  kind: 'frame';
+  h: number;
+  title: string;
+  color: string | null;
+}
+
+/**
  * A comment on a note, to-do, link, photo or video. Stored as an item (so it
  * syncs and is shared like everything else) on the same board as its target,
  * but never drawn on the canvas itself.
@@ -211,7 +223,7 @@ export const COMMENTABLE = new Set<ItemKind>(['note', 'todo', 'link', 'media']);
 /** The board a tile opens: itself, or what it's a shortcut to. */
 export const boardTarget = (b: Board) => b.linkTo ?? b.id;
 
-export type Item = Note | Todo | Link | Media | Column | Board | Comment;
+export type Item = Note | Todo | Link | Media | Column | Board | Frame | Comment;
 /** Items that can be stacked in a column (everything, columns included). */
 export type Stackable = Item;
 export const isStackable = (it: Item | undefined): it is Stackable => !!it;
@@ -259,6 +271,7 @@ const DEFAULTS: { [K in ItemKind]: Omit<ItemOf<K>, 'id' | 'kind' | 'z' | 'x' | '
   comment: { w: 0, parentId: null, targetId: '', authorId: '', authorName: '', text: '', createdAt: 0, time: null, resolved: false },
   column: { w: COLUMN_WIDTH, title: '', color: null, strip: null, cols: 1, childIds: [], parentId: null },
   board: { w: BOARD_WIDTH, title: '', color: null, icon: null, parentId: null },
+  frame: { w: 480, h: 320, title: '', color: null, parentId: null },
 };
 
 // localStorage can throw (private mode, blocked storage); never let that break the board.
@@ -395,6 +408,7 @@ export const useBoard = create<BoardState>()(
 
       moveToColumn(id, columnId, index) {
         set((s) => {
+          if (s.items[id]?.kind === 'frame') return s; // frames stay on the board
           // A column can't go inside itself or anything inside it.
           for (let c: string | null = columnId; c; c = parentOf(s.items[c])) if (c === id) return s;
           const items = unparent(s.items, id);

@@ -128,10 +128,11 @@ export function useLiftedZ(id: string): number | null {
   const movingId = useUi((s) => s.movingId);
   const group = useUi((s) =>
     s.movingId && s.selectedIds.length > 1 && s.selectedIds.includes(s.movingId) ? s.selectedIds : null);
+  const carried = useUi((s) => (s.movingId ? s.carried : null));
   return useBoard((s) => {
     if (!movingId) return null;
     for (let cur: string | null = id; cur; cur = parentOf(s.items[cur])) {
-      if (cur === movingId || group?.includes(cur)) return LIFTED_Z + stackDepth(s.items, id);
+      if (cur === movingId || group?.includes(cur) || carried?.includes(cur)) return LIFTED_Z + stackDepth(s.items, id);
     }
     return null;
   });

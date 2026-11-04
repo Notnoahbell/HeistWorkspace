@@ -29,6 +29,8 @@ interface UiState {
   dragId: string | null;
   /** Item that was dragged and hasn't come to rest yet (hides the toolbar). */
   movingId: string | null;
+  /** What the held item carries along (a column's or frame's contents, the rest of a group). */
+  carried: string[];
   /** Where the dragged item would land if released now. */
   drop: DropTarget | null;
   /** Board (tile on the canvas, or a crumb in the path) the drag would move things into. */
@@ -67,6 +69,7 @@ export const useUi = create<UiState>()(
       panning: false,
       dragId: null,
       movingId: null,
+      carried: [],
       drop: null,
       boardDrop: null,
       versionDrop: null,

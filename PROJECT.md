@@ -210,6 +210,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   nested section. Drag the right edge to change the count, or use the toolbar's
   Columns picker. Data v5: vertical → 1, horizontal → one column per item. Code
   still calls the kind `column`; only the UI says "section".
+- **2026-11-04: Frames group loosely.** A `frame` item is just a titled, tinted rect
+  (x, y, w, h) drawn behind everything (bigger frames further back). Nothing is stored
+  inside it: dragging one carries whatever sits *wholly* within its bounds at grab time,
+  so things move in and out by being dragged in and out. Box selection only picks a frame
+  if the box encloses it, so selecting within one picks its contents. Deleting a frame
+  leaves its contents. Arrange (align / spread / grid) never stacks things on top of
+  each other: aligning on a vertical line also makes a column, on a horizontal line a row.
 
 - **2026-11-03: Boards are items.** All items live in one flat map tagged with
   `boardId`; a board's tile *is* the board. Each user's root is a virtual Home
@@ -281,6 +288,10 @@ npm run build      # typecheck + production build
   right) lists mentions and replies; clicking one opens the board and selects the item
 - Sections: S (or C); double-click header to rename; double-click body to add a note;
   drag the right edge to change the number of grid columns
+- Frames: select several things → Wrap in a frame (Ctrl/⌘+G); click a selected frame's tag
+  to rename; drag its background to move it with what's inside; drag edges / corners to resize.
+  The strip beside a multi-selection lines things up, spaces them out or tidies them into a
+  grid (hover a button to preview)
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
   follows the cursor and becomes a real item once it clears the sidebar
 - Drag and flick to throw; Delete removes; G toggles snap, hold Alt to place freely

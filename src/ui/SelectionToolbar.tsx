@@ -6,12 +6,12 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, LayoutGrid, Trash2,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Frame, LayoutGrid, Trash2,
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
 import { useBoard } from '../board/store';
-import { arrangeSelection, canArrange, deleteSelection, groupIntoColumn, itemSize, planArrange, posOf, type Arrange } from '../board/actions';
+import { arrangeSelection, canArrange, deleteSelection, groupIntoColumn, itemSize, planArrange, posOf, wrapInFrame, type Arrange } from '../board/actions';
 import { copySelection, duplicateSelection } from '../board/clipboard';
 import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
@@ -39,6 +39,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
   const copyable = items.some((it) => it.kind !== 'board');
   const actions = [
+    { key: 'frame', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
     { key: 'column', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
     ...(copyable ? [
       { key: 'copy', label: 'Copy (Ctrl+C)', icon: <Copy {...ICON_PROPS} />, run: copySelection },
@@ -59,7 +60,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
         {actions.map((act, i) => (
           <Fragment key={act.key}>
             {i > 0 && (act.danger || act.key === 'copy') && <span className="toolbar-divider" role="separator" />}
-            <button title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
+            <button data-key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
               {act.icon}
             </button>
           </Fragment>

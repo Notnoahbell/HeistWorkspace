@@ -18,8 +18,8 @@ import { BoardIcon } from './BoardIcon';
 import { SectionIcon } from './SectionIcon';
 import { ACCEPT, addMediaFiles } from '../board/media';
 
-/** Kinds made from the rail's add tiles (media comes from files instead). */
-type AddKind = Exclude<ItemKind, 'media' | 'comment'>;
+/** Kinds made from the rail's add tiles (media comes from files instead; frames by wrapping a selection). */
+type AddKind = Exclude<ItemKind, 'media' | 'comment' | 'frame'>;
 
 const ICON = { size: 18, strokeWidth: 1.8, 'aria-hidden': true } as const;
 const TILE_ICON = { size: 18, strokeWidth: 2, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;

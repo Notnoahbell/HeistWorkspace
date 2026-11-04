@@ -375,6 +375,19 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
         },
         del,
       ];
+    case 'frame':
+      return [
+        color,
+        {
+          key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
+          // Frames rename inline, in their tag.
+          run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
+        },
+        {
+          key: 'delete', label: 'Remove frame (keeps what was in it)', danger: true, glyph: <Trash2 {...ICON_PROPS} size={18} />,
+          run: () => confirmDelete(item.id),
+        },
+      ];
     case 'board': {
       if (item.linkTo) {
         const target = item.linkTo;

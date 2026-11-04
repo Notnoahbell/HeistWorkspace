@@ -63,6 +63,7 @@ export function itemSize(it: Item): Size {
     return { w: layout().fills[it.id] ?? size.w, h: size.h };
   }
   if (it.kind === 'board') return { w: it.w, h: heights[it.id] ?? BOARD_HEIGHT };
+  if (it.kind === 'frame') return { w: it.w, h: it.h };
   return { w: it.w, h: heights[it.id] ?? NOTE_MIN_HEIGHT };
 }
 
@@ -92,6 +93,8 @@ export function itemsInRect(r: Rect): string[] {
     .filter((it) => {
       if (it.boardId !== boardId || parentOf(it) || !onCanvas(it)) return false;
       const { w, h } = itemSize(it);
+      // A frame only when it's wholly inside, so a box drawn within one picks out its contents.
+      if (it.kind === 'frame') return it.x >= r.x0 && it.x + w <= r.x1 && it.y >= r.y0 && it.y + h <= r.y1;
       return it.x < r.x1 && it.x + w > r.x0 && it.y < r.y1 && it.y + h > r.y0;
     })
     .map((it) => it.id);
@@ -99,8 +102,26 @@ export function itemsInRect(r: Rect): string[] {
 
 // --- Dragging ----------------------------------------------------------------------
 
-/** What rides along with a column: its contents, at any depth. */
-const contentsOf = (id: string) => columnContents(board().items, id);
+/** Top-level things sitting wholly inside a frame (other frames included). */
+export function frameMembers(frameId: string): string[] {
+  const { items } = board();
+  const f = items[frameId];
+  if (f?.kind !== 'frame') return [];
+  return Object.values(items)
+    .filter((it) => {
+      if (it.id === frameId || it.boardId !== f.boardId || parentOf(it) || !onCanvas(it)) return false;
+      const { w, h } = itemSize(it);
+      return it.x >= f.x && it.y >= f.y && it.x + w <= f.x + f.w && it.y + h <= f.y + f.h;
+    })
+    .map((it) => it.id);
+}
+
+/** What rides along with an item: a column's contents at any depth, or what's inside a frame (and their contents). */
+function contentsOf(id: string): string[] {
+  const { items } = board();
+  if (items[id]?.kind !== 'frame') return columnContents(items, id);
+  return frameMembers(id).flatMap((m) => [m, ...columnContents(items, m)]);
+}
 
 /** Everything moving with a drag of `id` (it, its contents, the rest of a dragged group). */
 function draggedWith(id: string, group: boolean): Set<string> {
@@ -144,12 +165,11 @@ function moveIntoBoard(body: Body, id: string, targetId: string) {
   const bounds = contentBounds(targetId);
   const base = bounds ? { x: snap(bounds.x1 + GAP_IN_TARGET), y: snap(bounds.y0) } : { x: 0, y: 0 };
   at[id] = base;
-  if (body.multi) {
-    for (const f of body.followers) {
-      if (parentOf(items[f.body.id])) continue; // column contents ride along with their column
-      ids.push(f.body.id);
-      at[f.body.id] = { x: base.x + f.ox, y: base.y + f.oy };
-    }
+  // The rest of a group, or what's inside a frame.
+  for (const f of body.followers) {
+    if (parentOf(items[f.body.id])) continue; // column contents ride along with their column
+    ids.push(f.body.id);
+    at[f.body.id] = { x: base.x + f.ox, y: base.y + f.oy };
   }
   board().moveToBoard(ids, targetId, at);
   const target = board().items[targetId];
@@ -183,6 +203,8 @@ export function itemHooks(id: string): BodyHooks {
           for (const c of contentsOf(other)) carried.add(c);
         }
       }
+      carried.delete(id);
+      ui().set({ carried: [...carried] });
       const followers = [...carried].map((c) => bodies.get(c)).filter((b): b is Body => !!b);
       if (followers.length) {
         const { w, h } = itemSize(items[id]);
@@ -202,7 +224,8 @@ export function itemHooks(id: string): BodyHooks {
       if (onto !== ui().versionDrop) ui().set({ versionDrop: onto, ...(onto ? { drop: null } : {}) });
       if (onto) return;
 
-      if (body.multi) return; // groups move freely; dropping a group into a column isn't supported
+      // Groups and frames move freely; neither drops into a column.
+      if (body.multi || self?.kind === 'frame') return;
       const col = columnAt(p, new Set([id, ...contentsOf(id)]));
       const current = ui().drop;
       if (!col) {
@@ -247,12 +270,10 @@ export function itemHooks(id: string): BodyHooks {
       if (parentOf(board().items[id])) board().detach(id, land);
       else board().updateItem(id, land);
 
-      // Group drag: everything else top-level lands at the same offset.
-      if (body.multi) {
-        const { items } = board();
-        for (const f of body.followers) {
-          if (!parentOf(items[f.body.id])) board().updateItem(f.body.id, { x: land.x + f.ox, y: land.y + f.oy });
-        }
+      // Group or frame drag: everything else top-level lands at the same offset.
+      const { items } = board();
+      for (const f of body.followers) {
+        if (!parentOf(items[f.body.id])) board().updateItem(f.body.id, { x: land.x + f.ox, y: land.y + f.oy });
       }
       return land;
     },
@@ -404,11 +425,12 @@ const KIND_NOUN: Record<Exclude<ItemKind, 'comment'>, [string, string]> = {
   todo: ['to-do list', 'to-do lists'],
   link: ['link', 'links'],
   media: ['photo or video', 'photos and videos'],
+  frame: ['frame', 'frames'],
 };
 
 /** "2 boards, 5 notes" — what's on a board, by kind. */
 export function boardSummary(items: Record<string, Item>, boardId: string): string {
-  const n: Record<ItemKind, number> = { board: 0, column: 0, note: 0, todo: 0, link: 0, media: 0, comment: 0 };
+  const n: Record<ItemKind, number> = { board: 0, column: 0, note: 0, todo: 0, link: 0, media: 0, frame: 0, comment: 0 };
   for (const it of Object.values(items)) if (it.boardId === boardId) n[it.kind]++;
   const parts = (Object.keys(KIND_NOUN) as (keyof typeof KIND_NOUN)[])
     .filter((k) => n[k])
@@ -533,10 +555,42 @@ export function planArrange(how: Arrange): Placed[] {
 /** Arrange the selection (items slide to their new places). */
 export function arrangeSelection(how: Arrange) {
   const { items } = board();
-  for (const p of planArrange(how)) {
+  const plan = planArrange(how);
+  const placed = new Set(plan.map((p) => p.id));
+  // A frame's contents move with it (unless they're being arranged themselves).
+  const along = Object.fromEntries(plan.map((p) => [p.id, items[p.id]?.kind === 'frame' ? frameMembers(p.id).filter((m) => !placed.has(m)) : []]));
+  for (const p of plan) {
     const it = items[p.id];
-    if (it && (it.x !== p.x || it.y !== p.y)) board().updateItem(p.id, { x: p.x, y: p.y });
+    if (!it || (it.x === p.x && it.y === p.y)) continue;
+    board().updateItem(p.id, { x: p.x, y: p.y });
+    for (const m of along[p.id]) board().updateItem(m, { x: items[m].x + p.x - it.x, y: items[m].y + p.y - it.y });
   }
+}
+
+// --- Frames ----------------------------------------------------------------------
+
+/** Room around framed things, and above them for the frame's title tag. */
+const FRAME_PAD = GRID_SIZE * 2;
+const FRAME_TAG = GRID_SIZE * 2.5;
+
+/** Wrap the selection in a new frame, sized to fit with some padding, and name it. */
+export function wrapInFrame(ids = ui().selectedIds) {
+  const { items } = board();
+  const boardId = currentBoardId();
+  const inside = ids.map((id) => items[id]).filter((it) => it && it.boardId === boardId && !parentOf(it) && onCanvas(it));
+  if (!inside.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const it of inside) {
+    const { w, h } = itemSize(it);
+    x0 = Math.min(x0, it.x); y0 = Math.min(y0, it.y);
+    x1 = Math.max(x1, it.x + w); y1 = Math.max(y1, it.y + h);
+  }
+  // Outwards to the grid, so the frame lines up with the dots but still clears everything.
+  const out = (v: number, up: boolean) => (ui().snap ? (up ? Math.ceil : Math.floor)(v / GRID_SIZE) * GRID_SIZE : v);
+  const x = out(x0 - FRAME_PAD, false), y = out(y0 - FRAME_PAD - FRAME_TAG, false);
+  const id = board().addItem('frame', { boardId, x, y, w: out(x1 + FRAME_PAD, true) - x, h: out(y1 + FRAME_PAD, true) - y });
+  ui().set({ selectedIds: [id], editingId: id, contextMenu: null });
+  return id;
 }
 
 /**

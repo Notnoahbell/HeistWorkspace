@@ -7,6 +7,7 @@ import { useUi } from './board/ui';
 import { useBoardId } from './board/nav';
 import { NoteView } from './board/NoteView';
 import { ColumnView } from './board/ColumnView';
+import { FrameView } from './board/FrameView';
 import { BoardView } from './board/BoardView';
 import { TodoView } from './board/TodoView';
 import { LinkView } from './board/LinkView';
@@ -15,7 +16,7 @@ import { addMediaFiles, addVersionFile } from './board/media';
 import { videoTargetAt } from './board/versions';
 import { currentBoardId } from './board/nav';
 import {
-  clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, zoomToFit,
+  clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, wrapInFrame, zoomToFit,
 } from './board/actions';
 import { ToolRail } from './ui/ToolRail';
 import { TopBar } from './ui/TopBar';
@@ -35,7 +36,8 @@ function useIds(boardId: string, kind: ItemKind) {
 }
 
 function ItemLayer({ boardId }: { boardId: string }) {
-  // Columns render first so their published slots are ready for notes.
+  // Frames first (they sit behind everything); then columns, so their published slots are ready for notes.
+  const frames = useIds(boardId, 'frame');
   const columns = useIds(boardId, 'column');
   const boards = useIds(boardId, 'board');
   const notes = useIds(boardId, 'note');
@@ -44,6 +46,7 @@ function ItemLayer({ boardId }: { boardId: string }) {
   const media = useIds(boardId, 'media');
   return (
     <>
+      {frames.map((id) => <FrameView key={id} id={id} />)}
       {columns.map((id) => <ColumnView key={id} id={id} />)}
       {boards.map((id) => <BoardView key={id} id={id} />)}
       {notes.map((id) => <NoteView key={id} id={id} />)}
@@ -91,6 +94,7 @@ export function App() {
         const k = e.key.toLowerCase();
         const run: Record<string, () => unknown> = {
           a: selectAll, c: copySelection, x: cutSelection, d: duplicateSelection,
+          g: () => { if (ui.selectedIds.length) wrapInFrame(); },
         };
         if (run[k]) {
           e.preventDefault();
