@@ -2679,7 +2679,13 @@ button, a, label { cursor: var(--cursor, default); }
 .media-frame .media-status-ctl:not([data-set]) > .media-status { background: rgb(0 0 0 / 0.6); text-shadow: none; }
 .media-frame .media-status-ctl:not([data-set]) > .media-status:hover { background: rgb(0 0 0 / 0.78); }
 .media-tags > .media-version { flex: none; }
-.media:not(:hover):not([data-selected='true']) .media-status-ctl:not([data-set]):not([data-open]) { display: none; }
+/* At rest the status is just the strip along the top: its tag (or, unset, the "Status"
+   button) shows while the card is hovered, or its list is open. */
+.media:not(:hover) .media-status-ctl:not([data-open]) { display: none; }
+.media-status-strip {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 1; height: 4px;
+  background: var(--st); pointer-events: none;
+}
 .media-frame .media-status-ctl[data-set] > .media-status:hover { background: var(--st); filter: brightness(1.1); }
 .media-status-menu {
   position: fixed; z-index: 70;

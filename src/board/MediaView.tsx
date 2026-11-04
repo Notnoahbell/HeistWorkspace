@@ -180,6 +180,10 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </>
           )}
 
+          {/* A set status is a coloured strip along the top; hovering shows its tag (to change it). */}
+          {media.status && statusInfo(media.status) && (
+            <span className="media-status-strip" style={{ '--st': statusInfo(media.status)!.color } as CSSProperties} aria-hidden="true" />
+          )}
           {/* Top-left corner: the status (set right there), then the version and loop tags. */}
           <span className="media-tags">
             {!uploading && !failed && <CardStatus id={id} version={version} value={media.status ?? null} />}
