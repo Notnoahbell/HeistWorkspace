@@ -19,12 +19,16 @@ interface Use { itemId: string; boardId: string; name: string; version: number; 
 interface AdminFile {
   file: string; url: string; type: 'video' | 'image'; mime: string | null; name: string; size: number; extra: number;
   derived: Record<string, number>; poster: string | null; by: string | null; byGuess: boolean; at: number; known: boolean; uses: Use[];
+  /** Unused files: when the automatic clean-up deletes it. */
+  deletesAt: number | null;
 }
 interface Listing {
   files: AdminFile[];
   boards: Record<string, { path: string[]; owner: string | null }>;
   users: Record<string, { id: string; name: string; icon: string | null }>;
   total: number;
+  /** How long a file sits unused before it's cleared automatically. */
+  graceHours: number;
 }
 type Scope = { kind: 'all' } | { kind: 'unused' } | { kind: 'board'; id: string };
 type SortKey = 'at' | 'size' | 'name' | 'by';
@@ -85,6 +89,14 @@ const fmtWhen = (t: number) => {
   if (s < 86400 * 7) return `${Math.floor(s / 86400)} d ago`;
   return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 };
+/** "in 23 h", "in 40 min", "soon". */
+const fmtUntil = (t: number) => {
+  const s = (t - Date.now()) / 1000;
+  if (s < 60) return 'soon';
+  if (s < 3600) return `in ${Math.ceil(s / 60)} min`;
+  if (s < 86400 * 2) return `in ${Math.ceil(s / 3600)} h`;
+  return `in ${Math.ceil(s / 86400)} days`;
+};
 const fmtFull = (t: number) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 // --- Page ------------------------------------------------------------------------------
@@ -129,6 +141,11 @@ function Admin() {
       error={error}
       onRefresh={() => void load()}
       onLock={() => { storeKey(null, false); setKey(null); setData(null); }}
+      onSweep={async () => {
+        const r = await api<{ deleted: number; freed: number; waiting: number }>(key, '/api/admin/sweep', { method: 'POST', body: JSON.stringify({ now: true }) });
+        await load();
+        return r;
+      }}
       onDelete={async (files) => {
         const r = await api<{ deleted: number; freed: number; cardsUpdated: number; cardsDeleted: number }>(key, '/api/admin/delete', { method: 'POST', body: JSON.stringify({ files }) });
         await load();
@@ -160,9 +177,10 @@ function Unlock({ error, onUnlock }: { error: string | null; onUnlock: (key: str
   );
 }
 
-function FileManager({ data, loading, error, onRefresh, onLock, onDelete }: {
+function FileManager({ data, loading, error, onRefresh, onLock, onSweep, onDelete }: {
   data: Listing | null; loading: boolean; error: string | null;
   onRefresh: () => void; onLock: () => void;
+  onSweep: () => Promise<{ deleted: number; freed: number; waiting: number }>;
   onDelete: (files: string[]) => Promise<{ deleted: number; freed: number; cardsUpdated: number; cardsDeleted: number }>;
 }) {
   const [scope, setScope] = useState<Scope>({ kind: 'all' });
@@ -173,6 +191,7 @@ function FileManager({ data, loading, error, onRefresh, onLock, onDelete }: {
   const [open, setOpen] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sweeping, setSweeping] = useState(false);
 
   const files = data?.files ?? [];
   const userName = (id: string | null) => (id ? data?.users[id]?.name ?? 'Unknown user' : 'Unknown');
@@ -279,9 +298,25 @@ function FileManager({ data, loading, error, onRefresh, onLock, onDelete }: {
             <h2>{scopeTitle}</h2>
             <span>{shown.length} {shown.length === 1 ? 'file' : 'files'} · {fmtBytes(shown.reduce((n, f) => n + f.size + f.extra, 0))}</span>
             {scope.kind === 'unused' && unused.length > 0 && (
-              <button className="admin-ghost" onClick={() => setChecked(new Set(unused.map((f) => f.file)))}>Select all unused</button>
+              <button
+                className="admin-ghost"
+                disabled={sweeping}
+                title="Delete every file that isn't on a board (except ones uploaded in the last couple of minutes)"
+                onClick={async () => {
+                  setSweeping(true);
+                  try {
+                    const r = await onSweep();
+                    setNotice(r.deleted ? `Cleared ${r.deleted} unused ${r.deleted === 1 ? 'file' : 'files'} · ${fmtBytes(r.freed)} freed` : 'Nothing to clear yet');
+                  } finally { setSweeping(false); }
+                }}
+              >
+                <Trash2 {...ICON} /> {sweeping ? 'Clearing…' : 'Clear unused now'}
+              </button>
             )}
           </div>
+          {scope.kind === 'unused' && data && (
+            <p className="admin-hint">Files that aren't on any board are deleted automatically once they've been unused for {data.graceHours} hours.</p>
+          )}
           {error && <p className="admin-error" role="alert">{error}</p>}
           {notice && <p className="admin-notice" role="status" onAnimationEnd={() => setNotice(null)}>{notice}</p>}
           <div className="admin-table-wrap">
@@ -322,7 +357,11 @@ function FileManager({ data, loading, error, onRefresh, onLock, onDelete }: {
                             <span className="admin-chip" title={boardPath(boardsOn[0]).join(' / ')}>{boardPath(boardsOn[0]).slice(-1)[0]}</span>
                             {boardsOn.length > 1 && <span className="admin-chip admin-chip-more">+{boardsOn.length - 1}</span>}
                           </>
-                        ) : <span className="admin-chip admin-chip-none">Unused</span>}
+                        ) : (
+                          <span className="admin-chip admin-chip-none" title={f.deletesAt ? `Not on any board; deleted automatically ${fmtFull(f.deletesAt)}` : undefined}>
+                            Unused{f.deletesAt ? ` · clears ${fmtUntil(f.deletesAt)}` : ''}
+                          </span>
+                        )}
                       </td>
                       <td className="admin-col-actions" onClick={(e) => e.stopPropagation()}>
                         <a className="admin-icon-btn" href={f.url} target="_blank" rel="noopener noreferrer" title="Open" aria-label="Open"><ExternalLink {...ICON} /></a>
@@ -416,6 +455,7 @@ function Detail({ f, data, onClose, onDelete }: { f: AdminFile; data: Listing; o
         <dt>File</dt><dd className="admin-mono">{f.file}</dd>
       </dl>
       <h4>{f.uses.length ? `On ${f.uses.length} ${f.uses.length === 1 ? 'card' : 'cards'}` : 'Not on any board'}</h4>
+      {!f.uses.length && f.deletesAt && <p className="admin-hint admin-hint-tight">Deleted automatically {fmtUntil(f.deletesAt)} ({fmtFull(f.deletesAt)}) unless it's put on a board.</p>}
       <ul className="admin-uses">
         {f.uses.map((u) => (
           <li key={`${u.itemId}-${u.version}`}>

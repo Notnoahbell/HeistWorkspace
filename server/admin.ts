@@ -9,8 +9,19 @@
 //                              the boards: an older version is dropped from its card;
 //                              a card's current version falls back to the one before;
 //                              a card with nothing left is deleted with its comments.
+//   POST /api/admin/sweep    { now?: true } → run the unused-file clean-up (now: skip
+//                              the waiting period)
+//
+// Unused files clear themselves: every few minutes the server looks for uploads
+// no board refers to any more. Each one gets a clock; once it has been unused for
+// ORPHAN_GRACE_HOURS (24 by default) straight, it's deleted with its posters,
+// filmstrip and proxy. The wait covers an upload whose card hasn't synced yet, a
+// card cut and pasted later, undo, and a server that has just restarted and is
+// waiting for browsers to send their boards back. The clocks are kept on disk
+// (.orphans.json beside the uploads), and nothing is swept while the server
+// holds no media cards at all (data that looks wiped).
 
-import { readdir, readFile, stat, unlink } from 'node:fs/promises';
+import { readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -19,8 +30,16 @@ import type { UploadRecord } from './uploads.ts';
 
 const MEDIA_RE = /^([0-9a-f]{24})\.(png|jpe?g|gif|webp|avif|mp4|webm|mov)$/i;
 const DERIVED = ['derived.json', 'poster.jpg', 'strip.jpg', 'proxy.mp4', 'meta.json'];
+const DERIVED_RE = /^([0-9a-f]{24})\.(derived\.json|poster\.jpg|strip\.jpg|proxy\.mp4|meta\.json)$/i;
+/** Any reference to an upload, anywhere in an item. */
+const REF_RE = /\/uploads\/([0-9a-f]{24})\./gi;
 /** Wrong keys allowed per address per minute. */
 const MAX_FAILS = 10;
+/** How long a file must sit unused (on no board) before it's deleted. */
+export const GRACE_MS = Math.max(0, Number(process.env.ORPHAN_GRACE_HOURS ?? 24)) * 3600_000;
+const SWEEP_EVERY_MS = 10 * 60_000;
+const FIRST_SWEEP_MS = 60_000;
+const ORPHANS_FILE = '.orphans.json';
 
 type AnyItem = { id: string; kind: string; boardId: string; [k: string]: unknown };
 interface Version { src: string; name: string; meta?: Record<string, unknown>; addedAt?: number; addedBy?: string | null; [k: string]: unknown }
@@ -40,6 +59,86 @@ async function body(req: IncomingMessage): Promise<unknown> {
 
 export function createAdmin(dir: string, sync: SyncServer) {
   const fails = new Map<string, { n: number; since: number }>();
+
+  // --- Unused-file clean-up --------------------------------------------------------
+
+  /** Since when each unused file (by id) has been unused. */
+  let orphans: Record<string, number> = {};
+  const loaded = readFile(join(dir, ORPHANS_FILE), 'utf8').then((t) => { orphans = JSON.parse(t); }).catch(() => {});
+  const saveOrphans = () => writeFile(join(dir, ORPHANS_FILE), JSON.stringify(orphans)).catch(() => {});
+
+  /** Upload ids any item refers to. */
+  function referenced(): Set<string> {
+    const ids = new Set<string>();
+    for (const it of Object.values(sync.adminView().items)) {
+      const text = JSON.stringify(it);
+      if (!text.includes('/uploads/')) continue;
+      for (const m of text.matchAll(REF_RE)) ids.add(m[1].toLowerCase());
+    }
+    return ids;
+  }
+
+  let sweeping: Promise<{ deleted: string[]; freed: number; waiting: number }> | null = null;
+  /** Mark what's unused, delete what has been unused long enough (or everything unused, with `now`). */
+  function sweep(now = false) {
+    sweeping ??= (async () => {
+      await loaded;
+      const items = Object.values(sync.adminView().items);
+      const deleted: string[] = [];
+      let freed = 0, waiting = 0;
+      // No media cards at all while files exist: the data looks wiped (or not back yet). Leave it.
+      if (!items.some((it) => it.kind === 'media')) return { deleted, freed, waiting };
+      const refs = referenced();
+      const names = await readdir(dir).catch(() => [] as string[]);
+      const mains = new Map<string, string>();
+      for (const n of names) { const m = MEDIA_RE.exec(n); if (m) mains.set(m[1].toLowerCase(), n); }
+      const t = Date.now();
+      const seen = new Set<string>();
+      for (const [id, file] of mains) {
+        if (refs.has(id)) continue;
+        seen.add(id);
+        orphans[id] ??= t;
+        const st = await stat(join(dir, file)).catch(() => null);
+        if (!st) continue;
+        // Old enough unused, and old enough as a file (a brand-new upload's card may not be in yet).
+        // (Even "now" leaves anything uploaded in the last two minutes: its card may still be on the way.)
+        if (now ? t - st.mtimeMs < 120_000 : t - orphans[id] < GRACE_MS || t - st.mtimeMs < GRACE_MS) { waiting++; continue; }
+        for (const name of [file, ...DERIVED.map((d) => `${id}.${d}`)]) {
+          const p = join(dir, name);
+          const ds = await stat(p).catch(() => null);
+          if (!ds) continue;
+          await unlink(p).catch(() => {});
+          freed += ds.size;
+        }
+        deleted.push(file);
+        delete orphans[id];
+      }
+      // Posters, filmstrips, proxies and records left behind by a file that's gone.
+      for (const n of names) {
+        const m = DERIVED_RE.exec(n);
+        if (!m || mains.has(m[1].toLowerCase())) continue;
+        const ds = await stat(join(dir, n)).catch(() => null);
+        // (A minute's grace: an upload's record can be written just before its file is listed.)
+        if (!ds || t - ds.mtimeMs < 60_000) continue;
+        await unlink(join(dir, n)).catch(() => {});
+        freed += ds.size;
+      }
+      // Forget clocks for files that are in use again (or gone).
+      for (const id of Object.keys(orphans)) if (!seen.has(id)) delete orphans[id];
+      await saveOrphans();
+      if (deleted.length) console.log(`[uploads] cleared ${deleted.length} unused file(s), ${Math.round(freed / 1e6)} MB`);
+      return { deleted, freed, waiting };
+    })().finally(() => { sweeping = null; });
+    return sweeping;
+  }
+
+  // One sweeper per uploads folder, even when the dev server restarts this module.
+  const timers = ((globalThis as { __heistSweepers?: Map<string, NodeJS.Timeout[]> }).__heistSweepers ??= new Map());
+  for (const old of timers.get(dir) ?? []) { clearTimeout(old); clearInterval(old); }
+  timers.set(dir, [
+    setTimeout(() => void sweep(), FIRST_SWEEP_MS),
+    setInterval(() => void sweep(), SWEEP_EVERY_MS),
+  ]);
 
   function authorised(req: IncomingMessage): boolean | 'locked' {
     const ip = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || '?';
@@ -88,6 +187,7 @@ export function createAdmin(dir: string, sync: SyncServer) {
   }
 
   async function list() {
+    await loaded;
     const { items, profiles } = sync.adminView() as { items: Record<string, AnyItem>; profiles: Record<string, { id: string; name: string; icon: string | null }> };
     const names = await readdir(dir).catch(() => [] as string[]);
     const present = new Set(names);
@@ -147,10 +247,12 @@ export function createAdmin(dir: string, sync: SyncServer) {
         at,
         known: !!record,
         uses: used,
+        // Unused: when the clean-up will delete it (null while it's on a board).
+        deletesAt: used.length ? null : Math.max((orphans[id] ?? Date.now()), st.mtimeMs) + GRACE_MS,
       });
     }
     files.sort((a, b) => b.at - a.at);
-    return { files, boards, users: profiles, total };
+    return { files, boards, users: profiles, total, graceHours: GRACE_MS / 3600_000 };
   }
 
   /** Take files off the boards, then off the disk. */
@@ -208,6 +310,11 @@ export function createAdmin(dir: string, sync: SyncServer) {
     if (!ok) return json(res, 401, { error: 'Wrong key.' });
     try {
       if (path === '/api/admin/files' && req.method === 'GET') return json(res, 200, await list());
+      if (path === '/api/admin/sweep' && req.method === 'POST') {
+        const b = (await body(req)) as { now?: unknown };
+        const r = await sweep(b.now === true);
+        return json(res, 200, { deleted: r.deleted.length, freed: r.freed, waiting: r.waiting });
+      }
       if (path === '/api/admin/delete' && req.method === 'POST') {
         const b = (await body(req)) as { files?: unknown };
         const files = Array.isArray(b.files) ? b.files.filter((f): f is string => typeof f === 'string') : [];
@@ -219,5 +326,5 @@ export function createAdmin(dir: string, sync: SyncServer) {
     }
   }
 
-  return { handle };
+  return { handle, sweep };
 }

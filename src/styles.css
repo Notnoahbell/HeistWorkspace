@@ -2563,3 +2563,6 @@ button, a, label { cursor: var(--cursor, default); }
   .admin-detail { position: absolute; right: 0; top: 0; bottom: 0; z-index: 3; width: min(360px, 100vw); }
   .admin-col-on, .admin-table th:nth-child(7), .admin-table th:nth-child(5), .admin-table td:nth-child(5) { display: none; }
 }
+.admin-hint { margin: -2px 18px 10px; color: var(--text-dim); }
+.admin-hint-tight { margin: 0 0 8px; }
+.admin-main-head .admin-ghost:disabled { opacity: 0.6; cursor: default; }

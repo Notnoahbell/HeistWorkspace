@@ -229,6 +229,14 @@ Sized for ~150 users; a single modest server handles this comfortably.
   marked as a guess. Protected by a key checked server-side (`x-admin-key`, 10 wrong tries
   per minute per address): `ADMIN_KEY` env var (Render generates one, see its Environment
   tab), else one generated once, kept in `server-db.json` and printed at startup.
+- **2026-11-04: Unused uploads clear themselves** (`server/admin.ts`, sweep every 10 min).
+  A file no item refers to (any `/uploads/<id>.` string anywhere in any item, so versions,
+  previews and future uses count) gets a clock, saved in `uploads/.orphans.json`; after
+  `ORPHAN_GRACE_HOURS` (24) unused, and at least that old as a file, it's deleted with its
+  posters / proxy / record. Back on a board resets it. Posters etc. whose file is gone are
+  cleared too. Nothing is swept while the server holds no media cards at all (looks wiped,
+  or browsers haven't re-sent their boards yet). The admin page shows when each unused file
+  goes and has "Clear unused now" (skips the wait, not uploads from the last 2 minutes).
 - **2026-11-04: Videos are kept on the device.** `src/lib/mediaCache.ts` downloads a whole
   video once into Cache Storage (4 at a time, with progress; files over 400 MB just stream;
   least recently used dropped past 3 GB) and players get a disk-backed blob: URL for the saved
