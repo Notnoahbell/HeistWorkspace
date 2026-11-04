@@ -24,7 +24,7 @@ import { fmtTime } from './Scrubber';
 const ICON = { size: 14, strokeWidth: 2.2, 'aria-hidden': true } as const;
 /** Threads shown beside a card before "Show N more". */
 const QUICK_MAX = 5;
-const POP_WIDTH = 264;
+const POP_WIDTH = 344;
 const GAP = 14;
 
 /**
@@ -214,7 +214,7 @@ function ReactButton({ c }: { c: Comment }) {
             </button>
           ))}
           <button className="cmt-ring-close" title="Close" aria-label="Close reactions" onClick={() => setAt(null)}>
-            <X size={15} strokeWidth={2.2} aria-hidden="true" />
+            <X size={13} strokeWidth={2.4} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -591,20 +591,14 @@ function Panel({ id, style, video }: { id: string; style: CSSProperties; video: 
   );
 }
 
-/**
- * Beside a note, link, to-do or photo: one conversation, oldest first. No box
- * until you press Reply (or the toolbar's comment button).
- */
+/** Beside a note, link, to-do or photo: one conversation, oldest first, with the reply box at the bottom. */
 function Conversation({ id, style }: { id: string; style: CSSProperties }) {
   const [showAll, setShowAll] = useState(false);
-  const [replying, setReplying] = useState(false);
   const composing = useUi((s) => s.commenting === id);
   const all = useComments(id);
   const open = useMemo(() => all.filter((c) => !c.resolved).sort((a, b) => a.createdAt - b.createdAt), [all]);
   const list = showAll ? open : open.slice(-QUICK_MAX);
   const earlier = open.length - list.length;
-  const writing = replying || composing;
-  const close = () => { setReplying(false); if (composing) useUi.getState().set({ commenting: null }); };
 
   return (
     <div className="cmt-pop" style={style} onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
@@ -614,19 +608,16 @@ function Conversation({ id, style }: { id: string; style: CSSProperties }) {
           {list.map((c) => <FlatComment key={c.id} c={c} />)}
         </div>
       )}
+      {/* The reply box is always there; the toolbar's comment button puts the caret in it. */}
       <div className="cmt-pop-compose">
         <Typing targetId={id} />
-        {writing ? (
-          <Composer
-            targetId={id}
-            autoFocus
-            placeholder={open.length ? 'Reply…' : 'Write a comment…'}
-            onDone={close}
-            onCancel={close}
-          />
-        ) : (
-          open.length > 0 && <button className="cmt-reply-open" onClick={() => setReplying(true)}>Reply</button>
-        )}
+        <Composer
+          key={composing ? 'opened' : 'idle'}
+          targetId={id}
+          autoFocus={composing}
+          placeholder={open.length ? 'Reply…' : 'Write a comment…'}
+          onCancel={composing ? () => useUi.getState().set({ commenting: null }) : undefined}
+        />
       </div>
     </div>
   );

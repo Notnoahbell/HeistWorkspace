@@ -111,6 +111,7 @@ function SingleToolbar() {
           {i > 0 && actionGroup(all[i - 1]) !== actionGroup(a) && <span className="toolbar-divider" role="separator" />}
           <button
             data-flyout-trigger
+            data-key={a.key}
             data-danger={a.danger}
             title={a.label}
             aria-label={a.label}
