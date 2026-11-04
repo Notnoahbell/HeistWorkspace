@@ -1207,18 +1207,18 @@ html, body, #root {
 .cmt-quick-compose { display: flex; flex-direction: column; gap: 4px; }
 .cmt-composer {
   position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 6px;
-  padding: 7px 7px 7px 12px; background: var(--panel); border: 1px solid var(--panel-border); cursor: text;
+  padding: 10.5px 7px 10.5px 12px; background: var(--panel); border: 1px solid var(--panel-border); cursor: text;
   border-radius: 12px;
 }
 .cmt-quick .cmt-composer { box-shadow: var(--panel-shadow); }
 .cmt-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .cmt-composer textarea {
-  flex: 1; min-width: 0; min-height: 22px; padding: 2px 0; resize: none; overflow: hidden;
+  flex: 1; min-width: 0; min-height: 24px; padding: 3px 0; resize: none; overflow: hidden;
   border: 0; background: none; color: var(--text); outline: none;
   font: 13.5px/1.35 var(--font);
 }
 .cmt-composer textarea::placeholder { color: var(--text-dim); }
-.cmt-composer[data-reply] { margin: 4px 0 2px; padding: 5px 6px 5px 10px; box-shadow: none; border-radius: 10px; }
+.cmt-composer[data-reply] { margin: 4px 0 2px; padding: 7.5px 6px 7.5px 10px; box-shadow: none; border-radius: 10px; }
 .cmt-composer[data-reply] textarea { font-size: 13px; }
 .cmt-send {
   flex: none; height: 24px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--accent); color: #fff;
