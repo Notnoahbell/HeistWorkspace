@@ -1218,8 +1218,15 @@ html, body, #root {
 .cmt-tool:hover { background: var(--hover); color: var(--text); }
 .cmt-check:hover { background: #30a46c; color: #fff; }
 .cmt-delete:hover { color: #e5484d; }
-.cmt-delete[data-confirm] { background: #e5484d; color: #fff; }
+/* Delete arms on the first click: the bin opens into a red "Delete?" pill with a little shake. */
+.cmt-delete { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 28px; padding: 0 7px; transition: background 0.15s, color 0.15s; }
+.cmt-delete-label { max-width: 0; overflow: hidden; white-space: nowrap; font: 650 12px var(--font); transition: max-width 0.2s cubic-bezier(0.25, 1, 0.5, 1), margin 0.2s; }
+.cmt-delete[data-confirm] { background: #e5484d; color: #fff; padding: 0 10px 0 8px; animation: cmt-arm 0.32s ease-out; }
 .cmt-delete[data-confirm]:hover { background: #d13438; color: #fff; }
+.cmt-delete[data-confirm] .cmt-delete-label { max-width: 60px; margin-left: 5px; }
+.cmt-delete[data-confirm] svg { animation: cmt-lid 0.32s ease-out; }
+@keyframes cmt-arm { 0%, 100% { transform: none; } 20% { transform: translateX(-2px); } 45% { transform: translateX(2px); } 70% { transform: translateX(-1px); } }
+@keyframes cmt-lid { 30% { transform: rotate(-14deg) scale(1.1); } }
 .cmt-tool[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
 /* Editing in place: the text stays where it was (box edge pulled out to the left), same type, centred in the box. */
 .cmt[data-editing] .cmt-meta { margin-bottom: 8px; }
@@ -1227,7 +1234,6 @@ html, body, #root {
 .cmt[data-editing] .cmt-composer textarea { font-size: 14px; line-height: 21px; padding: 0; min-height: 21px; }
 .cmt[data-editing] .cmt-send { align-self: flex-end; }
 /* Sliding up out of the reply box. */
-.cmt-thread[data-dropping] { position: relative; z-index: 2; animation: none; }
 
 /* Under the text: reaction chips, Reply, the react button (or the six emoji while picking). */
 .cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 -2px; min-height: 30px; }
