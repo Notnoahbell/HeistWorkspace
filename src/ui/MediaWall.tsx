@@ -232,57 +232,107 @@ function Wall({ ids, mode, onMode }: { ids: string[]; mode: LoadMode; onMode: (m
   const fmt = (t: number) => fmtTimecode(t, fps);
 
   // --- Keeping the videos on the clock --------------------------------------------
+  //
+  // Playing, they follow the clock by nudging their speed. Anything bigger — starting,
+  // a jump, one drifting well off, one running out of data — is a "line-up": the clock
+  // stops, every video pauses and seeks to the same frame, and only when all of them
+  // have landed and have data to play do they start again, on the same tick. (Seeking
+  // while the clock runs on is a chase: slow seekers land late, are off again, seek
+  // again, and never catch up.)
   const waitTicks = useRef(0);
-  /** Bring every video to the clock. `exact`: seek anything that's off at all (after a jump), not just far off. */
-  const sync = (exact = false) => {
+  /** Set while lining up. */
+  const lining = useRef(false);
+  const showWaiting = (on: boolean) => stage.current?.toggleAttribute('data-waiting', on);
+
+  /** Stop the clock and line everyone up at its time. */
+  const lineUp = () => {
+    clock.hold(true);
+    lining.current = true;
+    waitTicks.current = 0;
+    showWaiting(true);
+    syncRef.current();
+  };
+
+  const sync = () => {
     const t = clock.currentTime;
     const run = !clock.paused;
-    const held = clock.waiting;
-    let unready = false, unloaded = false;
-    for (const v of videos.current.values()) {
-      if (v.error) continue;
-      const length = lengthOf(v);
-      if (v.readyState < 1 || length == null) { unloaded = true; continue; }
-      const last = Math.max(0, length - 0.04);
-      const due = t < last; // still has picture to play at this time (shorter ones stop on their last frame)
-      if (!run || held || !due) {
+    const vids = [...videos.current.values()].filter((v) => !v.error);
+
+    // Lining up: everyone to the same frame, then go together.
+    if (run && lining.current) {
+      let all = true;
+      for (const v of vids) {
+        const length = lengthOf(v);
+        if (v.readyState < 1 || length == null) { all = false; continue; }
+        const last = Math.max(0, length - 0.04);
+        const want = Math.min(t, last);
         if (!v.paused) v.pause();
-        if (!held && !v.seeking && Math.abs(v.currentTime - Math.min(t, last)) > STILL_DRIFT) v.currentTime = Math.min(t, last);
-        if (held && due && v.readyState < 3) unready = true;
+        if (v.seeking) { all = false; continue; }
+        if (Math.abs(v.currentTime - want) > STILL_DRIFT) { v.currentTime = want; all = false; continue; }
+        // Ones past their end just hold their last frame; the rest need data to play on.
+        if (t < last && v.readyState < 3) all = false;
+      }
+      if (!all) return;
+      lining.current = false;
+      showWaiting(false);
+      clock.hold(false);
+      for (const v of vids) {
+        const length = lengthOf(v);
+        if (length == null || clock.currentTime >= length - 0.04) continue;
+        v.playbackRate = clock.playbackRate;
+        void v.play().catch(() => {});
+      }
+      return;
+    }
+
+    // Paused: everyone holds the clock's frame. (While scrubbing, each re-seeks to the
+    // latest time once its last seek has landed, rather than queueing one per move.)
+    if (!run) {
+      for (const v of vids) {
+        const length = lengthOf(v);
+        if (v.readyState < 1 || length == null) continue;
+        const want = Math.min(t, Math.max(0, length - 0.04));
+        if (!v.paused) v.pause();
+        if (!v.seeking && Math.abs(v.currentTime - want) > STILL_DRIFT) v.currentTime = want;
+      }
+      return;
+    }
+
+    // Playing: follow by speed; line up again if anything is badly off or out of data.
+    let lineUpNow = false, starving = false;
+    for (const v of vids) {
+      const length = lengthOf(v);
+      if (v.readyState < 1 || length == null) { lineUpNow = true; continue; }
+      const last = Math.max(0, length - 0.04);
+      if (t >= last) {
+        // Shorter than the longest: stop on its last frame.
+        if (!v.paused) v.pause();
+        if (!v.seeking && Math.abs(v.currentTime - last) > STILL_DRIFT) v.currentTime = last;
         continue;
       }
-      if (v.seeking) { if (v.readyState < 3) unready = true; continue; }
+      if (v.seeking) { starving = true; continue; }
       const drift = v.currentTime - t;
-      if (Math.abs(drift) > (exact ? STILL_DRIFT : SEEK_DRIFT)) {
-        v.currentTime = t;
-        v.playbackRate = clock.playbackRate;
-      } else {
-        // Behind: a touch faster; ahead: a touch slower.
-        v.playbackRate = clock.playbackRate * (1 - Math.max(-NUDGE, Math.min(NUDGE, drift * 0.8)));
-      }
-      if (v.paused) void v.play().catch(() => {});
-      if (v.readyState < 3) unready = true;
+      if (Math.abs(drift) > SEEK_DRIFT) { lineUpNow = true; continue; }
+      // Behind: a touch faster; ahead: a touch slower.
+      v.playbackRate = clock.playbackRate * (1 - Math.max(-NUDGE, Math.min(NUDGE, drift * 0.8)));
+      if (v.paused && !v.ended) void v.play().catch(() => {});
+      if (v.readyState < 3) starving = true;
     }
-    // Wait for a video that's run out of data — after a moment, so one blip doesn't stop them all.
-    waitTicks.current = unready ? waitTicks.current + 1 : 0;
-    const hold = run && (unloaded || (held ? unready : waitTicks.current >= 2));
-    if (hold !== held) {
-      clock.hold(hold);
-      stage.current?.toggleAttribute('data-waiting', hold);
-      if (!hold) sync(); // carry on together from where the clock stopped
-    }
+    // Out of data for a moment (not just a blip): line up and wait for it.
+    waitTicks.current = starving ? waitTicks.current + 1 : 0;
+    if (lineUpNow || waitTicks.current >= 2) lineUp();
   };
   const syncRef = useRef(sync);
   syncRef.current = sync;
 
-  // Clock events → videos. Seeks are coalesced to one per frame.
+  // Clock events → videos. Starting and jumps line everyone up; paused seeks are coalesced to one per frame.
   useEffect(() => {
     let raf = 0;
-    const later = (hard: boolean) => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => syncRef.current(hard)); };
-    const onPlay = () => { setPlaying(true); later(true); };
-    const onPause = () => { setPlaying(false); stage.current?.removeAttribute('data-waiting'); syncRef.current(); };
-    const onSeek = () => later(!clock.paused);
-    const onRate = () => syncRef.current(true);
+    const later = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => syncRef.current()); };
+    const onPlay = () => { setPlaying(true); lineUp(); };
+    const onPause = () => { setPlaying(false); lining.current = false; showWaiting(false); syncRef.current(); };
+    const onSeek = () => { if (clock.paused) later(); else lineUp(); };
+    const onRate = () => { if (!clock.paused) lineUp(); };
     clock.addEventListener('play', onPlay);
     clock.addEventListener('pause', onPause);
     clock.addEventListener('seeked', onSeek);
@@ -561,8 +611,8 @@ function Wall({ ids, mode, onMode }: { ids: string[]; mode: LoadMode; onMode: (m
                       disablePictureInPicture
                       onLoadedMetadata={() => { measure(); syncRef.current(); }}
                       onDurationChange={measure}
-                      onSeeked={() => { if (clock.paused) syncRef.current(); }}
-                      onCanPlay={(e) => { checkBuffer(it.id, e.currentTarget); if (clock.waiting) syncRef.current(); }}
+                      onSeeked={() => { if (clock.paused || lining.current) syncRef.current(); }}
+                      onCanPlay={(e) => { checkBuffer(it.id, e.currentTarget); if (lining.current) syncRef.current(); }}
                       onCanPlayThrough={(e) => checkBuffer(it.id, e.currentTarget)}
                       onProgress={(e) => checkBuffer(it.id, e.currentTarget)}
                       onLoadedData={(e) => checkBuffer(it.id, e.currentTarget)}

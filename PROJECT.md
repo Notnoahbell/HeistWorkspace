@@ -250,6 +250,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   worker (`public/sw.js`) caches posters, filmstrips and photos only: Chrome refuses video a
   service worker returns as synthesised 206 ranges ("format error"), so it never touches video.
   Needs https or localhost (not plain-http LAN addresses, where it does nothing).
+- **2026-11-04: Jumps line everyone up.** In Side by side, starting, any jump, a video >0.35s
+  off, or one out of data stops the clock, pauses and seeks every video to the same frame, and
+  restarts them all together once each has landed with data. Seeking while the clock ran on
+  was a chase (slow seekers landed late, were off again, re-seeked, never caught up). How long
+  a jump takes then depends on keyframe spacing, so videos with keyframes >2s apart (first
+  minute, read with ffprobe) get a 720p proxy, and proxies have a keyframe every second: in
+  testing, the same footage went from 1–8s per jump to under 0.15s.
 - **2026-11-04: Side by side plays up to 25 (5×5) on one clock.** `src/ui/MediaWall.tsx`.
   The time belongs to a master clock, not to any one video; videos follow by nudging
   their playback rate (±8%) and only seek when >0.35s off, because 25 simultaneous seeks

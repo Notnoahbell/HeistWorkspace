@@ -18,6 +18,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 const FFMPEG = process.env.FFMPEG_PATH ?? 'ffmpeg';
 const FFPROBE = process.env.FFPROBE_PATH ?? 'ffprobe';
+/** Seconds between keyframes beyond which a video gets a quick-seeking proxy. */
+const MAX_KEYFRAME_GAP = 2;
 /** Frames in a filmstrip, and how wide each one is. */
 const STRIP_FRAMES = 24;
 const STRIP_WIDTH = 160;
@@ -114,7 +116,10 @@ export function createDerive(dir: string) {
         width: v.width, height: v.height,
       });
       const bitrate = Number(probe.format?.bit_rate ?? 0);
-      const needsProxy = !PLAYABLE.has(String(v.codec_name)) || (v.height ?? 0) > 1080 || bitrate > 12_000_000;
+      // Keyframes far apart make every jump slow (decoding starts from the last one; with several
+      // videos side by side, that's several at once): such files get a proxy with one a second.
+      const gap = await keyframeGap(src, duration);
+      const needsProxy = !PLAYABLE.has(String(v.codec_name)) || (v.height ?? 0) > 1080 || bitrate > 12_000_000 || gap > MAX_KEYFRAME_GAP;
       state.proxy = needsProxy ? 'pending' : null;
 
       // Poster (a little way in, past any fade from black) and filmstrip.
@@ -132,6 +137,8 @@ export function createDerive(dir: string) {
       await slot(() => run(FFMPEG, [
         '-v', 'error', '-y', '-i', src,
         '-vf', 'scale=-2:min(720\\,ih)', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
+        // A keyframe every second, so jumping around (back especially) only decodes a second's worth.
+        '-force_key_frames', 'expr:gte(t,n_forced*1)',
         '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', p.proxy,
       ]));
       state.proxy = `/uploads/${id}.proxy.mp4`;
@@ -164,4 +171,20 @@ export function createDerive(dir: string) {
   }
 
   return { handle };
+}
+
+/** The longest stretch between keyframes in the first minute (keyframes only are read, so it's quick). */
+async function keyframeGap(src: string, duration: number): Promise<number> {
+  try {
+    const { out } = await run(FFPROBE, [
+      '-v', 'error', '-select_streams', 'v:0', '-skip_frame', 'nokey', '-read_intervals', '%+60',
+      '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'csv=p=0', src,
+    ]);
+    const times = out.split(/\s+/).filter(Boolean).map((l) => parseFloat(l)) // lines can end in a comma.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!times.length) return 0;
+    const end = Math.min(60, duration || times[times.length - 1]);
+    let gap = 0;
+    for (let i = 1; i < times.length; i++) gap = Math.max(gap, times[i] - times[i - 1]);
+    return Math.max(gap, end - times[times.length - 1]);
+  } catch { return 0; }
 }
