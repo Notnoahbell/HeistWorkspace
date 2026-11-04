@@ -286,9 +286,8 @@ const seenThreads = new Set<string>();
 let launch: { targetId: string; box: DOMRect; dock: Element; dockTop: number; at: number } | null = null;
 
 /**
- * A comment you just posted lifts out of the box, slams down into its place
- * in the stack with a squash and a bounce, and its neighbours recoil from the
- * impact (nearest most). The box slides down to make room.
+ * A comment you just posted slides up out of the reply box into its place,
+ * and the box glides down to make room.
  */
 function useDrop(ref: RefObject<HTMLElement | null>, c: Comment, fresh: boolean) {
   useLayoutEffect(() => {
@@ -299,42 +298,15 @@ function useDrop(ref: RefObject<HTMLElement | null>, c: Comment, fresh: boolean)
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     el.scrollIntoView({ block: 'nearest' });
     const to = el.getBoundingClientRect();
-    const dx = from.box.left - to.left;
-    const dy = from.box.top - to.top;
-    const LAND = 0.6; // impact, as a share of the drop
-    const DURATION = 640;
+    const ease = 'cubic-bezier(0.25, 1, 0.5, 1)';
     el.dataset.dropping = '';
-    const drop = el.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(0.97)`, opacity: 0.5, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
-      { transform: 'translate(0, -16px) scale(1.035)', opacity: 1, offset: 0.36, easing: 'cubic-bezier(0.7, 0, 1, 0.6)' },
-      { transform: 'translate(0, 3px) scale(1.015, 0.96)', offset: LAND, easing: 'cubic-bezier(0.3, 0.6, 0.4, 1)' },
-      { transform: 'translate(0, -2.5px) scale(0.995, 1.012)', offset: 0.8, easing: 'ease-in-out' },
-      { transform: 'none' },
-    ], { duration: DURATION, easing: 'linear' });
-    drop.onfinish = drop.oncancel = () => { delete el.dataset.dropping; };
-
-    // Neighbours get knocked: those above jump up, those below dip, fading with distance.
-    const stack = [...(el.parentElement?.children ?? [])].filter((n) => n.classList.contains('cmt-thread'));
-    const mine = stack.indexOf(el);
-    stack.forEach((n, i) => {
-      if (n === el) return;
-      const d = Math.abs(i - mine);
-      const dir = i < mine ? -1 : 1;
-      const amp = 6 / d;
-      (n as HTMLElement).animate([
-        { transform: 'none' },
-        { transform: `translateY(${dir * amp}px)`, offset: 0.25 },
-        { transform: `translateY(${-dir * amp * 0.35}px)`, offset: 0.6 },
-        { transform: 'none' },
-      ], { duration: 460, delay: DURATION * LAND + (d - 1) * 45, easing: 'ease-out' });
-    });
-
-    // The box was pushed down by the new comment; let it slide there instead of jumping.
+    const slide = el.animate(
+      [{ transform: `translateY(${from.box.top - to.top}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: 260, easing: ease },
+    );
+    slide.onfinish = slide.oncancel = () => { delete el.dataset.dropping; };
     const shift = from.dock.isConnected ? from.dock.getBoundingClientRect().top - from.dockTop : 0;
-    if (shift > 1) {
-      from.dock.animate([{ transform: `translateY(${-shift}px)` }, { transform: 'none' }],
-        { duration: 380, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
-    }
+    if (shift > 1) from.dock.animate([{ transform: `translateY(${-shift}px)` }, { transform: 'none' }], { duration: 260, easing: ease });
   }, []);
 }
 

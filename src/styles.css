@@ -1221,14 +1221,13 @@ html, body, #root {
 .cmt-delete[data-confirm] { background: #e5484d; color: #fff; }
 .cmt-delete[data-confirm]:hover { background: #d13438; color: #fff; }
 .cmt-tool[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
-/* Editing in place: the text stays where it was (box edge pulled out to the left), same type. */
-.cmt[data-editing] .cmt-composer { margin: 1px -6px 2px -11px; padding: 5px 5px 5px 10px; align-items: flex-end; border-radius: 10px; }
-.cmt[data-editing] .cmt-composer textarea { font-size: 14px; line-height: 1.5; padding: 0; min-height: 21px; align-self: center; }
-/* Mid-drop: lifted on a card of its own, until it lands. */
-.cmt-thread[data-dropping] {
-  position: relative; z-index: 2; animation: none;
-  background: var(--panel); border-radius: 12px; box-shadow: 0 10px 28px rgb(0 0 0 / 0.18), 0 0 0 1px var(--panel-border);
-}
+/* Editing in place: the text stays where it was (box edge pulled out to the left), same type, centred in the box. */
+.cmt[data-editing] .cmt-meta { margin-bottom: 8px; }
+.cmt[data-editing] .cmt-composer { margin: 0 -6px 2px -11px; padding: 5px 5px 5px 10px; align-items: center; border-radius: 10px; }
+.cmt[data-editing] .cmt-composer textarea { font-size: 14px; line-height: 21px; padding: 0; min-height: 21px; }
+.cmt[data-editing] .cmt-send { align-self: flex-end; }
+/* Sliding up out of the reply box. */
+.cmt-thread[data-dropping] { position: relative; z-index: 2; animation: none; }
 
 /* Under the text: reaction chips, Reply, the react button (or the six emoji while picking). */
 .cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 -2px; min-height: 30px; }
