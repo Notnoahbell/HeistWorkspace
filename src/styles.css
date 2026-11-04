@@ -1169,7 +1169,7 @@ html, body, #root {
   overflow: hidden; animation: cmt-in 0.12s ease-out backwards;
 }
 /* One stack: comments run on with no cards or rules between them. */
-.cmt-pop .cmt-list { flex: 0 1 auto; display: flex; flex-direction: column; padding: 6px 4px 0; }
+.cmt-pop .cmt-list { flex: 0 1 auto; display: flex; flex-direction: column; padding: 6px 4px 0; overflow-x: hidden; }
 .cmt-pop-compose { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 12px 14px; }
 .cmt-pop-compose:empty { display: none; }
 .cmt-pop .cmt-typing { padding: 2px 0; }
@@ -1218,15 +1218,13 @@ html, body, #root {
 .cmt-tool:hover { background: var(--hover); color: var(--text); }
 .cmt-check:hover { background: #30a46c; color: #fff; }
 .cmt-delete:hover { color: #e5484d; }
-/* Delete arms on the first click: the bin opens into a red "Delete?" pill with a little shake. */
+/* Delete arms on the first click: the bin opens smoothly into a red "Delete?" pill. */
 .cmt-delete { display: inline-flex; align-items: center; justify-content: center; width: auto; min-width: 28px; padding: 0 7px; transition: background 0.15s, color 0.15s; }
 .cmt-delete-label { max-width: 0; overflow: hidden; white-space: nowrap; font: 650 12px var(--font); transition: max-width 0.2s cubic-bezier(0.25, 1, 0.5, 1), margin 0.2s; }
-.cmt-delete[data-confirm] { background: #e5484d; color: #fff; padding: 0 10px 0 8px; animation: cmt-arm 0.32s ease-out; }
+.cmt-delete[data-confirm] { background: #e5484d; color: #fff; padding: 0 10px 0 8px; }
 .cmt-delete[data-confirm]:hover { background: #d13438; color: #fff; }
 .cmt-delete[data-confirm] .cmt-delete-label { max-width: 60px; margin-left: 5px; }
-.cmt-delete[data-confirm] svg { animation: cmt-lid 0.32s ease-out; }
-@keyframes cmt-arm { 0%, 100% { transform: none; } 20% { transform: translateX(-2px); } 45% { transform: translateX(2px); } 70% { transform: translateX(-1px); } }
-@keyframes cmt-lid { 30% { transform: rotate(-14deg) scale(1.1); } }
+
 .cmt-tool[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
 /* Editing in place: the text stays where it was (box edge pulled out to the left), same type, centred in the box. */
 .cmt[data-editing] .cmt-meta { margin-bottom: 8px; }
@@ -1346,7 +1344,7 @@ html, body, #root {
 }
 .cmt-tabs [role='tab'] span { margin-left: 4px; padding: 1px 6px; border-radius: 8px; background: var(--hover); font-size: 11px; }
 .cmt-tabs [role='tab'][aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
-.cmt-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.cmt-list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .cmt-empty { margin: 0; padding: 18px 14px; font-size: 13px; color: var(--text-dim); text-align: center; }
 
 /* Notifications (bell in the top bar). */

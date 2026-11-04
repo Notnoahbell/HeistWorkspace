@@ -287,17 +287,29 @@ function Reactions({ c }: { c: Comment }) {
   );
 }
 
+/**
+ * While a comment animates past the edge of the list, don't let a scrollbar
+ * flash up (unless the list already scrolls). Returns the undo.
+ */
+function holdScrollbar(el: HTMLElement): () => void {
+  const list = el.closest<HTMLElement>('.cmt-list');
+  if (!list || list.scrollHeight > list.clientHeight + 1) return () => {};
+  list.style.overflowY = 'hidden';
+  return () => { list.style.overflowY = ''; };
+}
+
 /** Fade and slide a comment away, then close the gap it leaves (the rest move up to fill it). */
 async function animateOut(el: HTMLElement) {
   el.style.pointerEvents = 'none';
-  await el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(24px)' }],
-    { duration: 170, easing: 'ease-in', fill: 'forwards' }).finished;
+  holdScrollbar(el); // the list re-renders without it afterwards, so no need to undo
+  await el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(16px)' }],
+    { duration: 100, easing: 'ease-in', fill: 'forwards' }).finished;
   const cs = getComputedStyle(el);
   el.style.overflow = 'hidden';
   await el.animate([
     { height: `${el.offsetHeight}px`, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, marginTop: cs.marginTop, marginBottom: cs.marginBottom },
     { height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px' },
-  ], { duration: 200, easing: 'cubic-bezier(0.25, 1, 0.5, 1)', fill: 'forwards' }).finished;
+  ], { duration: 140, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)', fill: 'forwards' }).finished;
 }
 
 /** Threads already shown once in this session. */
@@ -321,10 +333,12 @@ function useDrop(ref: RefObject<HTMLElement | null>, c: Comment, fresh: boolean)
     const to = el.getBoundingClientRect();
     const ease = 'cubic-bezier(0.25, 1, 0.5, 1)';
     el.style.animation = 'none'; // instead of the fade-in, not as well as
-    el.animate(
+    const release = holdScrollbar(el);
+    const slide = el.animate(
       [{ transform: `translateY(${from.box.top - to.top}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
       { duration: 260, easing: ease },
     );
+    slide.onfinish = slide.oncancel = release;
     const shift = from.dock.isConnected ? from.dock.getBoundingClientRect().top - from.dockTop : 0;
     if (shift > 1) from.dock.animate([{ transform: `translateY(${-shift}px)` }, { transform: 'none' }], { duration: 260, easing: ease });
   }, []);
