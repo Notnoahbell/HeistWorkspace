@@ -6,7 +6,10 @@
 // A video with versions has a version menu (comments follow the version) and
 // Compare: two versions side by side, playing together.
 //
-// Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · C comments · Esc close
+// Keys: Space play-pause · J / K / L shuttle back / stop / forward (again for faster) · ← → 5s ·
+// , . one frame · [ ] previous / next comment · Enter comment here · I / O range in / out ·
+// M mute · C comments · Esc close. Shift-drag the timeline for a range; the pen in the
+// comment box draws on the frame.
 // Full screen only from its button (a double-click or stray key shouldn't throw you into it).
 // Click the timecode to switch between timecode and frame numbers.
 
@@ -29,6 +32,7 @@ import { fmtFrames, fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from 
 import { CommentList, CommentLookContext, type CommentLook } from './Comments';
 import { Avatar } from './Collab';
 import { StatusMenu, VersionMenu } from './VersionMenu';
+import { Annotation, clearDraft, DrawTools, useDraft } from './Annotate';
 
 const ICON = { size: 18, strokeWidth: 2, 'aria-hidden': true } as const;
 /** In full screen, controls fade out after this long without the mouse moving (while playing). */
@@ -96,9 +100,16 @@ function Player({ id, start }: { id: string; start: number }) {
   const [closing, setClosing] = useState(false);
   const [units, setUnits] = useState(readUnits);
   const [rate, setRate] = useState(1);
+  /** The speed picked from the menu (what the shuttle goes back to). */
+  const rate0 = useRef(1);
   const [speedMenu, setSpeedMenu] = useState(false);
   const [duration, setDuration] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const draft = useDraft();
+  const comparing0 = compareWith != null && current > 1; // (before the early return; same as `comparing` below)
+  const active = useBoard((s) => (activeId ? s.items[activeId] : undefined));
+  /** J / L shuttle: direction and speed, and the timer that steps backwards (browsers can't play in reverse). */
+  const shuttle = useRef<{ dir: 1 | -1; speed: number; timer: number; rate: number } | null>(null);
   const siblings = useSiblings(item?.boardId ?? '');
   const markers = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? [])
     .filter((c) => !c.replyTo && c.time != null && commentVersion(c) === version)));
@@ -143,6 +154,10 @@ function Player({ id, start }: { id: string; start: number }) {
     const begin = () => { video.currentTime = at; if (play) void video.play().catch(() => {}); };
     if (video.readyState >= 1) begin(); else video.addEventListener('loadedmetadata', begin, { once: true });
   }, [video]);
+  useEffect(() => { clearDraft(); }, [id, version]);
+  useEffect(() => () => { clearDraft(); if (shuttle.current) clearInterval(shuttle.current.timer); }, []);
+  // Drawing needs a still frame.
+  useEffect(() => { if (draft.drawing) video?.pause(); }, [draft.drawing, video]);
   const pickVersion = (n: number) => {
     if (n === version) return;
     resume.current = { at: video?.currentTime ?? 0, play: !!video && !video.paused };
@@ -202,7 +217,64 @@ function Player({ id, start }: { id: string; start: number }) {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void stage.current?.requestFullscreen().catch(() => {});
   };
-  const togglePlay = () => { if (video) { if (video.paused) void video.play(); else video.pause(); } };
+  const stopShuttle = () => {
+    const sh = shuttle.current;
+    if (!sh) return;
+    clearInterval(sh.timer);
+    shuttle.current = null;
+    setRate(sh.rate);
+  };
+  /** L: play forward, faster each press (1×, 2×, 4×). J: the same backwards. */
+  const shuttleBy = (dir: 1 | -1) => {
+    const v = video;
+    if (!v) return;
+    const prev = shuttle.current;
+    const speed = prev?.dir === dir ? Math.min(4, prev.speed * 2) : 1;
+    if (prev) clearInterval(prev.timer);
+    const rate = prev?.rate ?? rate0.current;
+    useDraft.setState({ drawing: false });
+    if (dir === 1) {
+      shuttle.current = { dir, speed, timer: 0, rate };
+      setRate(speed);
+      void v.play().catch(() => {});
+      return;
+    }
+    v.pause();
+    const timer = window.setInterval(() => {
+      v.currentTime = Math.max(0, v.currentTime - 0.04 * speed);
+      if (v.currentTime <= 0) stopShuttle();
+    }, 40);
+    shuttle.current = { dir, speed, timer, rate };
+  };
+  const togglePlay = () => {
+    if (!video) return;
+    if (shuttle.current) { stopShuttle(); video.pause(); return; }
+    if (video.paused) { useDraft.setState({ drawing: false }); void video.play(); } else video.pause();
+  };
+  /** Enter: comment on this frame (opens the comments if they're hidden). */
+  const startComment = () => {
+    stopShuttle();
+    video?.pause();
+    const focus = () => document.querySelector<HTMLTextAreaElement>('.viewer-side .cmt-full-compose textarea')?.focus();
+    if (!side) { toggleSide(); setTimeout(focus, 320); } else focus();
+  };
+  /** [ and ]: the comment before / after this moment. */
+  const jumpComment = (dir: 1 | -1) => {
+    if (!video) return;
+    const t = video.currentTime;
+    const sorted = [...markers].sort((a, b) => a.time! - b.time!);
+    const next = dir === 1 ? sorted.find((c) => c.time! > t + 0.05) : [...sorted].reverse().find((c) => c.time! < t - 0.05);
+    if (next) { setActiveId(next.id); seek(next.time!); }
+  };
+  /** I / O: start or end a range at this moment. */
+  const markRange = (end: 'a' | 'b') => {
+    if (!video) return;
+    const t = video.currentTime;
+    const r = useDraft.getState().range;
+    const a = end === 'a' ? t : Math.min(r?.a ?? 0, t);
+    const b = end === 'b' ? t : Math.max(r?.b ?? t, t);
+    useDraft.setState({ range: b > a ? { a, b } : { a, b: a } });
+  };
   const toggleUnits = () => {
     const next = units === 'frames' ? 'time' : 'frames';
     setUnits(next);
@@ -222,8 +294,18 @@ function Player({ id, start }: { id: string; start: number }) {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e)) return;
       const v = video;
       const keys: Record<string, () => void> = {
-        Escape: () => { if (speedMenu) setSpeedMenu(false); else if (!document.fullscreenElement) dismiss(); },
-        ' ': togglePlay, k: togglePlay,
+        Escape: () => {
+          if (speedMenu) setSpeedMenu(false);
+          else if (useDraft.getState().drawing) useDraft.setState({ drawing: false });
+          else if (!document.fullscreenElement) dismiss();
+        },
+        ' ': togglePlay,
+        k: () => { stopShuttle(); video?.pause(); },
+        l: () => shuttleBy(1),
+        j: () => shuttleBy(-1),
+        Enter: startComment,
+        '[': () => jumpComment(-1), ']': () => jumpComment(1),
+        i: () => markRange('a'), o: () => markRange('b'),
         ArrowLeft: () => { if (v) v.currentTime = Math.max(0, v.currentTime - 5); },
         ArrowRight: () => { if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); },
         ',': () => { if (v) stepFrame(v, -1, fps); }, '.': () => { if (v) stepFrame(v, 1, fps); },
@@ -248,7 +330,8 @@ function Player({ id, start }: { id: string; start: number }) {
     activeId,
     onPick: (c) => { setActiveId(c.id); if (isVideo && c.time != null) seek(c.time); },
     version,
-  }), [activeId, isVideo, video, version, fps]);
+    review: isVideo && !comparing0,
+  }), [activeId, isVideo, video, version, fps, comparing0]);
   // Every version gets its frame rate / poster / proxy worked out (older uploads catch up here).
   useEffect(() => {
     if (item?.kind === 'media' && item.mediaType === 'video') for (const v of versionList(item)) ensureDerived(v.src, v.meta);
@@ -339,6 +422,13 @@ function Player({ id, start }: { id: string; start: number }) {
               <img src={src} alt={item.name} draggable={false} />
             )}
             {comparing && <span className="viewer-pane-tag">v{version}{shown.current ? ' · Current' : ''}</span>}
+            {/* The drawing being made, or the picked comment's drawing while paused on it. */}
+            {isVideo && !comparing && (draft.drawing || draft.shapes.length > 0
+              ? <Annotation video={video} shapes={draft.shapes} editable={draft.drawing} />
+              : active?.kind === 'comment' && active.drawing?.length && !playing
+                ? <Annotation video={video} shapes={active.drawing} editable={false} />
+                : null)}
+            {draft.drawing && !comparing && <DrawTools />}
             </div>
             {comparing && otherInfo && (
               <div className="viewer-pane" data-side={otherInfo.n > version ? 'right' : 'left'}>
@@ -356,10 +446,40 @@ function Player({ id, start }: { id: string; start: number }) {
           </div>
 
           {isVideo && (
-            <div className="viewer-timeline">
+            <div
+              className="viewer-timeline"
+              onPointerDownCapture={(e) => {
+                // Shift-drag: mark a range instead of scrubbing.
+                if (!e.shiftKey || !duration) return;
+                const track = e.currentTarget.querySelector('.scrub-track')!.getBoundingClientRect();
+                const at = (x: number) => Math.min(duration, Math.max(0, ((x - track.left) / track.width) * duration));
+                e.preventDefault();
+                e.stopPropagation();
+                const start = at(e.clientX);
+                useDraft.setState({ range: { a: start, b: start } });
+                const move = (ev: PointerEvent) => {
+                  const t = at(ev.clientX);
+                  useDraft.setState({ range: { a: Math.min(start, t), b: Math.max(start, t) } });
+                };
+                const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+                window.addEventListener('pointermove', move);
+                window.addEventListener('pointerup', up);
+              }}
+            >
               <Scrubber video={video} className="viewer-scrub" format={fmt} />
+              {draft.range && duration > 0 && (
+                <div className="viewer-range" style={{ '--a': draft.range.a / duration, '--b': draft.range.b / duration } as CSSProperties} />
+              )}
               {/* Who commented where: click to jump there and pick the comment. */}
               <div className="viewer-markers">
+                {duration > 0 && markers.filter((c) => c.timeEnd != null).map((c) => (
+                  <span
+                    key={`r-${c.id}`}
+                    className="viewer-marker-range"
+                    data-active={c.id === activeId || undefined}
+                    style={{ left: `${Math.min(1, c.time! / duration) * 100}%`, width: `${(Math.min(duration, c.timeEnd!) - c.time!) / duration * 100}%`, background: personalColor(c.authorId) }}
+                  />
+                ))}
                 {duration > 0 && markers.map((c) => {
                   const p = users[c.authorId];
                   return (
@@ -368,7 +488,7 @@ function Player({ id, start }: { id: string; start: number }) {
                       className="viewer-marker"
                       data-active={c.id === activeId || undefined}
                       style={{ left: `${Math.min(1, c.time! / duration) * 100}%` }}
-                      title={`${p?.name ?? c.authorName} · ${timecode(c.time!)}\n${c.text}`}
+                      title={`${p?.name ?? c.authorName} · ${timecode(c.time!)}${c.timeEnd != null ? ` – ${timecode(c.timeEnd)}` : ''}\n${c.text}`}
                       onClick={() => { setActiveId(c.id); seek(c.time!); }}
                     >
                       <Avatar profile={{ name: p?.name ?? c.authorName, icon: p?.icon ?? null }} color={personalColor(c.authorId)} size={16} />
@@ -402,7 +522,7 @@ function Player({ id, start }: { id: string; start: number }) {
                     {speedMenu && (
                       <div className="viewer-speed-menu" role="menu">
                         {[...SPEEDS].reverse().map((r) => (
-                          <button key={r} role="menuitemradio" aria-checked={r === rate} onClick={() => { setRate(r); setSpeedMenu(false); }}>
+                          <button key={r} role="menuitemradio" aria-checked={r === rate} onClick={() => { stopShuttle(); rate0.current = r; setRate(r); setSpeedMenu(false); }}>
                             {r === 1 ? 'Normal' : `${r}×`}
                           </button>
                         ))}

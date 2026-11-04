@@ -4,7 +4,8 @@
 
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ArrowUp, Check, ChevronDown, Clock, Pencil, SmilePlus, Trash2, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, Clock, Pencil, PenLine, SmilePlus, Trash2, X } from 'lucide-react';
+import { clearDraft, useDraft } from './Annotate';
 import { COMMENTABLE, useBoard, type Comment, type Media } from '../board/store';
 import { forVersion, isVideo, versionOf } from '../board/versions';
 import { useUi } from '../board/ui';
@@ -38,6 +39,8 @@ export interface CommentLook {
   onPick?: (c: Comment) => void;
   /** On a video: the version being looked at (else the current one). */
   version?: number;
+  /** In the player: comments can cover a range and carry a drawing (see Annotate). */
+  review?: boolean;
 }
 export const CommentLookContext = createContext<CommentLook>({ fmt: fmtTime, numbered: false, activeId: null });
 
@@ -173,8 +176,14 @@ function CommentRow({ c, reply, onSeek, onReply, number }: {
         ) : (
           <p className="cmt-text">
             {c.time != null && (
-              <button className="cmt-time" title="Jump to this moment" disabled={!onSeek} onClick={(e) => { e.stopPropagation(); onSeek?.(c.time!); }}>
-                {look.fmt(c.time)}
+              <button
+                className="cmt-time"
+                title={c.drawing?.length ? 'Jump here and show the drawing' : 'Jump to this moment'}
+                disabled={!onSeek && !look.onPick}
+                onClick={(e) => { e.stopPropagation(); if (look.onPick) look.onPick(c); else onSeek?.(c.time!); }}
+              >
+                {look.fmt(c.time)}{c.timeEnd != null && <> – {look.fmt(c.timeEnd)}</>}
+                {c.drawing?.length ? <PenLine size={11} strokeWidth={2.6} aria-label="with a drawing" /> : null}
               </button>
             )}
             <CommentText c={c} />
@@ -420,6 +429,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
   const [query, setQuery] = useState<{ start: number; q: string } | null>(null);
   const [active, setActive] = useState(0);
   const look = useContext(CommentLookContext);
+  const draft = useDraft();
   const ref = useRef<HTMLTextAreaElement>(null);
   const box = useRef<HTMLDivElement>(null);
   /** Where the caret goes once a picked mention is in the text. */
@@ -479,7 +489,15 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
       const from = box.current.closest('.cmt-pop-compose, .cmt-full-compose, .cmt-replies') ?? box.current;
       launch = { targetId, box: box.current.getBoundingClientRect(), dock: from, dockTop: from.getBoundingClientRect().top, at: Date.now() };
     }
+    const draft = look.review && !replyTo && !onSubmit ? useDraft.getState() : null;
     if (onSubmit) onSubmit(text);
+    else if (draft && (draft.range || draft.shapes.length)) {
+      addComment(targetId, text, {
+        time: draft.range ? draft.range.a : clock?.() ?? null, timeEnd: draft.range?.b ?? null,
+        drawing: draft.shapes, version: look.version,
+      });
+      clearDraft();
+    }
     else addComment(targetId, text, { time: clock && timed ? clock() : null, replyTo, version: look.version });
     setText('');
     setQuery(null);
@@ -509,16 +527,47 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
           )}
         </div>
       )}
-      {clock && !replyTo && !onSubmit && now != null && (
+      {clock && !replyTo && !onSubmit && now != null && (look.review && draft.range ? (
+        <span className="cmt-chip cmt-chip-range" aria-pressed="true">
+          <Clock size={11} strokeWidth={2.4} aria-hidden="true" />
+          {look.fmt(draft.range.a)} → {look.fmt(draft.range.b)}
+          <button className="cmt-chip-x" title="Back to a single moment" aria-label="Clear range" onClick={(e) => { e.stopPropagation(); useDraft.setState({ range: null }); }}>
+            <X size={10} strokeWidth={2.8} aria-hidden="true" />
+          </button>
+        </span>
+      ) : (
         <button
           className="cmt-chip"
           aria-pressed={timed}
-          title={timed ? 'Pinned to this moment — click to comment on the whole video' : 'Pin to the current moment'}
+          title={timed ? 'Pinned to this moment — click to comment on the whole video (Shift-drag the timeline, or I / O, for a range)' : 'Pin to the current moment'}
           onClick={(e) => { e.stopPropagation(); setTimed((t) => !t); }}
         >
           <Clock size={11} strokeWidth={2.4} aria-hidden="true" />
           {timed ? look.fmt(now) : 'Whole video'}
         </button>
+      ))}
+      {look.review && clock && !replyTo && !onSubmit && (
+        <>
+          {draft.shapes.length > 0 && (
+            <span className="cmt-chip cmt-chip-draw" aria-pressed="true">
+              <PenLine size={11} strokeWidth={2.4} aria-hidden="true" />
+              {draft.shapes.length} {draft.shapes.length === 1 ? 'mark' : 'marks'}
+              <button className="cmt-chip-x" title="Remove the drawing" aria-label="Remove drawing" onClick={(e) => { e.stopPropagation(); useDraft.setState({ shapes: [], drawing: false }); }}>
+                <X size={10} strokeWidth={2.8} aria-hidden="true" />
+              </button>
+            </span>
+          )}
+          <button
+            className="cmt-draw"
+            aria-pressed={draft.drawing}
+            title={draft.drawing ? 'Stop drawing' : 'Draw on the frame'}
+            aria-label="Draw on the frame"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => { e.stopPropagation(); useDraft.setState((d) => ({ drawing: !d.drawing })); }}
+          >
+            <PenLine size={15} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        </>
       )}
       <textarea
         ref={ref}

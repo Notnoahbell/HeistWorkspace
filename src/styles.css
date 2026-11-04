@@ -2151,3 +2151,57 @@ button, a, label { cursor: var(--cursor, default); }
 }
 .status-options button:hover { background: var(--hover); }
 .status-options button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+/* --- Review in the player: ranges, drawing ---------------------------------- */
+
+/* A range being marked (Shift-drag, or I / O), over the timeline's track (which is inset 10px). */
+.viewer-timeline { position: relative; }
+.viewer-range {
+  position: absolute; top: 6px; height: 26px; pointer-events: none;
+  left: calc(10px + (100% - 20px) * var(--a)); width: max(2px, calc((100% - 20px) * (var(--b) - var(--a))));
+  background: rgb(245 197 66 / 0.25); box-shadow: inset 2px 0 #f5c542, inset -2px 0 #f5c542; border-radius: 3px;
+}
+/* A posted range comment: a bar from its start to its end, under the avatars. */
+.viewer-marker-range { position: absolute; top: 8px; height: 6px; border-radius: 3px; opacity: 0.5; pointer-events: none; }
+.viewer-marker-range[data-active] { opacity: 0.9; }
+.viewer-marker { z-index: 1; }
+
+/* Marks drawn on the frame. */
+.annot { position: absolute; z-index: 2; overflow: visible; pointer-events: none; }
+.annot[data-editable] { pointer-events: auto; cursor: crosshair; touch-action: none; box-shadow: 0 0 0 2px rgb(111 125 255 / 0.6); }
+.annot :is(polyline, line, rect) { filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.5)); }
+.draw-tools {
+  position: absolute; z-index: 3; top: calc(var(--pad) + 10px); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 3px; padding: 5px; border-radius: 12px;
+  background: rgb(20 20 24 / 0.94); border: 1px solid var(--vline); box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  animation: cmt-in 0.12s ease-out backwards;
+}
+.draw-btn {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px;
+  background: none; color: #fff; cursor: pointer;
+}
+.draw-btn:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); }
+.draw-btn[aria-pressed='true'] { background: #6f7dff; }
+.draw-btn:disabled { opacity: 0.35; cursor: default; }
+.draw-swatch { width: 20px; height: 20px; margin: 0 2px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3); }
+.draw-swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px rgb(20 20 24), 0 0 0 4px #fff; }
+.draw-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--vline); }
+.draw-done {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; margin-left: 4px; padding: 0 12px; border: 0; border-radius: 8px;
+  background: #6f7dff; color: #fff; font: 600 13px var(--font); cursor: pointer;
+}
+
+/* In the comment box: the range chip (with ×), the drawing chip, and the pen. */
+.cmt-chip-range, .cmt-chip-draw { cursor: default; }
+.cmt-chip-x {
+  display: grid; place-items: center; width: 14px; height: 14px; margin: 0 -3px 0 2px; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: inherit; cursor: pointer; opacity: 0.7;
+}
+.cmt-chip-x:hover { opacity: 1; background: rgb(0 0 0 / 0.15); }
+.cmt-draw {
+  flex: none; align-self: flex-end; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px;
+  background: var(--hover); color: var(--text-dim); cursor: pointer;
+}
+.cmt-draw:hover { color: var(--text); }
+.cmt-draw[aria-pressed='true'] { background: var(--accent); color: #fff; }
+.cmt-time svg { margin-left: 4px; vertical-align: -1px; }

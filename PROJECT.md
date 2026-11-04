@@ -194,6 +194,12 @@ Sized for ~150 users; a single modest server handles this comfortably.
   renamed (`label`), restored (copied back on top as a new version, comments stay put)
   and deleted (its comments go; later versions and theirs move down one). Each version
   has a review status (`status`: review / changes / approved), shown as a tag on the card.
+- **2026-11-04: Review tools.** A comment can cover a range (`timeEnd`) and carry a
+  drawing (`drawing`: shapes in 0–1 picture coordinates, so they fit any size). The comment
+  being written in the player lives in a small local draft store (Annotate.tsx) the comment
+  box reads when it posts. Frame rate, poster, filmstrip and a proxy come from
+  /api/derive (ffprobe/ffmpeg on the server; FFMPEG_PATH / FFPROBE_PATH to point
+  elsewhere); cards hover-scrub with the filmstrip. Resolving comments was removed.
 - **2026-11-03: Reactions.** Six fixed emoji (👍 🔥 ❤️ 😂 💯 👎) stored on the comment as
   `reactions: { emoji: userId[] }`. Whole-item last-write-wins means two people reacting
   to the same comment at the same instant can drop one; fine for now, worth a per-field
@@ -257,8 +263,11 @@ npm run build      # typecheck + production build
   defaults to the filename — click the name of a selected card to rename; the arrow
   hides/shows the name and details. ▶ plays a video in place; drag its timeline to scrub.
   GIFs loop on their own. Double-click, Enter or the ⤢ in the card's bottom-right corner
-  opens the full-size player: Space/K play-pause, ←/→ 5s, , and . one frame, M mute,
-  C show/hide comments, Esc close; full screen only from its button. Drag a video onto
+  opens the full-size player: Space play-pause, J/K/L shuttle (again for faster), ←/→ 5s,
+  , and . one frame, [ and ] previous / next comment, Enter comment on this frame, I / O
+  (or Shift-drag the timeline) a range, M mute, C show/hide comments, Esc close; full
+  screen only from its button. The pen in the comment box draws on the frame (pen, arrow,
+  box; Ctrl+Z undo); clicking such a comment later shows the drawing. Drag a video onto
   another to add it as the next version; the player's "v3 ▾" switches version and Compare
   sets two side by side. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)

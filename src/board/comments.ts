@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
-import { useBoard, type Comment, type Item, type Media } from './store';
+import { useBoard, type Comment, type Item, type Media, type Shape } from './store';
 import { session, homeId, isHome } from '../session';
 import { usePresence, type Peer } from '../sync/presence';
 import { setTyping } from '../sync/client';
@@ -66,7 +66,9 @@ export const useOpenCount = (targetId: string, version?: number) =>
       (n, c) => n + (!threaded || (!c.replyTo && commentVersion(c) === v) ? 1 : 0), 0);
   });
 
-export function addComment(targetId: string, text: string, opts: { time?: number | null; replyTo?: string | null; version?: number } = {}) {
+export function addComment(targetId: string, text: string, opts: {
+  time?: number | null; timeEnd?: number | null; replyTo?: string | null; version?: number; drawing?: Shape[];
+} = {}) {
   const { items } = useBoard.getState();
   const target = items[targetId];
   const body = text.trim();
@@ -88,6 +90,8 @@ export function addComment(targetId: string, text: string, opts: { time?: number
     replyTo: opts.replyTo ?? null,
     mentions,
     ...(version != null ? { version } : {}),
+    ...(!opts.replyTo && opts.timeEnd != null && opts.time != null && opts.timeEnd > opts.time ? { timeEnd: opts.timeEnd } : {}),
+    ...(!opts.replyTo && opts.drawing?.length ? { drawing: opts.drawing } : {}),
   });
 }
 

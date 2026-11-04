@@ -107,6 +107,9 @@ export interface MediaVersion {
   status?: ReviewStatus | null;
 }
 
+/** A mark drawn on a video frame: pen stroke, arrow or box. Coordinates are 0–1 across/down the picture. */
+export interface Shape { k: 'pen' | 'arrow' | 'box'; c: string; p: number[] }
+
 /** Where the review of a version stands. */
 export type ReviewStatus = 'review' | 'changes' | 'approved';
 
@@ -192,6 +195,10 @@ export interface Comment extends ItemBase, Stacked {
   editedAt?: number | null;
   /** Which version of a video it's on (1 if unset). */
   version?: number;
+  /** A range rather than a moment: where it ends (seconds). */
+  timeEnd?: number | null;
+  /** Marks drawn on the frame at `time`. */
+  drawing?: Shape[];
   /** Emoji → ids of the people who reacted with it. */
   reactions?: Record<string, string[]>;
 }
