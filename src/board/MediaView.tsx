@@ -11,6 +11,7 @@ import { cardVideos, commentIndex } from './comments';
 import { useShallow } from 'zustand/react/shallow';
 import { isTyping } from '../canvas/input';
 import { openViewer } from '../ui/MediaViewer';
+import { useCachedSrc } from '../lib/mediaCache';
 import { CommentBadge } from '../ui/Comments';
 import { commentVersion, statusInfo, versionOf } from './versions';
 
@@ -94,10 +95,11 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [selected, video]);
 
+  // The proxy if the server made one; else a fresh upload's local copy; else the original;
+  // and the copy saved on this device in place of any of those, when there is one (lib/mediaCache).
+  const src = useCachedSrc(media ? playable(media.src, media.meta, local?.url) : undefined) ?? '';
   if (!media) return null;
 
-  // The proxy if the server made one; else a fresh upload's local copy; else the original.
-  const src = playable(media.src, media.meta, local?.url);
   const { width = 16, height = 9 } = media.meta;
   const failed = media.upload === 'failed';
   const uploading = media.upload === 'uploading';

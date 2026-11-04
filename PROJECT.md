@@ -218,6 +218,15 @@ Sized for ~150 users; a single modest server handles this comfortably.
   leaves its contents. Arrange (align / spread / grid) never stacks things on top of
   each other: aligning on a vertical line also makes a column, on a horizontal line a row.
   Frames are square-cornered and resize from the bottom-right corner only.
+- **2026-11-04: Videos are kept on the device.** `src/lib/mediaCache.ts` downloads a whole
+  video once into Cache Storage (4 at a time, with progress; files over 400 MB just stream;
+  least recently used dropped past 3 GB) and players get a disk-backed blob: URL for the saved
+  copy, so playing and seeking need no network and reopening is instant. Side by side fetches
+  every tile this way and won't play until all can (ring loader, one segment per video);
+  the full player saves what you watch; cards use a saved copy when there is one. A service
+  worker (`public/sw.js`) caches posters, filmstrips and photos only: Chrome refuses video a
+  service worker returns as synthesised 206 ranges ("format error"), so it never touches video.
+  Needs https or localhost (not plain-http LAN addresses, where it does nothing).
 - **2026-11-04: Side by side plays up to 25 (5×5) on one clock.** `src/ui/MediaWall.tsx`.
   The time belongs to a master clock, not to any one video; videos follow by nudging
   their playback rate (±8%) and only seek when >0.35s off, because 25 simultaneous seeks

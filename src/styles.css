@@ -2308,12 +2308,71 @@ button, a, label { cursor: var(--cursor, default); }
 .wall-sound:hover { background: rgb(0 0 0 / 0.85); }
 .wall-sound[aria-pressed='true']:hover { background: #5d6cf5; }
 .viewer-main[data-idle] :is(.wall-label, .wall-sound) { opacity: 0; }
+/* Buffering mid-play: a small spinner in the middle (after a moment, so blips don't flash it). */
 .wall-waiting {
-  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 2;
-  padding: 5px 12px; background: rgb(0 0 0 / 0.75); color: #fff; font: 600 12px var(--font);
+  position: absolute; left: 50%; top: 50%; z-index: 2;
+  width: 44px; height: 44px; margin: -22px 0 0 -22px; padding: 9px;
+  border-radius: 50%; background: rgb(0 0 0 / 0.6);
   pointer-events: none; opacity: 0; transition: opacity 0.15s;
 }
-.viewer-main[data-waiting] .wall-waiting { opacity: 1; transition-delay: 0.3s; }
+.wall-waiting i {
+  display: block; width: 100%; height: 100%; border-radius: 50%;
+  border: 3px solid rgb(255 255 255 / 0.2); border-top-color: #fff;
+  animation: wall-spin 0.8s linear infinite;
+}
+.viewer-main[data-waiting]:not([data-loading]) .wall-waiting { opacity: 1; transition-delay: 0.3s; }
+@keyframes wall-spin { to { transform: rotate(360deg); } }
+
+/* Loading: tiles wait dimmed with a sweep of light and a fill along the bottom; each pops in when ready. */
+.wall-tile { --p: 1; }
+.wall-tile > :is(video, img) { transition: opacity 0.35s ease, filter 0.35s ease; }
+.wall-tile[data-loading] > video { opacity: 0.35; filter: grayscale(0.6) blur(1px); }
+.wall-tile[data-loading]::before {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.09) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: wall-sheen 1.6s ease-in-out infinite;
+}
+.wall-tile[data-loading]::after {
+  content: ''; position: absolute; left: 0; bottom: 0; z-index: 1; height: 3px;
+  width: calc(var(--p) * 100%); background: #6f7dff;
+  transition: width 0.25s ease-out;
+}
+.wall-tile:not([data-loading]) > video { animation: wall-pop 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.2); }
+@keyframes wall-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes wall-pop { from { opacity: 0.35; transform: scale(0.96); } }
+
+/* The ring: one segment per video, filling as each arrives. */
+.wall-loader {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgb(8 8 12 / 0.78), rgb(8 8 12 / 0.35) 70%, transparent);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.wall-loader[data-done] { opacity: 0; transform: scale(1.08); }
+.wall-loader-card { position: relative; display: grid; place-items: center; }
+.wall-ring { display: block; filter: drop-shadow(0 6px 24px rgb(0 0 0 / 0.5)); }
+.wall-ring-spin { animation: wall-turn 14s linear infinite; }
+.wall-ring-track { fill: none; stroke: rgb(255 255 255 / 0.1); stroke-linecap: butt; }
+.wall-ring-fill { fill: none; stroke: #6f7dff; stroke-linecap: butt; transition: stroke-dasharray 0.3s ease-out, stroke 0.3s; }
+.wall-ring-fill[data-full] { stroke: #9aa4ff; animation: wall-seg 0.5s ease-out; }
+@keyframes wall-turn { to { transform: rotate(360deg); } }
+@keyframes wall-seg { from { stroke: #fff; stroke-width: 16px; } }
+.wall-loader-text { position: absolute; display: grid; place-items: center; gap: 2px; color: #fff; text-align: center; }
+.wall-loader-text b { font: 700 40px/1 var(--font); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.wall-loader-text small { font-size: 20px; margin-left: 1px; opacity: 0.7; }
+.wall-loader-text span { font: 600 12px var(--font); color: #9a9aa6; font-variant-numeric: tabular-nums; }
+.wall-loader-note { margin: 0; font: 500 12.5px var(--font); color: #c9c9d2; text-shadow: 0 1px 3px rgb(0 0 0 / 0.6); }
+.wall-loader-start {
+  pointer-events: auto; padding: 7px 14px; border: 1px solid rgb(255 255 255 / 0.2);
+  background: rgb(255 255 255 / 0.08); color: #fff; font: 600 12.5px var(--font); cursor: pointer;
+}
+.wall-loader-start:hover { background: rgb(255 255 255 / 0.16); }
+.viewer-main[data-loading] :is(.viewer-timeline, .viewer-bar .viewer-bar-side:first-child) { opacity: 0.35; }
+@media (prefers-reduced-motion: reduce) {
+  .wall-ring-spin, .wall-tile[data-loading]::before { animation: none; }
+}
 
 .selection-toolbar button[data-key='wall'] { color: var(--accent); }
 

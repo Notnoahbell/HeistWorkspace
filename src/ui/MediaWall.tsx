@@ -15,6 +15,10 @@
 // - Per frame only the timecode and the timeline fill are touched, straight in
 //   the DOM; React renders when the set of tiles or the controls change.
 // - Proxies (720p) play where the server has made them; only one tile has sound.
+// - Each file is downloaded whole first and kept on this device (lib/mediaCache),
+//   so playback and seeking come off the disk, and the next time is instant.
+//   Nothing can be played until every video is in and ready: a ring in the
+//   middle shows each one arriving.
 //
 // Keys: Space play-pause · K stop · ← → 5s · , . one frame · Home start · M sound · Esc close.
 
@@ -29,6 +33,7 @@ import { posOf } from '../board/actions';
 import { playable, useLocalMedia } from '../board/media';
 import { versionInfo, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
+import { cachedUrl, isCached, warm } from '../lib/mediaCache';
 import { fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
 
 /** Most tiles at once (5 × 5). Past that, decoding and bandwidth stop keeping up on an ordinary laptop. */
@@ -45,6 +50,8 @@ const NUDGE = 0.08;
 const STILL_DRIFT = 0.02;
 const SYNC_MS = 200;
 const VOLUME_KEY = 'heist:volume';
+/** After this long loading, offer to start with what's ready. */
+const IMPATIENT_MS = 10_000;
 
 /** Open these together (the media among them, in reading order, at most MAX_WALL). */
 export function openWall(ids: string[]) {
@@ -189,6 +196,14 @@ function Wall({ ids }: { ids: string[] }) {
   const [full, setFull] = useState(false);
   const [idle, setIdle] = useState(false);
   const [closing, setClosing] = useState(false);
+  /** Per video: download progress (0-1), how it'll play once fetched, and whether it can play. */
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  /** What each tile plays once its file is in: the saved copy (blob:), or the network if it couldn't be saved. */
+  const [fetched, setFetched] = useState<Record<string, string>>({});
+  const [canPlay, setCanPlay] = useState<Record<string, boolean>>({});
+  const [fromCache, setFromCache] = useState(0);
+  const [impatient, setImpatient] = useState(false);
+  const [forced, setForced] = useState(false);
 
   const crumbs = useBoard(useShallow((s) => (items[0] ? pathTo(items[0].boardId, s.items).map((c) => c.title) : [])));
   const fps = items.find((it) => it.mediaType === 'video' && it.meta.fps)?.meta.fps ?? FPS;
@@ -293,8 +308,41 @@ function Wall({ ids }: { ids: string[] }) {
       everyVideo.current.delete(v);
     }
   }, []);
-  // Start playing straight away (muted, so the browser allows it); the clock waits for them to load.
-  useEffect(() => { if (items.some((it) => it.mediaType === 'video')) void clock.play(); }, [clock]);
+  // --- Loading -----------------------------------------------------------------------
+  const srcOf = (it: Media) => {
+    const info = versionInfo(it, versionOf(it));
+    return playable(info.src, info.meta, info.current ? locals[ids.indexOf(it.id)] : undefined);
+  };
+  const videoItems = items.filter((it) => it.mediaType === 'video');
+  // Fetch each video whole (kept on this device); only then does its tile get the file.
+  useEffect(() => {
+    let live = true;
+    const pending: Record<string, number> = {};
+    let raf = 0;
+    const flush = () => { raf = 0; if (live) setProgress((p) => ({ ...p, ...pending })); };
+    for (const it of videoItems) {
+      const src = srcOf(it);
+      void isCached(src).then((hit) => { if (hit && live) setFromCache((n) => n + 1); });
+      void warm(src, (f) => { pending[it.id] = f; if (!raf) raf = requestAnimationFrame(flush); })
+        .then(async (how) => {
+          const url = (how === 'cached' && (await cachedUrl(src))) || src;
+          if (live) setFetched((m) => ({ ...m, [it.id]: url }));
+        });
+    }
+    const slow = setTimeout(() => setImpatient(true), IMPATIENT_MS);
+    return () => { live = false; cancelAnimationFrame(raf); clearTimeout(slow); };
+  }, [ids.join()]);
+  const markPlayable = (id: string) => setCanPlay((m) => (m[id] ? m : { ...m, [id]: true }));
+  const readyCount = videoItems.filter((it) => canPlay[it.id]).length;
+  const ready = forced || readyCount === videoItems.length;
+  /** 0-1 for each video: the download is most of it, the last bit is the browser being able to play it. */
+  const share = (id: string) => (canPlay[id] ? 1 : Math.min(0.95, (progress[id] ?? 0) * 0.95));
+  // Everything in: start (muted, so the browser allows it).
+  useEffect(() => {
+    if (!ready || !videoItems.length) return;
+    measure();
+    void clock.play();
+  }, [ready]);
 
   // Sound from one tile at a time.
   useEffect(() => {
@@ -358,7 +406,7 @@ function Wall({ ids }: { ids: string[] }) {
   // Opening one tile in the full player stops these; back here, they carry on from there.
   useEffect(() => { if (single) clock.pause(); }, [single, clock]);
 
-  const togglePlay = () => { if (!hasTime) return; if (clock.paused) void clock.play(); else clock.pause(); };
+  const togglePlay = () => { if (!hasTime || !ready) return; if (clock.paused) void clock.play(); else clock.pause(); };
   const pickRate = (r: number) => { setRate(r); clock.playbackRate = r; setSpeedMenu(false); };
   const firstVideo = items.find((it) => it.mediaType === 'video')?.id ?? null;
   const toggleSound = () => setAudible((a) => (a ? null : firstVideo));
@@ -372,6 +420,8 @@ function Wall({ ids }: { ids: string[] }) {
     const onKey = (e: KeyboardEvent) => {
       if (useUi.getState().viewer) return; // the full player on top has the keys
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e)) return;
+      // Still loading: only closing works.
+      if (!ready && e.key !== 'Escape') { if (e.key === ' ') e.preventDefault(); return; }
       const c = clock;
       const keys: Record<string, () => void> = {
         Escape: () => { if (speedMenu) setSpeedMenu(false); else if (!document.fullscreenElement) dismiss(); },
@@ -419,7 +469,7 @@ function Wall({ ids }: { ids: string[] }) {
           </nav>
         </header>
 
-        <section ref={stage} className="viewer-main" data-idle={idle || undefined} data-full={full || undefined}>
+        <section ref={stage} className="viewer-main" data-idle={idle || undefined} data-full={full || undefined} data-loading={!ready || undefined}>
           <div
             ref={grid}
             className="wall-grid"
@@ -427,15 +477,25 @@ function Wall({ ids }: { ids: string[] }) {
           >
             {items.map((it, i) => {
               const info = versionInfo(it, versionOf(it));
-              const src = playable(info.src, info.meta, info.current ? locals[ids.indexOf(it.id)] : undefined);
+              const src = srcOf(it);
               const video = it.mediaType === 'video';
               const loud = audible === it.id;
+              const loading = video && !canPlay[it.id];
               return (
-                <div key={it.id} className="wall-tile" data-loud={loud || undefined} onDoubleClick={() => openOne(it.id)} title="Double-click to open on its own">
+                <div
+                  key={it.id}
+                  className="wall-tile"
+                  data-loud={loud || undefined}
+                  data-loading={loading || undefined}
+                  style={{ '--p': share(it.id) } as CSSProperties}
+                  onDoubleClick={() => openOne(it.id)}
+                  title="Double-click to open on its own"
+                >
                   {video ? (
                     <video
                       ref={videoRef(it.id)}
-                      src={src || undefined}
+                      // Only once it's fetched (then it plays from this device); the poster shows meanwhile.
+                      src={fetched[it.id] || undefined}
                       poster={info.meta.poster}
                       data-duration={info.meta.duration}
                       preload="auto"
@@ -445,7 +505,8 @@ function Wall({ ids }: { ids: string[] }) {
                       onLoadedMetadata={() => { measure(); syncRef.current(); }}
                       onDurationChange={measure}
                       onSeeked={() => { if (clock.paused) syncRef.current(); }}
-                      onCanPlay={() => { if (clock.waiting) syncRef.current(); }}
+                      onCanPlay={() => { markPlayable(it.id); if (clock.waiting) syncRef.current(); }}
+                      onError={() => markPlayable(it.id)}
                       onClick={togglePlay}
                     />
                   ) : (
@@ -471,11 +532,20 @@ function Wall({ ids }: { ids: string[] }) {
                 </div>
               );
             })}
-            <span className="wall-waiting" aria-live="polite">Loading…</span>
+            <span className="wall-waiting" aria-label="Buffering"><i /></span>
+            {videoItems.length > 0 && (
+              <WallLoader
+                shares={videoItems.map((it) => share(it.id))}
+                ready={ready}
+                done={readyCount}
+                fromCache={fromCache}
+                onStart={impatient && readyCount > 0 && !ready ? () => setForced(true) : undefined}
+              />
+            )}
           </div>
 
           {hasTime && (
-            <div className="viewer-timeline">
+            <div className="viewer-timeline" inert={!ready}>
               <Scrubber video={clock as unknown as HTMLVideoElement} className="viewer-scrub" format={fmt} />
             </div>
           )}
@@ -484,7 +554,7 @@ function Wall({ ids }: { ids: string[] }) {
             <div className="viewer-bar-side">
               {hasTime && (
                 <>
-                  <button className="viewer-btn" onClick={togglePlay} title={playing ? 'Pause all (Space)' : 'Play all (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
+                  <button className="viewer-btn" onClick={togglePlay} disabled={!ready} title={!ready ? 'Loading…' : playing ? 'Pause all (Space)' : 'Play all (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
                     {playing ? <Pause {...ICON} fill="currentColor" /> : <Play {...ICON} fill="currentColor" />}
                   </button>
                   <button className="viewer-btn" aria-pressed={loop} onClick={() => setLoop((l) => !l)} title="Loop" aria-label="Loop">
@@ -525,6 +595,53 @@ function Wall({ ids }: { ids: string[] }) {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The loading ring: one segment per video, each filling as its file arrives,
+ * with the overall percentage in the middle. Fades out once all can play.
+ */
+function WallLoader({ shares, ready, done, fromCache, onStart }: {
+  shares: number[]; ready: boolean; done: number; fromCache: number; onStart?: () => void;
+}) {
+  const n = shares.length;
+  const R = 78, STROKE = 10, SIZE = (R + STROKE) * 2, MID = SIZE / 2;
+  const C = 2 * Math.PI * R;
+  const gap = n > 1 ? Math.min(6, C / n / 3) : 0;
+  const seg = C / n - gap;
+  const total = shares.reduce((a, b) => a + b, 0) / n;
+  return (
+    <div className="wall-loader" data-done={ready || undefined} aria-hidden={ready || undefined} role="status">
+      <div className="wall-loader-card">
+        <svg className="wall-ring" width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
+          <g className="wall-ring-spin" style={{ transformOrigin: `${MID}px ${MID}px` }}>
+            {shares.map((p, i) => {
+              const rot = -90 + (360 / n) * i + (gap / C) * 180;
+              return (
+                <g key={i} transform={`rotate(${rot} ${MID} ${MID})`}>
+                  <circle className="wall-ring-track" cx={MID} cy={MID} r={R} strokeWidth={STROKE} strokeDasharray={`${seg} ${C}`} />
+                  <circle
+                    className="wall-ring-fill"
+                    data-full={p >= 1 || undefined}
+                    cx={MID} cy={MID} r={R} strokeWidth={STROKE}
+                    strokeDasharray={`${Math.max(0.001, seg * p)} ${C}`}
+                  />
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+        <div className="wall-loader-text">
+          <b>{Math.floor(total * 100)}<small>%</small></b>
+          <span>{done} of {n} ready</span>
+        </div>
+      </div>
+      <p className="wall-loader-note">
+        {fromCache === n ? 'Already on this device' : fromCache > 0 ? `${fromCache} already on this device \u00b7 saving the rest for next time` : 'Saving to this device, so next time is instant'}
+      </p>
+      {onStart && <button className="wall-loader-start" onClick={onStart}>Start with {done} ready</button>}
     </div>
   );
 }
