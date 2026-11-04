@@ -1051,7 +1051,6 @@ html, body, #root {
 .viewer-file { font-weight: 650; overflow: hidden; text-overflow: ellipsis; min-width: 40px; }
 .viewer-meta { margin-left: 10px; font-size: 11.5px; color: var(--vdim); flex: none; }
 /* Versions: "v3 ▾" and Compare, in the top bar. */
-.viewer-version .version-list { left: auto; right: 0; }
 .viewer-version .version-btn { height: 28px; padding: 0 8px 0 10px; border: 1px solid var(--vline); border-radius: 7px; color: #fff; }
 .viewer-compare {
   display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--vline); border-radius: 7px;
@@ -1069,13 +1068,42 @@ html, body, #root {
   background: rgb(24 24 28 / 0.98); border: 1px solid var(--vline); border-radius: 10px; box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
   animation: cmt-in 0.12s ease-out backwards;
 }
-.version-list button {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px;
+.version-row { position: relative; display: flex; align-items: center; border-radius: 7px; }
+.version-row:hover { background: rgb(255 255 255 / 0.06); }
+.version-row[data-checked] { background: rgb(111 125 255 / 0.18); }
+.version-pick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 7px;
   background: none; color: #fff; text-align: left; cursor: pointer; font: inherit;
 }
-.version-list button:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
-.version-list button:disabled { opacity: 0.35; cursor: default; }
-.version-list button[aria-checked='true'] { background: rgb(111 125 255 / 0.18); }
+.status-list .version-pick:hover:not(:disabled) { background: rgb(255 255 255 / 0.08); }
+.version-pick:disabled { opacity: 0.35; cursor: default; }
+.status-list .version-pick[aria-checked='true'] { background: rgb(111 125 255 / 0.18); }
+/* Rename / restore / delete on each version (the menu in the top bar). */
+.version-acts { flex: none; display: flex; gap: 1px; padding-right: 4px; opacity: 0; transition: opacity 0.1s; }
+.version-row:hover .version-acts, .version-acts:focus-within, .version-acts:has([data-confirm]) { opacity: 1; }
+.version-act {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 26px; height: 26px; padding: 0 6px;
+  border: 0; border-radius: 6px; background: none; color: var(--vdim); cursor: pointer; font: 650 11.5px var(--font);
+}
+.version-act:hover { background: rgb(255 255 255 / 0.1); color: #fff; }
+.version-del:hover { color: #ff6b6f; }
+.version-del[data-confirm] { background: #e5484d; color: #fff; }
+.version-rename { flex: 1; display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 8px; }
+.version-rename input {
+  flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid #6f7dff; border-radius: 6px;
+  background: rgb(255 255 255 / 0.06); color: #fff; font: 13px var(--font); outline: none;
+}
+.version-sub { display: flex; align-items: center; gap: 0; }
+.version-sub .review-dot { margin-right: 5px; }
+/* Review status: a coloured dot (an empty ring for none). */
+.review-dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.review-dot[data-none] { box-shadow: inset 0 0 0 1.5px currentColor; opacity: 0.5; }
+.viewer-status .version-btn {
+  gap: 7px; height: 28px; padding: 0 8px 0 10px; border: 1px solid var(--vline); border-radius: 7px; color: #fff;
+}
+.viewer-status .version-btn:hover { background: rgb(255 255 255 / 0.08); }
+.viewer-status .version-list, .viewer-version .version-list { left: auto; right: 0; }
+.status-list { min-width: 200px; }
 .version-n { flex: none; min-width: 26px; font: 700 12.5px var(--font); font-variant-numeric: tabular-nums; }
 .version-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .version-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1193,16 +1221,22 @@ html, body, #root {
 }
 
 /* Version tag (v2, v3…) in the top-left corner, and the "drop to add as v3" target. */
-.media-version {
-  position: absolute; left: 8px; top: 8px; z-index: 1; padding: 2px 7px; border-radius: 6px;
-  background: rgb(0 0 0 / 0.6); color: #fff; font: 700 11px/16px var(--font); font-variant-numeric: tabular-nums; pointer-events: none;
+.media-tags { position: absolute; left: 8px; top: 8px; z-index: 1; display: flex; gap: 4px; pointer-events: none; }
+.media-version, .media-status {
+  padding: 2px 7px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: #fff;
+  font: 700 11px/16px var(--font); font-variant-numeric: tabular-nums;
 }
+.media-status { display: inline-flex; align-items: center; gap: 5px; background: var(--st); text-shadow: 0 1px 1px rgb(0 0 0 / 0.2); }
 .media-version-drop {
   position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   background: rgb(61 90 254 / 0.55); color: #fff; font: 700 13px var(--font); text-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   box-shadow: inset 0 0 0 3px #fff; animation: cmt-in 0.12s ease-out backwards; pointer-events: none;
 }
 .media[data-version-drop] { outline: 3px solid var(--accent); outline-offset: 2px; }
+.media-incoming { background: rgb(0 0 0 / 0.55); box-shadow: none; }
+.media-incoming-bar { width: 60%; height: 4px; border-radius: 2px; background: rgb(255 255 255 / 0.25); overflow: hidden; }
+.media-incoming-bar > span { display: block; height: 100%; background: #fff; transition: width 0.15s; }
+.file-drop[data-onto] { background: none; box-shadow: none; }
 
 /* Bottom-right corner: open in the player, and (when the name is hidden) show it again, just left of that. */
 .media-expand, .media-reveal { bottom: 6px; width: 26px; height: 26px; border-radius: 7px; opacity: 0; transition: opacity 0.12s; }
@@ -2106,3 +2140,14 @@ button, a, label { cursor: var(--cursor, default); }
   .rail-upload:hover .rail-inset { background: rgb(0 0 0 / 0.36); color: #f2f2f5; }
   .rail-upload:active .rail-inset { box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.7), inset 0 0 0 1px rgb(255 255 255 / 0.06); }
 }
+
+/* Review status in the toolbar: a ring, filled with the status colour once set. */
+.status-glyph { display: block; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--st); }
+.status-glyph[data-set] { background: var(--st); box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.12); }
+.status-options { display: flex; flex-direction: column; gap: 2px; min-width: 190px; }
+.status-options button {
+  display: flex; align-items: center; gap: 9px; padding: 7px 8px; border: 0; border-radius: 7px;
+  background: none; color: var(--text); font: 13px var(--font); text-align: left; cursor: pointer;
+}
+.status-options button:hover { background: var(--hover); }
+.status-options button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }

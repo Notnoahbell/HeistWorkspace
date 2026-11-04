@@ -3,7 +3,7 @@
 // earlier file is kept in `versions`. Comments belong to the version they were
 // made on.
 
-import { stackZ, useBoard, type Comment, type Item, type Media, type MediaMeta } from './store';
+import { stackZ, useBoard, type Comment, type Item, type Media, type MediaMeta, type MediaVersion, type ReviewStatus } from './store';
 import { session } from '../session';
 import { itemSize, posOf } from './actions';
 import { useLocalMedia } from './media';
@@ -22,6 +22,14 @@ export const forVersion = (list: Comment[], version: number | null) =>
 /** Can this item be stacked as / onto a video version? */
 export const isVideo = (it: Item | undefined): it is Media => it?.kind === 'media' && it.mediaType === 'video';
 
+/** Review statuses, in the order they're offered. */
+export const STATUSES: { value: ReviewStatus; label: string; color: string }[] = [
+  { value: 'review', label: 'Needs review', color: '#f5a524' },
+  { value: 'changes', label: 'Changes requested', color: '#e5484d' },
+  { value: 'approved', label: 'Approved', color: '#30a46c' },
+];
+export const statusInfo = (s: ReviewStatus | null | undefined) => STATUSES.find((x) => x.value === s) ?? null;
+
 export interface VersionInfo {
   n: number;
   src: string;
@@ -29,17 +37,27 @@ export interface VersionInfo {
   meta: MediaMeta;
   addedAt: number | null;
   addedBy: string | null;
+  label: string | null;
+  status: ReviewStatus | null;
   current: boolean;
 }
+
+/** The item's current file as a history entry. */
+const currentEntry = (m: Media): MediaVersion => ({
+  src: m.src, name: m.name, meta: m.meta, addedAt: m.versionAt ?? 0, addedBy: m.versionBy ?? null,
+  label: m.versionLabel ?? null, status: m.status ?? null,
+});
 
 /** Every version of a video, newest first. */
 export function versionList(m: Media): VersionInfo[] {
   const old = (m.versions ?? []).map((v, i) => ({
-    n: i + 1, src: v.src, name: v.name, meta: v.meta, addedAt: v.addedAt, addedBy: v.addedBy ?? null, current: false,
+    n: i + 1, src: v.src, name: v.name, meta: v.meta, addedAt: v.addedAt, addedBy: v.addedBy ?? null,
+    label: v.label ?? null, status: v.status ?? null, current: false,
   }));
   const cur = {
     n: versionOf(m), src: m.src, name: m.name, meta: m.meta,
-    addedAt: m.versionAt ?? null, addedBy: m.versionBy ?? null, current: true,
+    addedAt: m.versionAt ?? null, addedBy: m.versionBy ?? null,
+    label: m.versionLabel ?? null, status: m.status ?? null, current: true,
   };
   return [cur, ...old.reverse()];
 }
@@ -80,11 +98,7 @@ export function stackVersion(fromId: string, ontoId: string): number | null {
 
   const now = Date.now();
   const offset = versionOf(onto); // the dragged card's v1 lands right after the target's current
-  const history = [
-    ...(onto.versions ?? []),
-    { src: onto.src, name: onto.name, meta: onto.meta, addedAt: onto.versionAt ?? 0, addedBy: onto.versionBy ?? null },
-    ...(from.versions ?? []),
-  ];
+  const history = [...(onto.versions ?? []), currentEntry(onto), ...(from.versions ?? [])];
   for (const it of Object.values(items)) {
     if (it.kind === 'comment' && it.targetId === fromId) {
       updateItem(it.id, { targetId: ontoId, boardId: onto.boardId, version: offset + commentVersion(it) });
@@ -92,7 +106,7 @@ export function stackVersion(fromId: string, ontoId: string): number | null {
   }
   updateItem(ontoId, {
     versions: history, src: from.src, name: from.name, meta: from.meta,
-    versionAt: now, versionBy: session.userId,
+    versionAt: now, versionBy: session.userId, versionLabel: from.versionLabel ?? null, status: from.status ?? null,
   });
   // A card shows its local copy of a fresh upload; the target now shows the dragged one's (or the stored file).
   useLocalMedia.setState((s) => {
@@ -103,4 +117,72 @@ export function stackVersion(fromId: string, ontoId: string): number | null {
   }, true);
   removeItem(fromId);
   return history.length + 1;
+}
+
+/**
+ * A new file becomes the newest version (from a file dropped onto the card,
+ * or restoring an earlier one). Starts with no status. Returns its number.
+ */
+export function addVersion(id: string, file: { src: string; name: string; meta: MediaMeta }, label: string | null = null): number | null {
+  const { items, updateItem } = useBoard.getState();
+  const m = items[id];
+  if (!isVideo(m)) return null;
+  const history = [...(m.versions ?? []), currentEntry(m)];
+  updateItem(id, {
+    versions: history, src: file.src, name: file.name, meta: file.meta,
+    versionAt: Date.now(), versionBy: session.userId, versionLabel: label, status: null,
+  });
+  return history.length + 1;
+}
+
+/** Change something about version `n` (the current one lives on the item itself). */
+function patchVersion(id: string, n: number, patch: { label?: string | null; status?: ReviewStatus | null }) {
+  const { items, updateItem } = useBoard.getState();
+  const m = items[id];
+  if (m?.kind !== 'media') return;
+  if (n === versionOf(m)) {
+    updateItem(id, {
+      ...('label' in patch ? { versionLabel: patch.label } : {}),
+      ...('status' in patch ? { status: patch.status } : {}),
+    });
+    return;
+  }
+  updateItem(id, { versions: (m.versions ?? []).map((v, i) => (i + 1 === n ? { ...v, ...patch } : v)) });
+}
+export const renameVersion = (id: string, n: number, label: string) => patchVersion(id, n, { label: label.trim() || null });
+export const setStatus = (id: string, n: number, status: ReviewStatus | null) => patchVersion(id, n, { status });
+
+/** Put an earlier version back on top, as a new version (its comments stay where they were). */
+export function restoreVersion(id: string, n: number): number | null {
+  const m = useBoard.getState().items[id];
+  if (!isVideo(m)) return null;
+  const v = versionInfo(m, n);
+  return addVersion(id, { src: v.src, name: v.name, meta: v.meta }, `Restored v${n}`);
+}
+
+/**
+ * Remove version `n` and its comments; later versions move down one (their
+ * comments too). Removing the newest makes the one before it current. The
+ * only version can't be removed (delete the card instead).
+ */
+export function deleteVersion(id: string, n: number) {
+  const { items, updateItem, removeItem } = useBoard.getState();
+  const m = items[id];
+  if (!isVideo(m) || !m.versions?.length) return;
+  const all = [...m.versions, currentEntry(m)];
+  if (n < 1 || n > all.length) return;
+  const wasCurrent = n === all.length;
+  all.splice(n - 1, 1);
+  const cur = all.pop()!;
+  for (const c of Object.values(items)) {
+    if (c.kind !== 'comment' || c.targetId !== id) continue;
+    const v = commentVersion(c);
+    if (v === n) removeItem(c.id);
+    else if (v > n) updateItem(c.id, { version: v - 1 });
+  }
+  updateItem(id, {
+    versions: all, src: cur.src, name: cur.name, meta: cur.meta, versionAt: cur.addedAt || null, versionBy: cur.addedBy ?? null,
+    versionLabel: cur.label ?? null, status: cur.status ?? null,
+  });
+  if (wasCurrent) useLocalMedia.setState((s) => { const next = { ...s }; delete next[id]; return next; }, true);
 }

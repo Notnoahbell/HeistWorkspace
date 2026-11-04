@@ -22,13 +22,13 @@ import { pathTo } from '../board/nav';
 import { posOf } from '../board/actions';
 import { ensureDerived, mediaSubtitle, playable, useLocalMedia } from '../board/media';
 import { commentIndex, useOpenCount } from '../board/comments';
-import { commentVersion, versionInfo, versionList, versionOf } from '../board/versions';
+import { commentVersion, setStatus, versionInfo, versionList, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
 import { personalColor, usePresence } from '../sync/presence';
 import { fmtFrames, fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
 import { CommentList, CommentLookContext, type CommentLook } from './Comments';
 import { Avatar } from './Collab';
-import { VersionMenu } from './VersionMenu';
+import { StatusMenu, VersionMenu } from './VersionMenu';
 
 const ICON = { size: 18, strokeWidth: 2, 'aria-hidden': true } as const;
 /** In full screen, controls fade out after this long without the mouse moving (while playing). */
@@ -283,9 +283,10 @@ function Player({ id, start }: { id: string; start: number }) {
             <span className="viewer-file" title={shown.name}>{shown.name || 'Untitled'}</span>
             <span className="viewer-meta">{mediaSubtitle(shown.meta)}</span>
           </nav>
+          <StatusMenu value={shown.status} onChange={(s) => setStatus(id, version, s)} className="viewer-status" />
           {versioned && (
             <>
-              <VersionMenu media={item} value={version} onPick={pickVersion} className="viewer-version" />
+              <VersionMenu media={item} value={version} onPick={pickVersion} className="viewer-version" manage />
               <button
                 className="viewer-compare"
                 aria-pressed={comparing}

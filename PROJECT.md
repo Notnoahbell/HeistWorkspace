@@ -189,8 +189,11 @@ Sized for ~150 users; a single modest server handles this comfortably.
   draws a card is unchanged. Comments carry `version` (unset = 1); the card and its panel
   show the current version's, the player the one being viewed. The dragged card's own
   history and comments are appended and renumbered. Compare in the player plays two
-  versions side by side, the right one following the left (muted). Not yet: removing a
-  version, or dropping a new file straight onto a card as a version.
+  versions side by side, the right one following the left (muted). A video file dropped
+  from the desktop onto a video card becomes its next version too. Versions can be
+  renamed (`label`), restored (copied back on top as a new version, comments stay put)
+  and deleted (its comments go; later versions and theirs move down one). Each version
+  has a review status (`status`: review / changes / approved), shown as a tag on the card.
 - **2026-11-03: Reactions.** Six fixed emoji (👍 🔥 ❤️ 😂 💯 👎) stored on the comment as
   `reactions: { emoji: userId[] }`. Whole-item last-write-wins means two people reacting
   to the same comment at the same instant can drop one; fine for now, worth a per-field

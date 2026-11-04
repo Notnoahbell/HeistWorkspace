@@ -1,18 +1,18 @@
-import { memo, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { memo, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
-import { ensureDerived, mediaSubtitle, playable, retryUpload, useLocalMedia } from './media';
+import { ensureDerived, mediaSubtitle, playable, retryUpload, useLocalMedia, useVersionUploads } from './media';
 import { Scrubber, stepFrame, useContrastTone } from '../ui/Scrubber';
 import { cardVideos, commentIndex } from './comments';
 import { useShallow } from 'zustand/react/shallow';
 import { isTyping } from '../canvas/input';
 import { openViewer } from '../ui/MediaViewer';
 import { CommentBadge } from '../ui/Comments';
-import { commentVersion, versionOf } from './versions';
+import { commentVersion, statusInfo, versionOf } from './versions';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -48,6 +48,8 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     .flatMap((c) => (c.time != null && commentVersion(c) === version ? [c.time] : []))));
   // Another video is being dragged over this one: it would become the next version.
   const versionTarget = useUi((s) => s.versionDrop === id);
+  const status = statusInfo(media?.status);
+  const incoming = useVersionUploads((s) => s[id]);
 
   // Let comments read and set this card's video time.
   useEffect(() => {
@@ -155,7 +157,12 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </>
           )}
 
-          {version > 1 && <span className="media-version" title={`Version ${version}`}>v{version}</span>}
+          {(version > 1 || status) && (
+            <span className="media-tags">
+              {version > 1 && <span className="media-version" title={`Version ${version}`}>v{version}</span>}
+              {status && <span className="media-status" style={{ '--st': status.color } as CSSProperties}>{status.label}</span>}
+            </span>
+          )}
           {versionTarget && (
             <div className="media-version-drop" aria-hidden="true">
               <Layers size={20} {...ICON} />
@@ -163,6 +170,13 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </div>
           )}
 
+          {incoming && (
+            <div className="media-version-drop media-incoming" aria-live="polite">
+              <Layers size={20} {...ICON} />
+              Uploading v{version + 1}… {Math.round(incoming.progress * 100)}%
+              <span className="media-incoming-bar"><span style={{ width: `${Math.round(incoming.progress * 100)}%` }} /></span>
+            </div>
+          )}
           {uploading && local && (
             <div className="media-progress" aria-label="Uploading"><span style={{ width: `${Math.round(local.progress * 100)}%` }} /></div>
           )}

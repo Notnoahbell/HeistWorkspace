@@ -6,7 +6,8 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
-import { COMMENTABLE, useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
+import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
+import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
 import { useUi, type PanelKey } from '../board/ui';
 import { confirmDelete, enterBoard } from '../board/actions';
 import { COLOR_PRESETS } from '../lib/color';
@@ -238,6 +239,21 @@ export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
     case 'rename':
       if (item.kind !== 'column' && item.kind !== 'board') return null;
       return <RenamePanel value={item.title} placeholder={`Untitled ${item.kind === 'column' ? 'section' : 'board'}`} onChange={(v) => update(item.id, { title: v })} />;
+    case 'status':
+      if (item.kind !== 'media') return null;
+      return (
+        <PanelSection label={item.versions?.length ? `Status of v${versionOf(item)}` : 'Review status'}>
+          <div className="status-options" role="radiogroup" aria-label="Review status">
+            {[...STATUSES, null].map((s) => (
+              <button key={s?.value ?? 'none'} role="radio" aria-checked={(item.status ?? null) === (s?.value ?? null)}
+                onClick={() => setStatus(item.id, versionOf(item), s?.value ?? null)}>
+                <span className="review-dot" style={{ background: s?.color ?? 'transparent' }} data-none={!s || undefined} />
+                {s?.label ?? 'No status'}
+              </button>
+            ))}
+          </div>
+        </PanelSection>
+      );
     case 'layout':
       if (item.kind !== 'column') return null;
       return (
@@ -252,6 +268,12 @@ export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
         </PanelSection>
       );
   }
+}
+
+/** Toolbar glyph for review status: a ring, filled with the status colour once set. */
+function StatusGlyph({ status }: { status: ReviewStatus | null }) {
+  const st = statusInfo(status);
+  return <span className="status-glyph" style={{ '--st': st?.color ?? 'currentColor' } as CSSProperties} data-set={!!st || undefined} aria-hidden="true" />;
 }
 
 // --- Actions -----------------------------------------------------------------
@@ -303,6 +325,7 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
       return [color, del];
     case 'media':
       return [
+        { key: 'status', label: 'Review status', glyph: <StatusGlyph status={item.status ?? null} />, panel: 'status' },
         {
           key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
           // Renames inline, in the caption (shown again if it was tucked away).

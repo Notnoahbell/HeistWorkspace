@@ -10,6 +10,7 @@ import { useUi } from './ui';
 import { currentBoardId } from './nav';
 import { snap } from './layout';
 import { MEDIA_WIDTH, MEDIA_WIDTH_PORTRAIT } from './constants';
+import { addVersion } from './versions';
 
 /** File types the server accepts (no SVG: it can carry script). */
 export const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,video/mp4,video/webm,video/quicktime';
@@ -39,25 +40,57 @@ function readMeta(file: File, url: string): Promise<MediaMeta> {
   });
 }
 
-function send(id: string, file: File) {
-  const xhr = new XMLHttpRequest();
-  xhr.open('PUT', '/api/upload');
-  xhr.setRequestHeader('Content-Type', file.type);
-  xhr.upload.onprogress = (e) => {
-    if (!e.lengthComputable) return;
-    useLocalMedia.setState((s) => (s[id] ? { [id]: { ...s[id], progress: e.loaded / e.total } } : s));
-  };
-  const fail = () => useBoard.getState().updateItem(id, { upload: 'failed' });
-  xhr.onerror = fail;
-  xhr.onload = () => {
-    let body: { url?: string } = {};
-    try { body = JSON.parse(xhr.responseText); } catch {}
-    if (xhr.status !== 200 || !body.url) return fail();
-    useBoard.getState().updateItem(id, { src: body.url, upload: undefined });
-    const it = useBoard.getState().items[id];
-    if (it?.kind === 'media' && it.mediaType === 'video') ensureDerived(body.url, it.meta);
-  };
-  xhr.send(file);
+/** Send a file to the server; resolves with where it lives (or null if it failed). */
+function uploadFile(file: File, onProgress: (p: number) => void): Promise<string | null> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', '/api/upload');
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onerror = () => resolve(null);
+    xhr.onload = () => {
+      let body: { url?: string } = {};
+      try { body = JSON.parse(xhr.responseText); } catch {}
+      resolve(xhr.status === 200 && body.url ? body.url : null);
+    };
+    xhr.send(file);
+  });
+}
+
+async function send(id: string, file: File) {
+  const url = await uploadFile(file, (progress) =>
+    useLocalMedia.setState((s) => (s[id] ? { [id]: { ...s[id], progress } } : s)));
+  if (!url) { useBoard.getState().updateItem(id, { upload: 'failed' }); return; }
+  useBoard.getState().updateItem(id, { src: url, upload: undefined });
+  const it = useBoard.getState().items[id];
+  if (it?.kind === 'media' && it.mediaType === 'video') ensureDerived(url, it.meta);
+}
+
+/** Local-only: a new version uploading onto a card (by card id), and how far along (0–1). */
+export const useVersionUploads = create<Record<string, { name: string; progress: number }>>()(() => ({}));
+
+/**
+ * A video file dropped onto a video card: upload it, then make it the card's
+ * newest version. The card shows the progress meanwhile.
+ */
+export async function addVersionFile(id: string, file: File) {
+  if (!file.type.startsWith('video/') || !isMediaFile(file)) return;
+  const local = URL.createObjectURL(file);
+  const meta = await readMeta(file, local);
+  const done = () => useVersionUploads.setState((s) => { const next = { ...s }; delete next[id]; return next; }, true);
+  useVersionUploads.setState({ [id]: { name: file.name, progress: 0 } });
+  const url = await uploadFile(file, (progress) => useVersionUploads.setState((s) => (s[id] ? { [id]: { ...s[id], progress } } : s)));
+  done();
+  if (!url) {
+    URL.revokeObjectURL(local);
+    useUi.getState().set({ toast: { text: `Couldn't upload ${file.name}`, at: Date.now() } });
+    return;
+  }
+  const n = addVersion(id, { src: url, name: file.name, meta });
+  if (!n) return;
+  useLocalMedia.setState({ [id]: { url: local, progress: 1 } }); // play the local copy straight away
+  ensureDerived(url, meta);
+  useUi.getState().set({ selectedIds: [id], toast: { text: `${file.name} added as v${n}`, at: Date.now() } });
 }
 
 /** Retry a failed upload, if this browser still has the file's preview. */

@@ -11,7 +11,9 @@ import { BoardView } from './board/BoardView';
 import { TodoView } from './board/TodoView';
 import { LinkView } from './board/LinkView';
 import { MediaView } from './board/MediaView';
-import { addMediaFiles } from './board/media';
+import { addMediaFiles, addVersionFile } from './board/media';
+import { videoTargetAt } from './board/versions';
+import { currentBoardId } from './board/nav';
 import {
   clearSelection, contentBounds, createItem, deleteSelection, enterBoard, selectAll, viewportCenterWorld, zoomToFit,
 } from './board/actions';
@@ -149,18 +151,33 @@ export function App() {
     let depth = 0;
     const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
     const enter = (e: DragEvent) => { if (hasFiles(e)) { depth++; setFileDrag(true); } };
-    const leave = (e: DragEvent) => { if (hasFiles(e) && --depth <= 0) { depth = 0; setFileDrag(false); } };
+    const ui = () => useUi.getState();
+    const leave = (e: DragEvent) => {
+      if (hasFiles(e) && --depth <= 0) { depth = 0; setFileDrag(false); if (ui().versionDrop) ui().set({ versionDrop: null }); }
+    };
+    // One video file over a video card: it would become that card's next version.
+    const versionTarget = (e: DragEvent) => {
+      const items = e.dataTransfer?.items;
+      if (!items || items.length !== 1 || !items[0].type.startsWith('video/')) return null;
+      return videoTargetAt(camera.clientToWorld(e.clientX, e.clientY), currentBoardId(), new Set());
+    };
     const over = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
       e.dataTransfer!.dropEffect = 'copy';
+      const target = versionTarget(e);
+      if (target !== ui().versionDrop) ui().set({ versionDrop: target });
     };
     const drop = (e: DragEvent) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
       depth = 0;
       setFileDrag(false);
-      void addMediaFiles([...e.dataTransfer!.files], camera.clientToWorld(e.clientX, e.clientY));
+      const files = [...e.dataTransfer!.files];
+      const onto = ui().versionDrop;
+      if (onto) ui().set({ versionDrop: null });
+      if (onto && files.length === 1 && files[0].type.startsWith('video/')) void addVersionFile(onto, files[0]);
+      else void addMediaFiles(files, camera.clientToWorld(e.clientX, e.clientY));
     };
     window.addEventListener('dragenter', enter);
     window.addEventListener('dragleave', leave);
@@ -203,7 +220,17 @@ export function App() {
       <PeerCursors />
       <CursorChat />
       <MediaViewer />
-      {fileDrag && <div className="file-drop"><span>Drop photos or videos to add them</span></div>}
+      {fileDrag && <FileDropHint />}
     </>
+  );
+}
+
+/** While files are dragged over the window: what dropping will do. */
+function FileDropHint() {
+  const onto = useUi((s) => s.versionDrop);
+  return (
+    <div className="file-drop" data-onto={onto ? 'version' : undefined}>
+      <span>{onto ? 'Drop onto the video to add it as a new version' : 'Drop photos or videos to add them'}</span>
+    </div>
   );
 }

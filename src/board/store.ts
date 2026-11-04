@@ -102,7 +102,13 @@ export interface MediaVersion {
   /** When it became the current version, and who added it. */
   addedAt: number;
   addedBy?: string | null;
+  /** A name for the version ("Client cut"), and where its review stands. */
+  label?: string | null;
+  status?: ReviewStatus | null;
 }
+
+/** Where the review of a version stands. */
+export type ReviewStatus = 'review' | 'changes' | 'approved';
 
 /** A photo, GIF or video. */
 export interface Media extends ItemBase, Stacked {
@@ -122,6 +128,9 @@ export interface Media extends ItemBase, Stacked {
   /** When the current version was added, and who added it (once there are versions). */
   versionAt?: number | null;
   versionBy?: string | null;
+  /** The current version's name and review status (earlier ones keep theirs in `versions`). */
+  versionLabel?: string | null;
+  status?: ReviewStatus | null;
 }
 
 /** Before v5: sections stacked one way or the other. Read only to migrate. */
