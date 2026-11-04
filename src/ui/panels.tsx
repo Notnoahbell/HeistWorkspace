@@ -223,7 +223,7 @@ function RenamePanel({ value, placeholder, onChange }: { value: string; placehol
 export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
   switch (panel) {
     case 'color': {
-      if (item.kind === 'media') return null;
+      if (item.kind === 'media' || item.kind === 'comment') return null;
       const def = `var(--${item.kind}-default)`;
       return <ColorPanel value={item.color} presets={COLOR_PRESETS} noneLabel="Default" noneBackground={def} onChange={(v) => update(item.id, { color: v })} />;
     }
@@ -280,6 +280,8 @@ export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
   switch (item.kind) {
     case 'note':
       return [color, { key: 'text', label: 'Text', panel: 'text', glyph: <Type {...ICON_PROPS} size={18} /> }, del];
+    case 'comment':
+      return [];
     case 'todo':
       return [color, del];
     case 'media':

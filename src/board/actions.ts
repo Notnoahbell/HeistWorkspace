@@ -6,7 +6,7 @@ import { bodies, type Body, type BodyHooks } from './body';
 import { BOARD_HEIGHT, COLUMN_HEADER, COLUMN_WIDTH, NOTE_MIN_HEIGHT, NOTE_WIDTH } from './constants';
 import { dropIndex, snap, stackedSize, useLayout, type Size } from './layout';
 import {
-  columnContents, descendants, parentOf, stackZ, useBoard, type Column, type Item, type ItemKind,
+  columnContents, descendants, onCanvas, parentOf, stackZ, useBoard, type Column, type Item, type ItemKind,
 } from './store';
 import { currentBoardId, openBoard } from './nav';
 import { useUi } from './ui';
@@ -40,7 +40,7 @@ export function toggleSelect(id: string) {
 
 export function selectAll() {
   const boardId = currentBoardId();
-  const ids = Object.values(board().items).filter((i) => i.boardId === boardId && !parentOf(i)).map((i) => i.id);
+  const ids = Object.values(board().items).filter((i) => i.boardId === boardId && !parentOf(i) && onCanvas(i)).map((i) => i.id);
   ui().set({ selectedIds: ids, editingId: null });
 }
 
@@ -88,7 +88,7 @@ export function itemsInRect(r: Rect): string[] {
   const boardId = currentBoardId();
   return Object.values(board().items)
     .filter((it) => {
-      if (it.boardId !== boardId || parentOf(it)) return false;
+      if (it.boardId !== boardId || parentOf(it) || !onCanvas(it)) return false;
       const { w, h } = itemSize(it);
       return it.x < r.x1 && it.x + w > r.x0 && it.y < r.y1 && it.y + h > r.y0;
     })
@@ -350,7 +350,7 @@ export function contentBounds(boardId = currentBoardId()): Rect | null {
   if (boundsCache?.boardId === boardId) return boundsCache.rect;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const it of Object.values(board().items)) {
-    if (it.boardId !== boardId || parentOf(it)) continue;
+    if (it.boardId !== boardId || parentOf(it) || !onCanvas(it)) continue;
     const { w, h } = itemSize(it);
     x0 = Math.min(x0, it.x); y0 = Math.min(y0, it.y);
     x1 = Math.max(x1, it.x + w); y1 = Math.max(y1, it.y + h);
@@ -379,7 +379,7 @@ export function enterBoard(id: string) {
   openBoard(id);
 }
 
-const KIND_NOUN: Record<ItemKind, [string, string]> = {
+const KIND_NOUN: Record<Exclude<ItemKind, 'comment'>, [string, string]> = {
   board: ['board', 'boards'],
   column: ['section', 'sections'],
   note: ['note', 'notes'],
@@ -390,9 +390,9 @@ const KIND_NOUN: Record<ItemKind, [string, string]> = {
 
 /** "2 boards, 5 notes" — what's on a board, by kind. */
 export function boardSummary(items: Record<string, Item>, boardId: string): string {
-  const n: Record<ItemKind, number> = { board: 0, column: 0, note: 0, todo: 0, link: 0, media: 0 };
+  const n: Record<ItemKind, number> = { board: 0, column: 0, note: 0, todo: 0, link: 0, media: 0, comment: 0 };
   for (const it of Object.values(items)) if (it.boardId === boardId) n[it.kind]++;
-  const parts = (Object.keys(KIND_NOUN) as ItemKind[])
+  const parts = (Object.keys(KIND_NOUN) as (keyof typeof KIND_NOUN)[])
     .filter((k) => n[k])
     .map((k) => `${n[k]} ${KIND_NOUN[k][n[k] === 1 ? 0 : 1]}`);
   return parts.join(', ') || 'Empty';

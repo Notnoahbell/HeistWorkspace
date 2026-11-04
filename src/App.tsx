@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Canvas } from './canvas/Canvas';
 import { isTyping } from './canvas/input';
-import { useBoard, type ItemKind } from './board/store';
+import { onCanvas, useBoard, type ItemKind } from './board/store';
 import { useUi } from './board/ui';
 import { useBoardId } from './board/nav';
 import { NoteView } from './board/NoteView';
@@ -23,6 +23,7 @@ import { ContextMenu } from './ui/ContextMenu';
 import { Toast } from './ui/Toast';
 import { CursorChat, PeerCursors } from './ui/Presence';
 import { MediaViewer, openViewer } from './ui/MediaViewer';
+import { CommentsPopover } from './ui/Comments';
 import { copySelection, cutSelection, duplicateSelection, paste } from './board/clipboard';
 import { camera } from './canvas/camera';
 
@@ -52,7 +53,7 @@ function ItemLayer({ boardId }: { boardId: string }) {
 }
 
 function EmptyHint({ boardId }: { boardId: string }) {
-  const empty = useBoard((s) => !Object.values(s.items).some((i) => i.boardId === boardId));
+  const empty = useBoard((s) => !Object.values(s.items).some((i) => i.boardId === boardId && onCanvas(i)));
   if (!empty) return null;
   return <div className="empty-hint">Drag something in from the left to get started</div>;
 }
@@ -194,6 +195,7 @@ export function App() {
       <TopBar />
       <ToolRail />
       <SelectionToolbar />
+      <CommentsPopover />
       <EmptyHint boardId={boardId} />
       <Marquee />
       <ContextMenu />

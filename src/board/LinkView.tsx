@@ -7,6 +7,7 @@ import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { isLight } from '../lib/color';
 import { fetchPreview, hostOf, normalizeUrl } from '../lib/links';
+import { CommentBadge } from '../ui/Comments';
 
 const LINK_ICON = { size: 18, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 
@@ -109,6 +110,7 @@ export const LinkView = memo(function LinkView({ id }: { id: string }) {
         style={{ width: fill ?? link.w, '--item-bg': link.color ?? undefined } as CSSProperties}
       >
         {body}
+        <CommentBadge id={id} />
       </div>
     </div>
   );

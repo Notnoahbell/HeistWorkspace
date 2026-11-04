@@ -7,6 +7,7 @@ import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { isLight } from '../lib/color';
 import { newId } from '../lib/id';
+import { CommentBadge } from '../ui/Comments';
 
 const setEntries = (id: string, entries: TodoEntry[]) => useBoard.getState().updateItem(id, { entries });
 
@@ -89,6 +90,7 @@ export const TodoView = memo(function TodoView({ id }: { id: string }) {
             <span className="todo-bar"><span style={{ width: `${(done / todo.entries.length) * 100}%` }} /></span>
           </div>
         )}
+        <CommentBadge id={id} />
       </div>
     </div>
   );

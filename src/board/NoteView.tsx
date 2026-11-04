@@ -5,6 +5,7 @@ import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { isLight } from '../lib/color';
+import { CommentBadge } from '../ui/Comments';
 
 export const NoteView = memo(function NoteView({ id }: { id: string }) {
   const item = useBoard((s) => s.items[id]);
@@ -57,6 +58,7 @@ export const NoteView = memo(function NoteView({ id }: { id: string }) {
             {note.text || 'Double-click to write…'}
           </div>
         )}
+        <CommentBadge id={id} />
       </div>
     </div>
   );

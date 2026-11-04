@@ -86,21 +86,27 @@ export function useContrastTone(video: HTMLVideoElement | null): 'light' | 'dark
   return tone;
 }
 
-export function Scrubber({ video, className, tone = 'light', format }: {
+export function Scrubber({ video, className, tone = 'light', format, marks }: {
   video: HTMLVideoElement | null;
   className?: string;
   /** Light timeline for dark backgrounds, dark for light ones. */
   tone?: 'light' | 'dark';
   /** Show this label for the time under the pointer while hovering. */
   format?: (seconds: number) => string;
+  /** Times (s) to mark on the track, e.g. comments. */
+  marks?: number[];
 }) {
   const fill = useRef<HTMLSpanElement>(null);
   const drag = useRef<{ resume: boolean } | null>(null);
   const [hover, setHover] = useState<{ x: number; t: number } | null>(null);
+  const [duration, setDuration] = useState(0);
 
   const paint = (frac: number) => { if (fill.current) fill.current.style.width = `${Math.min(1, Math.max(0, frac)) * 100}%`; };
   const length = (v: HTMLVideoElement) => (Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0);
-  useVideoFrame(video, (v) => { if (!drag.current && length(v)) paint(v.currentTime / length(v)); });
+  useVideoFrame(video, (v) => {
+    if (!drag.current && length(v)) paint(v.currentTime / length(v));
+    if (length(v) !== duration) setDuration(length(v));
+  });
 
   // Measured on the track (not the padded hit area) so the knob sits under the pointer.
   const at = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -151,6 +157,9 @@ export function Scrubber({ video, className, tone = 'light', format }: {
       onDoubleClick={(e) => e.stopPropagation()}
     >
       <div className="scrub-track">
+        {duration > 0 && marks?.map((t, i) => (
+          <span key={i} className="scrub-mark" style={{ left: `${Math.min(1, t / duration) * 100}%` }} />
+        ))}
         <span ref={fill} className="scrub-fill" />
         {hover && format && <span className="scrub-hover" style={{ left: `${hover.x * 100}%` }}>{format(hover.t)}</span>}
       </div>

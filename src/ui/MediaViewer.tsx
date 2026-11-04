@@ -12,6 +12,10 @@ import { useBoard } from '../board/store';
 import { useUi } from '../board/ui';
 import { mediaSubtitle, useLocalMedia } from '../board/media';
 import { fmtFrames, fmtTime, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
+import { CommentList } from './Comments';
+import { commentIndex } from '../board/comments';
+import { isTyping } from '../canvas/input';
+import { useShallow } from 'zustand/react/shallow';
 
 const ICON = { size: 18, strokeWidth: 2, 'aria-hidden': true } as const;
 /** Controls fade out after this long without the mouse moving (while playing). */
@@ -48,6 +52,7 @@ function Player({ id, start }: { id: string; start: number }) {
   const [units, setUnits] = useState(readUnits);
   const [rate, setRate] = useState(1);
   const [speedMenu, setSpeedMenu] = useState(false);
+  const marks = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? []).flatMap((c) => (!c.resolved && c.time != null ? [c.time] : []))));
 
   const dismiss = () => {
     if (closing) return;
@@ -107,7 +112,7 @@ function Player({ id, start }: { id: string; start: number }) {
   // Keys go to the player only while it's open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e)) return;
       const v = video;
       const keys: Record<string, () => void> = {
         Escape: () => { if (speedMenu) setSpeedMenu(false); else if (!document.fullscreenElement) dismiss(); },
@@ -189,7 +194,7 @@ function Player({ id, start }: { id: string; start: number }) {
                   title={units === 'frames' ? `Frames at ${FPS} fps — click for time` : 'Click for frames'}
                   onClick={toggleUnits}
                 />
-                <Scrubber video={video} className="viewer-scrub" format={fmt} />
+                <Scrubber video={video} className="viewer-scrub" format={fmt} marks={marks} />
                 <div className="viewer-speed">
                   <button
                     className="viewer-btn viewer-rate"
@@ -225,6 +230,16 @@ function Player({ id, start }: { id: string; start: number }) {
             </button>
           </div>
         </div>
+
+        {/* Every comment on this item; on a video, in timecode order. */}
+        <aside className="viewer-comments" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="viewer-comments-title">Comments</div>
+          <CommentList
+            targetId={id}
+            clock={isVideo ? () => video?.currentTime ?? null : undefined}
+            onSeek={isVideo ? (t) => { if (video) { video.pause(); video.currentTime = t; } } : undefined}
+          />
+        </aside>
       </div>
     </div>
   );

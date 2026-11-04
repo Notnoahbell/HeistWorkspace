@@ -130,10 +130,36 @@ export interface Board extends ItemBase, Stacked {
   linkTo?: string;
 }
 
+/**
+ * A comment on a note, to-do, link, photo or video. Stored as an item (so it
+ * syncs and is shared like everything else) on the same board as its target,
+ * but never drawn on the canvas itself.
+ */
+export interface Comment extends ItemBase, Stacked {
+  kind: 'comment';
+  targetId: string;
+  authorId: string;
+  /** Name when written; the current profile name wins when known. */
+  authorName: string;
+  text: string;
+  createdAt: number;
+  /** Seconds into a video, or null for the item as a whole. */
+  time: number | null;
+  /** Ticked off: hidden from the item, kept under "Resolved". */
+  resolved: boolean;
+  resolvedBy?: string | null;
+  resolvedAt?: number | null;
+}
+
+/** Things drawn on the canvas (everything but comments). */
+export const onCanvas = (it: Item) => it.kind !== 'comment';
+/** Kinds people can comment on. */
+export const COMMENTABLE = new Set<ItemKind>(['note', 'todo', 'link', 'media']);
+
 /** The board a tile opens: itself, or what it's a shortcut to. */
 export const boardTarget = (b: Board) => b.linkTo ?? b.id;
 
-export type Item = Note | Todo | Link | Media | Column | Board;
+export type Item = Note | Todo | Link | Media | Column | Board | Comment;
 /** Items that can be stacked in a column (everything, columns included). */
 export type Stackable = Item;
 export const isStackable = (it: Item | undefined): it is Stackable => !!it;
@@ -178,6 +204,7 @@ const DEFAULTS: { [K in ItemKind]: Omit<ItemOf<K>, 'id' | 'kind' | 'z' | 'x' | '
   todo: { w: NOTE_WIDTH, color: null, entries: [], parentId: null },
   link: { w: NOTE_WIDTH, color: null, url: '', preview: null, parentId: null },
   media: { w: MEDIA_WIDTH, mediaType: 'image', src: '', name: '', meta: {}, captionHidden: false, parentId: null },
+  comment: { w: 0, parentId: null, targetId: '', authorId: '', authorName: '', text: '', createdAt: 0, time: null, resolved: false },
   column: { w: COLUMN_WIDTH, title: '', color: null, strip: null, cols: 1, childIds: [], parentId: null },
   board: { w: BOARD_WIDTH, title: '', color: null, icon: null, parentId: null },
 };
@@ -296,6 +323,8 @@ export const useBoard = create<BoardState>()(
           if (item.kind === 'board') {
             for (const d of descendants(items, id)) delete items[d];
           }
+          // Its comments go with it.
+          for (const it of Object.values(items)) if (it.kind === 'comment' && it.targetId === id) delete items[it.id];
           delete items[id];
           return { items, topZ };
         });
@@ -355,6 +384,12 @@ export const useBoard = create<BoardState>()(
             items[id] = { ...items[id], boardId, parentId: null, x: p.x, y: p.y, z: ++topZ } as Item;
             // A column's contents come along (boards keep their own contents).
             for (const c of columnContents(items, id)) items[c] = { ...items[c], boardId } as Item;
+          }
+          // Comments stay on the same board as what they're about.
+          for (const it of Object.values(items)) {
+            if (it.kind === 'comment' && items[it.targetId] && items[it.targetId].boardId !== it.boardId) {
+              items[it.id] = { ...it, boardId: items[it.targetId].boardId };
+            }
           }
           return { items, topZ };
         });

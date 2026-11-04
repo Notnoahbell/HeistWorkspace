@@ -80,7 +80,8 @@ self-hosted.
 
 ### Phase 3 — Video review (where we surpass Milanote)
 - [ ] Video cards with scrubbable hover-preview thumbnails
-- [ ] Frame-accurate, timecoded comments and threads
+- [x] Comments on notes, to-dos, links, photos and videos; timecoded on videos (frame-accurate still to come)
+- [ ] Comment threads (replies), @mentions, notifications
 - [ ] Draw-on-frame annotations
 - [ ] Version stacks (v1, v2, v3…) and side-by-side / overlay compare
 - [ ] Review status workflow (e.g. In progress → Needs review → Changes → Approved)
@@ -161,6 +162,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
 - **2026-11-03: Columns nest.** Every item kind is stackable; a column sizes itself
   to its contents (so nesting widens the parent) and cards in vertical columns
   stretch to its inner width. Stacked surfaces alternate tone by depth.
+- **2026-11-03: Comments are items** (`kind: 'comment'`, `targetId`, `time` for
+  videos), on the same board as their target, so sync, sharing and per-comment
+  last-write-wins come from the existing item sync. They're never drawn on the
+  canvas (`onCanvas()` filters them from select-all, box select, bounds, counts),
+  are deleted with their target and follow it to other boards. Resolving keeps
+  them (`resolved`, `resolvedBy`) under a Resolved tab. With the real backend,
+  consider a per-target index and comment-only permissions (comment without edit).
 - **2026-11-03: Columns → sections (grid).** The vertical/horizontal switch is gone;
   a section has `cols` (1 = a plain column) and fills left to right, wrapping, each
   row as tall as its tallest item. Cells are one card wide, or as wide as the widest
@@ -222,6 +230,11 @@ npm run build      # typecheck + production build
   GIFs loop on their own. Double-click (or Enter) opens the full-size player: Space/K
   play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
+- Comments: select a note, to-do, link, photo or video — up to 5 open comments swing out
+  beside it (Enter posts, Shift+Enter new line); "Show all" opens Open/Resolved tabs; the
+  tick resolves, ↺ reopens. On a video the comment is pinned to the card's current time
+  (click the time chip for a whole-video comment); click a timecode to jump there. The
+  player lists every comment beside the video, with marks on the timeline
 - Sections: S (or C); double-click header to rename; double-click body to add a note;
   drag the right edge to change the number of grid columns
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile

@@ -7,8 +7,11 @@ import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
 import { mediaSubtitle, retryUpload, useLocalMedia } from './media';
 import { Scrubber, stepFrame, useContrastTone } from '../ui/Scrubber';
+import { cardVideos, commentIndex } from './comments';
+import { useShallow } from 'zustand/react/shallow';
 import { isTyping } from '../canvas/input';
 import { openViewer } from '../ui/MediaViewer';
+import { CommentBadge } from '../ui/Comments';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -35,6 +38,15 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   const nameRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const tone = useContrastTone(video);
+  // Open timecoded comments, as marks on the timeline.
+  const marks = useBoard(useShallow((s) => (commentIndex(s.items).get(id) ?? []).flatMap((c) => (!c.resolved && c.time != null ? [c.time] : []))));
+
+  // Let comments read and set this card's video time.
+  useEffect(() => {
+    if (!video) return;
+    cardVideos.set(id, video);
+    return () => { if (cardVideos.get(id) === video) cardVideos.delete(id); };
+  }, [id, video]);
 
   const togglePlay = () => {
     if (!video) return;
@@ -110,7 +122,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
               <button className="media-play" data-playing={playing || undefined} aria-label={playing ? 'Pause' : 'Play'} {...keep} onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
                 {playing ? <Pause size={22} fill="currentColor" {...ICON} /> : <Play size={22} fill="currentColor" {...ICON} />}
               </button>
-              <Scrubber video={video} className="media-scrub" tone={tone} />
+              <Scrubber video={video} className="media-scrub" tone={tone} marks={marks} />
             </>
           )}
 
@@ -166,6 +178,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </button>
           </div>
         )}
+        <CommentBadge id={id} />
       </div>
     </div>
   );

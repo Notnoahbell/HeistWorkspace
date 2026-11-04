@@ -148,7 +148,9 @@ html, body, #root {
 
 .note {
   min-height: 56px;
-  overflow: hidden;
+  /* Clip like before, but leave room for the comment badge over the corner. */
+  overflow: clip;
+  overflow-clip-margin: 10px;
 }
 
 
@@ -501,7 +503,8 @@ html, body, #root {
 
 /* --- Links ---------------------------------------------------------------- */
 
-.link { overflow: hidden; }
+/* Visible so the comment badge can sit over the corner; the image and texts clip themselves. */
+.link { overflow: visible; }
 
 .link-bar {
   display: flex;
@@ -1009,8 +1012,11 @@ html, body, #root {
   animation: viewer-fade 0.18s ease-out;
 }
 .viewer-panel {
-  width: min(50vw, calc(50vh * var(--ar)));
-  min-width: min(360px, 92vw);
+  /* Media at about half the screen, comments in a column beside it. */
+  --mw: max(min(50vw, calc(50vh * var(--ar))), min(360px, 92vw));
+  display: grid;
+  grid-template-columns: var(--mw) 300px;
+  column-gap: 16px;
   color: #fff;
   animation: viewer-pop 0.2s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
@@ -1020,7 +1026,7 @@ html, body, #root {
 @keyframes viewer-pop { from { opacity: 0; transform: scale(0.94); } }
 @media (prefers-reduced-motion: reduce) { .viewer, .viewer-panel { animation-duration: 0.01s !important; } }
 
-.viewer-head { display: flex; align-items: center; gap: 4px; padding: 0 0 8px 2px; }
+.viewer-head { grid-column: 1; display: flex; align-items: center; gap: 4px; padding: 0 0 8px 2px; }
 .viewer-title { flex: 1; min-width: 0; }
 .viewer-name { font-size: 15px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-sub { margin-top: 2px; font-size: 12px; opacity: 0.65; }
@@ -1030,7 +1036,7 @@ html, body, #root {
 }
 .viewer-btn:hover { background: rgb(255 255 255 / 0.14); }
 
-.viewer-stage { position: relative; background: #000; box-shadow: 0 20px 60px rgb(0 0 0 / 0.5); }
+.viewer-stage { grid-column: 1; position: relative; background: #000; box-shadow: 0 20px 60px rgb(0 0 0 / 0.5); }
 .viewer-stage > :is(img, video) { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); object-fit: contain; user-select: none; }
 .viewer-stage:fullscreen { display: grid; place-items: center; box-shadow: none; }
 .viewer-stage:fullscreen > :is(img, video) { width: 100vw; height: 100vh; aspect-ratio: auto; }
@@ -1106,6 +1112,131 @@ html, body, #root {
 @media (prefers-color-scheme: dark) {
   .media::after { content: ''; position: absolute; inset: 0; border: 1px solid rgb(255 255 255 / 0.07); pointer-events: none; }
   .media-hide:hover { background: rgb(255 255 255 / 0.08); }
+}
+
+/* --- Comments ------------------------------------------------------------- */
+
+/* Open-comment count in a card's top-right corner. */
+.cmt-badge {
+  position: absolute; top: -8px; right: -8px; z-index: 3;
+  display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 9px; background: var(--accent); color: #fff;
+  font: 700 10.5px/1 var(--font); box-shadow: 0 0 0 2px var(--bg);
+  pointer-events: none;
+}
+
+.cmt-pop { position: fixed; z-index: 14; display: flex; flex-direction: column; }
+.cmt-quick { display: flex; flex-direction: column; gap: 6px; }
+.cmt-quick > .cmt,
+.cmt-pop[data-expanded] {
+  background: var(--panel); border: 1px solid var(--panel-border); box-shadow: var(--panel-shadow);
+}
+.cmt-pop[data-expanded] { max-height: min(72vh, 640px); }
+
+/* Cards swing out from behind the selected item, one after another. */
+@keyframes cmt-orbit { from { opacity: 0; transform: translate(-26px, 4px) rotate(-6deg) scale(0.95); } }
+@keyframes cmt-orbit-left { from { opacity: 0; transform: translate(26px, 4px) rotate(6deg) scale(0.95); } }
+.cmt-quick > * {
+  animation: cmt-orbit 0.34s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+  animation-delay: calc(var(--i, var(--n, 0)) * 45ms);
+  transform-origin: -90px 50%;
+}
+.cmt-pop[data-side='left'] .cmt-quick > * { animation-name: cmt-orbit-left; transform-origin: calc(100% + 90px) 50%; }
+@media (prefers-reduced-motion: reduce) { .cmt-quick > * { animation: none; } }
+
+.cmt { display: grid; grid-template-columns: 24px 1fr auto; gap: 9px; padding: 10px 10px 10px 11px; color: var(--text); }
+.cmt .avatar { font-size: 9.5px; }
+.cmt-body { min-width: 0; }
+.cmt-meta { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
+.cmt-author { font-size: 12.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmt-when { flex: none; font-size: 11.5px; color: var(--text-dim); }
+.cmt-text { margin: 0; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.cmt-time {
+  display: inline-block; margin-right: 6px; padding: 0 5px; border: 0;
+  background: var(--accent-soft); color: var(--accent);
+  font: 600 12px/18px var(--mono); font-variant-numeric: tabular-nums; cursor: pointer; vertical-align: 1px;
+}
+.cmt-time:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.cmt-time:disabled { cursor: default; }
+.cmt-resolved-by { margin-top: 4px; font-size: 11.5px; color: var(--text-dim); }
+.cmt[data-resolved] .cmt-text { color: var(--text-dim); }
+
+.cmt-actions { display: flex; flex-direction: column; gap: 4px; }
+.cmt-act {
+  display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  border: 1.5px solid var(--panel-border); border-radius: 50%; background: none; color: var(--text-dim); cursor: pointer;
+}
+.cmt-act:hover { color: var(--text); border-color: var(--text-dim); }
+.cmt-check:hover { background: #30a46c; border-color: #30a46c; color: #fff; }
+.cmt-delete { width: 20px; height: 20px; margin: -3px -2px -3px auto; align-self: center; border-color: transparent; opacity: 0; }
+.cmt:hover .cmt-delete { opacity: 1; }
+.cmt-delete:hover { color: #e5484d; border-color: transparent; }
+
+.cmt-more, .cmt-add {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text);
+  font: 600 12.5px var(--font); box-shadow: var(--panel-shadow); cursor: pointer;
+}
+.cmt-more:hover, .cmt-add:hover { background: var(--hover); }
+.cmt-more { color: var(--accent); }
+
+.cmt-composer {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; padding: 8px;
+  background: var(--panel); border: 1px solid var(--panel-border);
+}
+.cmt-quick > .cmt-composer { box-shadow: var(--panel-shadow); }
+.cmt-composer textarea {
+  flex: 1; min-width: 0; min-height: 30px; max-height: 120px; padding: 6px 8px; resize: none;
+  border: 1px solid var(--panel-border); background: var(--bg); color: var(--text);
+  font: 13.5px/1.35 var(--font); outline: none;
+}
+.cmt-composer textarea:focus { border-color: var(--accent); }
+.cmt-send {
+  height: 30px; padding: 0 12px; border: 0; background: var(--accent); color: #fff;
+  font: 600 12.5px var(--font); cursor: pointer;
+}
+.cmt-send:disabled { opacity: 0.4; cursor: default; }
+.cmt-chip {
+  flex-basis: 100%; align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; width: max-content; flex-grow: 0;
+  padding: 2px 7px; border: 1px dashed var(--panel-border); background: none; color: var(--text-dim);
+  font: 600 11.5px var(--mono); cursor: pointer;
+}
+.cmt-chip[aria-pressed='true'] { border-style: solid; border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+
+/* Full list: tabs, scrolling list, composer. */
+.cmt-full { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.cmt-tabs { display: flex; align-items: stretch; border-bottom: 1px solid var(--panel-border); }
+.cmt-tabs [role='tab'] {
+  flex: 1; padding: 10px 8px 9px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  background: none; color: var(--text-dim); font: 600 12.5px var(--font); cursor: pointer;
+}
+.cmt-tabs [role='tab'] span { margin-left: 4px; padding: 1px 6px; border-radius: 8px; background: var(--hover); font-size: 11px; }
+.cmt-tabs [role='tab'][aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
+.cmt-back { flex: none; width: 34px; border: 0; background: none; color: var(--text-dim); cursor: pointer; }
+.cmt-back:hover { color: var(--text); background: var(--hover); }
+.cmt-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.cmt-list > .cmt { border-bottom: 1px solid var(--panel-border); }
+.cmt-full .cmt-composer { border: 0; border-top: 1px solid var(--panel-border); }
+.cmt-empty { margin: 0; padding: 18px 14px; font-size: 13px; color: var(--text-dim); text-align: center; }
+
+/* In the player: a dark column beside the video. */
+.viewer-comments {
+  grid-column: 2; grid-row: 1 / 3; contain: size; min-height: 0;
+  display: flex; flex-direction: column;
+  --panel: #1d1d22; --text: #f2f2f5; --text-dim: #9d9da8; --panel-border: rgb(255 255 255 / 0.1);
+  --hover: rgb(255 255 255 / 0.08); --bg: #141418; --accent: #7b8cff; --accent-soft: rgb(123 140 255 / 0.18);
+  background: var(--panel); color: var(--text); box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
+}
+.viewer-comments-title { padding: 12px 14px 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+@media (max-width: 900px) {
+  .viewer-panel { grid-template-columns: var(--mw); }
+  .viewer-comments { display: none; }
+}
+
+/* Timeline marks where open comments sit. */
+.scrub-mark {
+  position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; z-index: 1;
+  border-radius: 50%; background: #ffd23f; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45); pointer-events: none;
 }
 
 /* Files dragged in from the desktop. */
