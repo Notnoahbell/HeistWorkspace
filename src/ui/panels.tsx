@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
 import { useUi, type PanelKey } from '../board/ui';
@@ -311,9 +311,6 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
             useUi.getState().set({ editingId: item.id, flyout: null });
           },
         },
-        item.captionHidden
-          ? { key: 'caption', label: 'Show name', glyph: <ChevronUp {...ICON_PROPS} size={18} />, run: () => update(item.id, { captionHidden: false }) }
-          : { key: 'caption', label: 'Hide name', glyph: <ChevronDown {...ICON_PROPS} size={18} />, run: () => update(item.id, { captionHidden: true }) },
         del,
       ];
     case 'link':
