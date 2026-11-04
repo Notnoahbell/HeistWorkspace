@@ -1017,13 +1017,14 @@ html, body, #root {
 .viewer-panel {
   --side: clamp(300px, 28vw, 420px);
   --vbg: #0b0b0d; --vbar: #141418; --vline: rgb(255 255 255 / 0.08); --vdim: #9a9aa6;
-  position: absolute; inset: 10vh 10vw;
+  position: absolute; inset: 5vh 5vw;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--side);
   grid-template-rows: 44px minmax(0, 1fr);
   background: var(--vbg); color: #f2f2f5;
   box-shadow: 0 24px 80px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.06);
   animation: viewer-pop 0.2s cubic-bezier(0.2, 0.9, 0.25, 1);
+  transition: grid-template-columns 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 .viewer[data-closing] { animation: viewer-fade 0.11s ease-in reverse forwards; }
 .viewer[data-closing] .viewer-panel { animation: viewer-pop 0.11s ease-in reverse forwards; }
@@ -1202,6 +1203,8 @@ html, body, #root {
 .cmt-pop-compose:empty { display: none; }
 .cmt-pop .cmt-typing { padding: 2px 0; }
 .cmt-pop-compose > .cmt-composer { margin-left: -4px; }
+.cmt-pop > .cmt-pop-compose:first-child { padding: 8px; }
+.cmt-pop > .cmt-pop-compose:first-child > .cmt-composer { margin-left: 0; }
 .cmt-pop-compose > .cmt-composer:not(:focus-within) { background: var(--hover); border-color: transparent; }
 .cmt-show-more {
   flex: none; align-self: flex-start; margin: 4px 0 2px 10px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px;
@@ -1404,12 +1407,20 @@ html, body, #root {
 
 /* In the player: comments down the right, numbered, amber timecodes. */
 .viewer-side {
-  grid-column: 2; grid-row: 2; min-height: 0; display: flex; flex-direction: column;
+  grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; overflow: hidden;
+  display: flex; justify-content: flex-end; /* the contents keep their width and slide, rather than squash */
   border-left: 1px solid var(--vline);
   --panel: #141418; --text: #f2f2f5; --text-dim: #9a9aa6; --panel-border: rgb(255 255 255 / 0.09);
   --hover: rgb(255 255 255 / 0.07); --bg: #0b0b0d; --accent: #7b8cff; --accent-soft: rgb(123 140 255 / 0.18);
   background: var(--panel); color: var(--text);
 }
+.viewer-side-inner {
+  flex: none; width: var(--side); min-height: 0; display: flex; flex-direction: column;
+  transition: opacity 0.22s ease-out, transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.viewer-panel[data-side='hidden'] .viewer-side { border-left-width: 0; }
+.viewer-panel[data-side='hidden'] .viewer-side-inner { opacity: 0; transform: translateX(24px); }
+@media (prefers-reduced-motion: reduce) { .viewer-panel, .viewer-side-inner { transition: none; } }
 .viewer-side .cmt-tabs { margin: 10px 10px 4px; padding: 3px; border: 0; border-radius: 10px; background: rgb(255 255 255 / 0.05); gap: 3px; }
 .viewer-side .cmt-tabs [role='tab'] { padding: 7px 8px; border: 0; margin: 0; border-radius: 7px; }
 .viewer-side .cmt-tabs [role='tab'][aria-selected='true'] { background: rgb(255 255 255 / 0.1); }
@@ -1424,7 +1435,7 @@ html, body, #root {
 /* Timecode chip sits in line before the text, like a prefix. */
 .viewer-side .cmt-chip { flex-basis: auto; align-self: center; }
 .viewer-side .cmt-chip[aria-pressed='true'] { background: rgb(245 190 50 / 0.16); color: #f5c542; }
-.viewer-panel[data-side='hidden'] { grid-template-columns: minmax(0, 1fr); }
+.viewer-panel[data-side='hidden'] { grid-template-columns: minmax(0, 1fr) 0px; }
 @media (max-width: 1100px) { .viewer-panel { inset: 16px; } }
 @media (max-width: 900px) {
   .viewer-panel { grid-template-columns: minmax(0, 1fr); }

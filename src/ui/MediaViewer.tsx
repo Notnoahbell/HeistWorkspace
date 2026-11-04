@@ -1,5 +1,5 @@
 // Player for a photo, GIF or video, laid out like a review tool: a window
-// (about 80% of the screen) over the dimmed, blurred board with the picture on
+// (about 90% of the screen) over the dimmed, blurred board with the picture on
 // the left, a full-width timeline with comment markers and the controls under
 // it, and every comment down the right (which can be hidden). Opens from a
 // double-click (or Enter) on a media card; ‹ › steps through the board's media.
@@ -369,15 +369,18 @@ function Player({ id, start }: { id: string; start: number }) {
         </section>
 
         {/* Every comment on this item; on a video, in timecode order. */}
-        {side && <aside className="viewer-side" onPointerDown={(e) => e.stopPropagation()}>
-          <CommentLookContext.Provider value={look}>
-            <CommentList
-              targetId={id}
-              clock={isVideo ? () => video?.currentTime ?? null : undefined}
-              onSeek={isVideo ? seek : undefined}
-            />
-          </CommentLookContext.Provider>
-        </aside>}
+        {/* Stays mounted so it can slide in and out; inert (no focus, no clicks) while hidden. */}
+        <aside className="viewer-side" inert={!side} aria-hidden={!side || undefined} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="viewer-side-inner">
+            <CommentLookContext.Provider value={look}>
+              <CommentList
+                targetId={id}
+                clock={isVideo ? () => video?.currentTime ?? null : undefined}
+                onSeek={isVideo ? seek : undefined}
+              />
+            </CommentLookContext.Provider>
+          </div>
+        </aside>
       </div>
     </div>
   );

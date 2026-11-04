@@ -115,7 +115,10 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
     // A reply goes on its own; a thread's first comment takes the thread with it.
     const el = (reply ? row.current : row.current?.closest('.cmt-thread')) as HTMLElement | null;
     if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) { deleteComment(c.id); return; }
-    animateOut(el).then(() => deleteComment(c.id));
+    // The last one beside a card takes the panel with it: let the whole panel go, not just the row.
+    const pop = el.closest<HTMLElement>('.cmt-pop');
+    const last = !reply && pop && pop.querySelectorAll('.cmt-thread').length === 1 && useUi.getState().commenting !== c.targetId;
+    (last ? animatePanelOut(pop) : animateOut(el)).then(() => deleteComment(c.id));
   };
   // Delete takes a second click, so a slip off a reaction can't remove a comment.
   useEffect(() => {
@@ -310,6 +313,13 @@ async function animateOut(el: HTMLElement) {
     { height: `${el.offsetHeight}px`, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, marginTop: cs.marginTop, marginBottom: cs.marginBottom },
     { height: '0px', paddingTop: '0px', paddingBottom: '0px', marginTop: '0px', marginBottom: '0px' },
   ], { duration: 140, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)', fill: 'forwards' }).finished;
+}
+
+/** The panel beside a card leaving: a quick fade as it drifts back toward the card. */
+async function animatePanelOut(pop: HTMLElement) {
+  pop.style.pointerEvents = 'none';
+  await pop.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-10px) scale(0.97)' }],
+    { duration: 170, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }).finished;
 }
 
 /** Threads already shown once in this session. */
