@@ -1,19 +1,20 @@
-import { memo, useLayoutEffect, useMemo, type CSSProperties } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { stackDepth, stackTone, stackZ, useBoard } from './store';
-import { columnLayout, useLayout, type Size } from './layout';
+import { columnLayout, gridCols, MAX_COLS, useLayout, type Size } from './layout';
 import { useUi } from './ui';
 import { useBody, useLiftedZ } from './useBody';
 import { createItem, itemHooks } from './actions';
-import { BOARD_ROW_HEIGHT, BOARD_SWATCH, COLUMN_HEADER, NOTE_MIN_HEIGHT, NOTE_WIDTH } from './constants';
+import { BOARD_ROW_HEIGHT, BOARD_SWATCH, COLUMN_GAP, COLUMN_HEADER, COLUMN_PAD, NOTE_MIN_HEIGHT, NOTE_WIDTH } from './constants';
 import { BoardIcon } from '../ui/BoardIcon';
 import { effectiveIcon } from '../lib/iconGuess';
 import { camera } from '../canvas/camera';
 import { isLight } from '../lib/color';
 
 /**
- * A column: stacks items vertically or side by side, sizes itself to fit
- * them, and can itself be stacked inside another column.
+ * A section: lays items out in a grid (one column by default), sizes itself
+ * to fit them, and can itself sit inside another section. Drag its right
+ * edge to add or remove grid columns.
  */
 export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const item = useBoard((s) => s.items[id]);
@@ -34,6 +35,8 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const editing = useUi((s) => s.editingId === id);
   const moving = useUi((s) => s.movingId === id);
   const lifted = useLiftedZ(id);
+  const resize = useRef<{ left: number; cell: number } | null>(null);
+  const [resizing, setResizing] = useState(false);
 
   const layout = useMemo(() => {
     if (!col) return null;
@@ -112,7 +115,8 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
         data-selected={selected}
         data-tone={tone}
         data-stacked={moving ? undefined : stackTone(depth)}
-        data-direction={col.direction}
+        data-cols={gridCols(col)}
+        data-resizing={resizing || undefined}
         style={visStyle}
       >
         {col.strip && <div className="column-strip" style={{ background: col.strip }} />}
@@ -122,7 +126,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
               className="column-title-input"
               ref={(el) => { if (el && document.activeElement !== el) { el.focus({ preventScroll: true }); el.select(); } }}
               defaultValue={col.title}
-              placeholder="Column title"
+              placeholder="Section title"
               onChange={(e) => update(id, { title: e.target.value })}
               onBlur={() => {
                 if (useUi.getState().editingId === id) useUi.getState().set({ editingId: null });
@@ -132,7 +136,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
               }}
             />
           ) : (
-            <span className="column-title" data-empty={!col.title}>{col.title || 'Untitled column'}</span>
+            <span className="column-title" data-empty={!col.title}>{col.title || 'Untitled section'}</span>
           )}
           <span className="column-count">{count} {count === 1 ? 'item' : 'items'}</span>
         </header>
@@ -157,6 +161,33 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
           </div>
         )}
         {count === 0 && !layout.placeholder && <div className="column-empty">Drop items here</div>}
+
+        {/* Drag the right edge: wider adds grid columns, narrower removes them. */}
+        <div
+          className="column-resize"
+          title="Drag to change the number of columns"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            if (e.button !== 0) return;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            resize.current = { left: visRef.current!.getBoundingClientRect().left, cell: layout.cell };
+            setResizing(true);
+            useUi.getState().set({ selectedId: id, editingId: null });
+          }}
+          onPointerMove={(e) => {
+            const r = resize.current;
+            if (!r) return;
+            const w = (e.clientX - r.left) / camera.z;
+            const cols = Math.min(MAX_COLS, Math.max(1, Math.round((w - COLUMN_PAD * 2 + COLUMN_GAP) / (r.cell + COLUMN_GAP))));
+            const now = useBoard.getState().items[id];
+            if (now?.kind === 'column' && gridCols(now) !== cols) update(id, { cols });
+          }}
+          onPointerUp={() => { resize.current = null; setResizing(false); }}
+          onPointerCancel={() => { resize.current = null; setResizing(false); }}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        />
+        {resizing && <div className="column-cols-badge">{gridCols(col)} {gridCols(col) === 1 ? 'column' : 'columns'}</div>}
       </div>
     </div>
   );

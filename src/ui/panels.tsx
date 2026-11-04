@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, Columns3, ExternalLink, Link2, Maximize2, PenLine, Rows3, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, ExternalLink, Link2, Maximize2, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
 import { useUi, type PanelKey } from '../board/ui';
@@ -13,6 +13,7 @@ import { COLOR_PRESETS } from '../lib/color';
 import { BOARD_ICONS, iconLabel } from '../lib/icons';
 import { ColorWheel } from './ColorWheel';
 import { BoardIcon } from './BoardIcon';
+import { gridCols, MAX_COLS } from '../board/layout';
 import { openViewer } from './MediaViewer';
 import { effectiveIcon, guessIcon } from '../lib/iconGuess';
 
@@ -237,7 +238,20 @@ export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
         : null;
     case 'rename':
       if (item.kind !== 'column' && item.kind !== 'board') return null;
-      return <RenamePanel value={item.title} placeholder={`Untitled ${item.kind}`} onChange={(v) => update(item.id, { title: v })} />;
+      return <RenamePanel value={item.title} placeholder={`Untitled ${item.kind === 'column' ? 'section' : 'board'}`} onChange={(v) => update(item.id, { title: v })} />;
+    case 'layout':
+      if (item.kind !== 'column') return null;
+      return (
+        <PanelSection label="Columns">
+          <Segmented<string>
+            label="Columns"
+            value={String(gridCols(item))}
+            onChange={(v) => update(item.id, { cols: Number(v) })}
+            options={Array.from({ length: MAX_COLS }, (_, i) => ({ value: String(i + 1), label: String(i + 1), title: `${i + 1} ${i ? 'columns' : 'column'}` }))}
+          />
+          <p className="panel-hint">Or drag the section's right edge.</p>
+        </PanelSection>
+      );
   }
 }
 
@@ -313,14 +327,13 @@ export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
         },
         {
           key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
-          // Columns rename inline, in their header.
+          // Sections rename inline, in their header.
           run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
         },
         {
-          key: 'direction',
-          label: item.direction === 'horizontal' ? 'Horizontal' : 'Vertical',
-          glyph: item.direction === 'horizontal' ? <Columns3 {...ICON_PROPS} size={18} /> : <Rows3 {...ICON_PROPS} size={18} />,
-          run: () => update(item.id, { direction: item.direction === 'horizontal' ? 'vertical' : 'horizontal' }),
+          key: 'layout', label: 'Columns', panel: 'layout',
+          // The current count, so it reads at a glance.
+          glyph: <span className="glyph-cols">{gridCols(item)}</span>,
         },
         del,
       ];

@@ -29,8 +29,8 @@ const TOOLS: { kind: AddKind; name: string; label: string; key: string; tile: Re
   { kind: 'link', name: 'Link', label: 'Link', key: 'L', tile: <span className="rail-tile"><Link2 {...TILE_ICON} /></span> },
   { kind: 'todo', name: 'To-do list', label: 'To-do', key: 'T', tile: <span className="rail-tile"><ListChecks {...TILE_ICON} /></span> },
   { kind: 'board', name: 'Board', label: 'Board', key: 'B', tile: <span className="rail-tile"><LayoutGrid {...TILE_ICON} /></span> },
-  // Stacked rows: a column's default (vertical) direction.
-  { kind: 'column', name: 'Column', label: 'Column', key: 'C', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
+  // Stacked rows: a section's default single column.
+  { kind: 'column', name: 'Section', label: 'Section', key: 'S', tile: <span className="rail-tile"><Rows3 {...TILE_ICON} /></span> },
 ];
 
 const SIZE: Record<AddKind, { w: number; h: number }> = {
@@ -55,7 +55,7 @@ function Preview({ kind }: { kind: AddKind }) {
       return (
         <div className="column" style={{ width: w, height: h }}>
           <header className="column-header">
-            <span className="column-title" data-empty="true">Untitled column</span>
+            <span className="column-title" data-empty="true">Untitled section</span>
             <span className="column-count">0 items</span>
           </header>
         </div>

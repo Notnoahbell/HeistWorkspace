@@ -9,9 +9,11 @@ import { useLayout } from './board/layout';
 import { installCursor } from './lib/cursor';
 import { connect } from './sync/client';
 import { usePresence } from './sync/presence';
+import { camera } from './canvas/camera';
+import { currentBoardId } from './board/nav';
 
 // Handy for poking at state from the console while developing.
-if (import.meta.env.DEV) Object.assign(window, { heist: { bodies, useBoard, useUi, useLayout, usePresence } });
+if (import.meta.env.DEV) Object.assign(window, { heist: { bodies, useBoard, useUi, useLayout, usePresence, camera, currentBoardId } });
 
 installCursor();
 connect();

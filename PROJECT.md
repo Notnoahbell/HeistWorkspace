@@ -61,6 +61,7 @@ self-hosted.
 - [x] Box selection, shift-click, Ctrl/⌘+A, group drag, right-click menu
       ("New column from selection", delete; "add here" on empty canvas)
 - [x] Nested columns (columns size to their contents) and horizontal columns
+- [x] Columns became **sections**: a grid with 1–6 columns (drag the right edge or pick a count)
 - [ ] Resize
 - [ ] Alignment guides
 - [ ] Undo / redo
@@ -160,6 +161,12 @@ Sized for ~150 users; a single modest server handles this comfortably.
 - **2026-11-03: Columns nest.** Every item kind is stackable; a column sizes itself
   to its contents (so nesting widens the parent) and cards in vertical columns
   stretch to its inner width. Stacked surfaces alternate tone by depth.
+- **2026-11-03: Columns → sections (grid).** The vertical/horizontal switch is gone;
+  a section has `cols` (1 = a plain column) and fills left to right, wrapping, each
+  row as tall as its tallest item. Cells are one card wide, or as wide as the widest
+  nested section. Drag the right edge to change the count, or use the toolbar's
+  Columns picker. Data v5: vertical → 1, horizontal → one column per item. Code
+  still calls the kind `column`; only the UI says "section".
 
 - **2026-11-03: Boards are items.** All items live in one flat map tagged with
   `boardId`; a board's tile *is* the board. Each user's root is a virtual Home
@@ -215,7 +222,8 @@ npm run build      # typecheck + production build
   GIFs loop on their own. Double-click (or Enter) opens the full-size player: Space/K
   play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
-- Columns: C; double-click header to rename; double-click body to add a note
+- Sections: S (or C); double-click header to rename; double-click body to add a note;
+  drag the right edge to change the number of grid columns
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
   follows the cursor and becomes a real item once it clears the sidebar
 - Drag and flick to throw; Delete removes; G toggles snap, hold Alt to place freely

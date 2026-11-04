@@ -35,7 +35,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
   const copyable = items.some((it) => it.kind !== 'board');
   const actions = [
-    { key: 'column', label: 'Gather into a new column', icon: <Columns3 {...ICON_PROPS} />, run: () => groupIntoColumn() },
+    { key: 'column', label: 'Gather into a new section', icon: <Columns3 {...ICON_PROPS} />, run: () => groupIntoColumn() },
     ...(copyable ? [
       { key: 'copy', label: 'Copy (Ctrl+C)', icon: <Copy {...ICON_PROPS} />, run: copySelection },
       { key: 'dup', label: 'Duplicate (Ctrl+D)', icon: <CopyPlus {...ICON_PROPS} />, run: duplicateSelection },

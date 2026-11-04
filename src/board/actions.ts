@@ -368,7 +368,7 @@ export function enterBoard(id: string) {
 
 const KIND_NOUN: Record<ItemKind, [string, string]> = {
   board: ['board', 'boards'],
-  column: ['column', 'columns'],
+  column: ['section', 'sections'],
   note: ['note', 'notes'],
   todo: ['to-do list', 'to-do lists'],
   link: ['link', 'links'],

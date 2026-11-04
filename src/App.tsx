@@ -59,7 +59,8 @@ function EmptyHint({ boardId }: { boardId: string }) {
 
 const limit = () => contentBounds();
 
-const ADD_KEYS: Record<string, ItemKind> = { n: 'note', l: 'link', t: 'todo', b: 'board', c: 'column' };
+// S adds a section; C still does too (sections used to be columns).
+const ADD_KEYS: Record<string, ItemKind> = { n: 'note', l: 'link', t: 'todo', b: 'board', s: 'column', c: 'column' };
 
 export function App() {
   const boardId = useBoardId();

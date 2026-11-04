@@ -98,17 +98,20 @@ export interface Media extends ItemBase, Stacked {
   upload?: 'uploading' | 'failed';
 }
 
+/** Before v5: sections stacked one way or the other. Read only to migrate. */
 export type ColumnDirection = 'vertical' | 'horizontal';
 
-/** A container that stacks items; columns can nest inside columns. */
+/** A section: lays items out in a grid (1 column = a plain column); sections nest. */
 export interface Column extends ItemBase, Stacked {
   kind: 'column';
   title: string;
   color: string | null;
   /** Coloured strip along the top edge. null = no strip. */
   strip: string | null;
-  /** Stack children top-to-bottom, or side by side. */
-  direction: ColumnDirection;
+  /** Grid columns; 1 stacks items top to bottom. */
+  cols: number;
+  /** @deprecated v4 and older; see gridCols(). */
+  direction?: ColumnDirection;
   childIds: string[];
 }
 
@@ -175,7 +178,7 @@ const DEFAULTS: { [K in ItemKind]: Omit<ItemOf<K>, 'id' | 'kind' | 'z' | 'x' | '
   todo: { w: NOTE_WIDTH, color: null, entries: [], parentId: null },
   link: { w: NOTE_WIDTH, color: null, url: '', preview: null, parentId: null },
   media: { w: MEDIA_WIDTH, mediaType: 'image', src: '', name: '', meta: {}, captionHidden: false, parentId: null },
-  column: { w: COLUMN_WIDTH, title: '', color: null, strip: null, direction: 'vertical', childIds: [], parentId: null },
+  column: { w: COLUMN_WIDTH, title: '', color: null, strip: null, cols: 1, childIds: [], parentId: null },
   board: { w: BOARD_WIDTH, title: '', color: null, icon: null, parentId: null },
 };
 
@@ -369,7 +372,7 @@ export const useBoard = create<BoardState>()(
     }),
     {
       name: 'heist:board:local-default',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => safeStorage),
       partialize: (s) => ({ items: s.items, topZ: s.topZ }),
       migrate: (persisted, version) => {
@@ -405,6 +408,14 @@ export const useBoard = create<BoardState>()(
         if (version < 4) {
           for (const it of Object.values(state.items ?? {})) {
             if (it.kind === 'column') Object.assign(it, { parentId: it.parentId ?? null, direction: it.direction ?? 'vertical' });
+          }
+        }
+        // v5: direction becomes a grid column count (horizontal = one row).
+        if (version < 5) {
+          for (const it of Object.values(state.items ?? {})) {
+            if (it.kind !== 'column') continue;
+            it.cols = it.direction === 'horizontal' ? Math.max(1, it.childIds.length) : 1;
+            delete it.direction;
           }
         }
         return state;
