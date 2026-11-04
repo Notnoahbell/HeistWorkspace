@@ -10,6 +10,7 @@ import {
 } from './store';
 import { currentBoardId, openBoard } from './nav';
 import { useUi } from './ui';
+import { COLOR_PRESETS } from '../lib/color';
 import { dismissShortcut } from '../sync/client';
 
 const board = useBoard.getState;
@@ -248,12 +249,24 @@ export function viewportCenterWorld(): Point {
 
 const snapPoint = (p: Point): Point => (ui().snap ? { x: snap(p.x), y: snap(p.y) } : p);
 
+/** The bright presets (not the greys, brown or peach) new boards start in. */
+const BOARD_STARTS = COLOR_PRESETS.slice(0, 12);
+
+/** A random starting colour, avoiding ones already used by boards alongside it while any are left. */
+function randomBoardColor(siblings: Item[]): string {
+  const used = new Set(siblings.map((b) => ('color' in b ? b.color?.toUpperCase() : undefined)));
+  const fresh = BOARD_STARTS.filter((c) => !used.has(c));
+  const pool = fresh.length ? fresh : BOARD_STARTS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function addOnCurrentBoard(kind: ItemKind, at: Point): string {
   const boardId = currentBoardId();
   if (kind === 'board') {
     // Number new boards so a fresh tree reads "Board 01, Board 02…".
-    const n = Object.values(board().items).filter((i) => i.kind === 'board' && i.boardId === boardId).length + 1;
-    return board().addItem('board', { ...at, boardId, title: `Board ${String(n).padStart(2, '0')}` });
+    const siblings = Object.values(board().items).filter((i) => i.kind === 'board' && i.boardId === boardId);
+    const n = siblings.length + 1;
+    return board().addItem('board', { ...at, boardId, title: `Board ${String(n).padStart(2, '0')}`, color: randomBoardColor(siblings) });
   }
   return board().addItem(kind, { ...at, boardId });
 }
