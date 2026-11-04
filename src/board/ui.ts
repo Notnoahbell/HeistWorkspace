@@ -42,7 +42,7 @@ interface UiState {
    * Message at the bottom. `icon`: a glyph before the text; `busy`: something's
    * under way (the icon animates, and it stays until replaced).
    */
-  toast: { text: string; boardId?: string; at: number; icon?: 'pin'; busy?: boolean } | null;
+  toast: { text: string; boardId?: string; at: number; icon?: 'pin'; busy?: boolean; /** How long it shows (ms). */ ms?: number } | null;
   /** Everything selected. */
   selectedIds: string[];
   /** The selected item when exactly one is selected, else null. */

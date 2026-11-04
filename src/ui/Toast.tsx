@@ -16,7 +16,7 @@ export function Toast() {
     if (!toast || toast.busy) return;
     const t = setTimeout(() => {
       if (useUi.getState().toast === toast) useUi.getState().set({ toast: null });
-    }, SHOW_MS);
+    }, toast.ms ?? SHOW_MS);
     return () => clearTimeout(t);
   }, [toast]);
 
