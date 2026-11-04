@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Download, Maximize2, Play, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Download, Maximize2, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
 import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
@@ -373,8 +373,9 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
       const video = item.mediaType === 'video';
       return [
         {
-          key: 'view', label: video ? 'Play in the player (Enter)' : 'View full size (Enter)', group: 'primary', text: video ? 'Play' : 'View',
-          glyph: video ? <Play {...ICON_PROPS} size={16} fill="currentColor" /> : <Maximize2 {...ICON_PROPS} size={16} />,
+          key: 'view', label: video ? 'Open in the player (Enter)' : 'View full size (Enter)', group: 'primary', text: video ? 'Play' : 'View',
+          // Opens it big (the same expand arrows as the card's own corner button).
+          glyph: <Maximize2 {...ICON_PROPS} size={16} />,
           run: () => useUi.getState().set({ viewer: { id: item.id, time: cardVideos.get(item.id)?.currentTime ?? 0 }, flyout: null }),
         },
         { key: 'status', label: 'Review status', group: 'review', glyph: <StatusGlyph status={item.status ?? null} />, panel: 'status' },
