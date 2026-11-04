@@ -1166,20 +1166,23 @@ html, body, #root {
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 16px; box-shadow: var(--panel-shadow);
   overflow: hidden; animation: cmt-in 0.12s ease-out both;
 }
-.cmt-pop-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 10px 2px 16px; }
-.cmt-pop-head h3 { margin: 0; font: 650 12.5px var(--font); color: var(--text); }
+.cmt-pop-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 8px 10px 4px 16px; }
+.cmt-pop-head h3 { margin: 0; font: 650 13px var(--font); color: var(--text); }
 .cmt-pop-head h3 span, .cmt-pop-back span {
   margin-left: 3px; padding: 1px 6px; border-radius: 8px; background: var(--hover); color: var(--text-dim); font-size: 11px; font-weight: 600;
 }
 .cmt-pop-link, .cmt-pop-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; cursor: pointer; }
-.cmt-pop-link { padding: 4px 9px; border-radius: 999px; color: var(--text-dim); font: 600 11.5px var(--font); }
+.cmt-pop-link { height: 28px; padding: 0 10px; border-radius: 999px; color: var(--text-dim); font: 600 12px var(--font); }
 .cmt-pop-link:hover { background: var(--hover); color: var(--text); }
+.cmt-pop-actions { display: flex; align-items: center; gap: 2px; }
+.cmt-resolve-all { color: var(--text); border: 1px solid var(--panel-border); }
+.cmt-resolve-all:hover { background: #30a46c; border-color: #30a46c; color: #fff; }
 .cmt-pop-back { margin-left: -8px; padding: 4px 8px 4px 3px; border-radius: 8px; color: var(--text); font: 650 12.5px var(--font); }
 .cmt-pop-back:hover { background: var(--hover); }
 /* Each thread is its own soft, rounded card. */
-.cmt-pop .cmt-list { flex: 0 1 auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 8px 8px; }
+.cmt-pop .cmt-list { flex: 0 1 auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 10px; }
 .cmt-pop .cmt-thread { flex: none; border-radius: 12px; background: var(--hover); }
-.cmt-pop-compose { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.cmt-pop-compose { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 10px; }
 .cmt-pop-compose:empty { display: none; }
 .cmt-pop .cmt-list + .cmt-pop-compose { border-top: 1px solid var(--panel-border); }
 .cmt-pop .cmt-typing { padding: 2px 8px; }
@@ -1189,22 +1192,27 @@ html, body, #root {
   background: none; color: var(--text-dim); font: 600 12px var(--font); cursor: pointer;
 }
 .cmt-show-more:hover { color: var(--accent); }
+.cmt-reply-open {
+  align-self: flex-start; height: 34px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font: 700 13px var(--font); cursor: pointer;
+}
+.cmt-reply-open:hover { background: var(--accent); color: #fff; }
 
 /* New comments drop in quickly. */
 @keyframes cmt-in { from { opacity: 0; transform: translateY(-4px); } }
 .cmt-thread[data-fresh] { animation: cmt-in 0.16s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .cmt-pop, .cmt-thread[data-fresh] { animation: none; } }
 
-.cmt { position: relative; display: grid; grid-template-columns: 24px 1fr; gap: 10px; padding: 13px 14px 12px 13px; color: var(--text); }
-.cmt[data-reply] { grid-template-columns: 20px 1fr; gap: 9px; padding: 10px 12px 8px 0; }
-.cmt .avatar { font-size: 9.5px; }
+.cmt { position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 11px; padding: 14px 14px 12px; color: var(--text); }
+.cmt[data-reply] { grid-template-columns: 22px 1fr; gap: 10px; padding: 12px 12px 10px 0; }
+.cmt .avatar { font-size: 10px; }
 .cmt[data-reply] .avatar { font-size: 8px; }
 .cmt-body { min-width: 0; }
-.cmt-meta { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
-.cmt-author { font-size: 12.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cmt-when { flex: none; font-size: 11.5px; color: var(--text-dim); }
-.cmt-text { margin: 0; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.cmt[data-reply] .cmt-text { font-size: 13px; }
+.cmt-meta { display: flex; align-items: baseline; gap: 7px; min-height: 22px; margin-bottom: 3px; }
+.cmt-author { font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmt-when { flex: none; font-size: 12px; color: var(--text-dim); }
+.cmt-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.cmt[data-reply] .cmt-text { font-size: 13.5px; }
 .cmt-mention { color: var(--accent); font-weight: 600; }
 .cmt-mention[data-me] { background: var(--accent-soft); padding: 0 2px; border-radius: 4px; }
 .cmt-time {
@@ -1218,14 +1226,11 @@ html, body, #root {
 .cmt-thread[data-resolved] > .cmt .cmt-text { color: var(--text-dim); }
 
 /* Hover tools over the corner of a comment: resolve, delete. */
-.cmt-tools {
-  position: absolute; top: 8px; right: 8px; z-index: 1; display: flex; gap: 1px; padding: 2px;
-  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 9px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.14);
-  opacity: 0; pointer-events: none; transition: opacity 0.1s;
-}
-.cmt:hover > .cmt-tools, .cmt:has(> .cmt-tools :focus-visible) > .cmt-tools { opacity: 1; pointer-events: auto; }
+.cmt-meta-end { display: flex; align-items: center; gap: 2px; margin: -4px -6px -4px auto; }
+.cmt-tools { display: flex; gap: 1px; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+.cmt:hover .cmt-tools, .cmt-tools:has(:focus-visible) { opacity: 1; pointer-events: auto; }
 .cmt-tool {
-  display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px;
   background: none; color: var(--text-dim); cursor: pointer;
 }
 .cmt-tool:hover { background: var(--hover); color: var(--text); }
@@ -1234,29 +1239,29 @@ html, body, #root {
 @media (hover: none) { .cmt-tools { opacity: 1; pointer-events: auto; } }
 
 /* Under the text: reaction chips, Reply, the react button (or the six emoji while picking). */
-.cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; min-height: 24px; }
+.cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 -2px; min-height: 30px; }
 .cmt-react {
-  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px 0 7px;
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px 0 9px;
   border: 1px solid var(--panel-border); border-radius: 999px; background: var(--panel); color: var(--text-dim);
-  font: 600 11.5px var(--font); font-variant-numeric: tabular-nums; cursor: pointer;
+  font: 600 12.5px var(--font); font-variant-numeric: tabular-nums; cursor: pointer;
 }
-.cmt-react span { font-size: 12.5px; line-height: 1; }
+.cmt-react span { font-size: 14px; line-height: 1; }
 .cmt-react:hover { border-color: var(--text-dim); color: var(--text); }
 .cmt-react[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .cmt-reply-btn {
-  height: 24px; padding: 0 8px; border: 0; border-radius: 999px; background: none; color: var(--text);
-  font: 700 12px var(--font); cursor: pointer;
+  height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--accent);
+  font: 700 13px var(--font); cursor: pointer;
 }
-.cmt-foot > .cmt-reply-btn:first-child { margin-left: -8px; }
-.cmt-reply-btn:hover { background: var(--hover); }
-.cmt-react-add { border-radius: 999px; }
+.cmt-foot > .cmt-reply-btn:first-child { margin-left: -10px; }
+.cmt-reply-btn:hover { background: var(--accent-soft); }
+.cmt-react-add { width: 30px; height: 30px; border-radius: 999px; }
 .cmt-picker {
-  display: inline-flex; gap: 1px; margin-left: -4px; padding: 2px; border: 1px solid var(--panel-border); border-radius: 999px;
+  display: inline-flex; gap: 0; margin-left: -2px; padding: 1px; border: 1px solid var(--panel-border); border-radius: 999px;
   background: var(--panel); box-shadow: 0 2px 10px rgb(0 0 0 / 0.12); animation: cmt-in 0.1s ease-out both;
 }
 .cmt-emoji {
-  display: grid; place-items: center; width: 27px; height: 26px; padding: 0; border: 0; border-radius: 50%;
-  background: none; font-size: 15px; line-height: 1; cursor: pointer; transition: transform 0.08s;
+  display: grid; place-items: center; width: 28px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  background: none; font-size: 16px; line-height: 1; cursor: pointer; transition: transform 0.08s;
 }
 .cmt-emoji:hover { background: var(--hover); transform: scale(1.2); }
 /* "3 replies ⌄" — folds the replies away, like YouTube. */
@@ -1268,7 +1273,7 @@ html, body, #root {
 .cmt-fold svg { transition: transform 0.15s; }
 .cmt-fold[aria-expanded='true'] svg { transform: rotate(180deg); }
 /* Replies sit under the first comment, indented to its text. */
-.cmt-replies { margin: -6px 12px 12px 45px; padding-left: 12px; border-left: 2px solid var(--panel-border); }
+.cmt-replies { margin: -4px 12px 12px 47px; padding-left: 12px; border-left: 2px solid var(--panel-border); }
 .cmt-fold + .cmt-replies { margin-top: -6px; }
 
 /* The composer is one text box: optional timecode chip, the text, and Post once there's something to send. */
@@ -1372,7 +1377,7 @@ html, body, #root {
 .viewer-side .cmt-list > .cmt-thread[data-active] { border-color: rgb(255 255 255 / 0.4); background: rgb(255 255 255 / 0.06); }
 .viewer-side .cmt-time { background: rgb(245 190 50 / 0.16); color: #f5c542; }
 .viewer-side .cmt-time:hover:not(:disabled) { background: #f5c542; color: #111; }
-.cmt-num { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.cmt-num { margin-left: 2px; font-size: 11px; font-weight: 600; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .viewer-side .cmt-full-compose { padding: 8px 10px 10px; }
 /* Timecode chip sits in line before the text, like a prefix. */
 .viewer-side .cmt-chip { flex-basis: auto; align-self: center; }

@@ -177,6 +177,12 @@ Sized for ~150 users; a single modest server handles this comfortably.
   on each client from the comments it can see (mentions of you, replies in threads you
   wrote in); read state is per browser for now (`heist:notices`). "Typing" rides on
   presence (`typing: <itemId>`), so it's per board and never stored.
+- **2026-11-03: One conversation per item, threads only on video.** Notes, links, to-dos
+  and photos have a single flat conversation like Milanote (oldest first, Reply at the end
+  opens the box, Resolve files the whole conversation). Videos keep a thread per moment,
+  with replies folded away. Same data either way (`isThreaded` decides how it's shown), so
+  existing replies just flatten in. Another person's comment after yours in a conversation
+  notifies you like a reply.
 - **2026-11-03: Reactions.** Six fixed emoji (👍 🔥 ❤️ 😂 💯 👎) stored on the comment as
   `reactions: { emoji: userId[] }`. Whole-item last-write-wins means two people reacting
   to the same comment at the same instant can drop one; fine for now, worth a per-field

@@ -46,9 +46,23 @@ export function toThreads(list: Comment[]): Thread[] {
     .map((root) => ({ root, replies: (byRoot.get(root.id) ?? []).sort((a, b) => a.createdAt - b.createdAt) }));
 }
 
-/** Open threads on an item (what the card's badge counts). */
+/**
+ * Videos have threads (one per moment, each with its replies). Everything else
+ * has a single conversation: every comment is a reply to it, oldest first.
+ */
+export const isThreaded = (it: Item | undefined) => it?.kind === 'media' && it.mediaType === 'video';
+
+/** What the card's badge counts: open threads on a video, open comments on anything else. */
 export const useOpenCount = (targetId: string) =>
-  useBoard((s) => (commentIndex(s.items).get(targetId) ?? EMPTY).reduce((n, c) => n + (!c.replyTo && !c.resolved ? 1 : 0), 0));
+  useBoard((s) => {
+    const threaded = isThreaded(s.items[targetId]);
+    return (commentIndex(s.items).get(targetId) ?? EMPTY).reduce((n, c) => n + (!c.resolved && (!threaded || !c.replyTo) ? 1 : 0), 0);
+  });
+
+/** Resolve (or reopen) a whole conversation at once. */
+export function setAllResolved(list: Comment[], resolved: boolean) {
+  for (const c of list) if (c.resolved !== resolved) setResolved(c.id, resolved);
+}
 
 export function addComment(targetId: string, text: string, opts: { time?: number | null; replyTo?: string | null } = {}) {
   const target = useBoard.getState().items[targetId];
@@ -170,12 +184,18 @@ export function noticesFrom(items: Record<string, Item>, me = session.userId): N
   if (items === noticed && me === noticeFor) return noticeCache;
   const comments = Object.values(items).filter((it): it is Comment => it.kind === 'comment');
   const mine = new Set<string>(); // threads you're part of
-  for (const c of comments) if (c.authorId === me) mine.add(c.replyTo ?? c.id);
+  const joined = new Map<string, number>(); // conversations you're part of → when you joined
+  for (const c of comments) {
+    if (c.authorId !== me) continue;
+    mine.add(c.replyTo ?? c.id);
+    joined.set(c.targetId, Math.min(joined.get(c.targetId) ?? Infinity, c.createdAt));
+  }
   const out: Notice[] = [];
   for (const c of comments) {
     if (c.authorId === me) continue;
     if (c.mentions?.includes(me)) out.push({ comment: c, kind: 'mention' });
     else if (c.replyTo && mine.has(c.replyTo)) out.push({ comment: c, kind: 'reply' });
+    else if (!isThreaded(items[c.targetId]) && c.createdAt > (joined.get(c.targetId) ?? Infinity)) out.push({ comment: c, kind: 'reply' });
   }
   out.sort((a, b) => b.comment.createdAt - a.comment.createdAt);
   noticed = items;
