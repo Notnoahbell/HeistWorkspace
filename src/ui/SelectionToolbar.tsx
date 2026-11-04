@@ -90,7 +90,6 @@ function ToolButton({ act, ...rest }: { act: ToolAction } & React.ButtonHTMLAttr
       {...rest}
     >
       {act.icon}
-      {act.text && <span className="toolbar-text">{act.text}</span>}
     </button>
   );
 }

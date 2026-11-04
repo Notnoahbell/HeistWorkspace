@@ -757,14 +757,8 @@ html, body, #root {
 .toolbar-divider { flex: none; align-self: stretch; width: 1px; margin: 6px 3px; background: var(--panel-border); }
 .selection-toolbar button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
 .selection-toolbar button[data-danger='true'] { color: #e5484d; }
-/* The main action: first, and the only button with a word; flat and square like the rest,
-   its icon in the accent colour. */
-.selection-toolbar button[data-group='primary'] {
-  display: inline-flex; align-items: center; gap: 6px; padding: 0 10px 0 8px;
-  color: var(--text); font: 650 12.5px var(--font);
-}
-.selection-toolbar button[data-group='primary'] svg { width: 15px; height: 15px; color: var(--accent); }
-.toolbar-text { white-space: nowrap; }
+/* The main action: first, its icon in the accent colour. */
+.selection-toolbar button[data-group='primary'] svg { color: var(--accent); }
 /* Comment stands out from the formatting buttons. */
 .selection-toolbar button[data-key='comment'] { color: var(--accent); }
 /* Delete: neutral until you're on it, so it doesn't shout. */
