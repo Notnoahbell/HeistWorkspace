@@ -264,8 +264,9 @@ Sized for ~150 users; a single modest server handles this comfortably.
   **organise** (rename, edit link, sort, columns, loop; frame / section for a selection) ·
   **file** (download) · **danger** (delete, last, neutral until hovered). A selection's
   toolbar starts "N selected"; the arrange strip stays to its right. Toolbar icons share one stroke
-  (2). A media card's review status lives in its top-left corner (the tag, click to change;
-  a "Status" button on hover when unset), not the toolbar.
+  (2). A media card's review status lives on the card, not the toolbar: at rest a
+  4px strip in its colour along the top; on hover, its tag in the top-left corner (click to
+  change; a "Status" button there when unset).
 - **2026-11-04: Downloads** (`src/board/download.ts`, panel `src/ui/Downloads.tsx`). Download
   sits left of Delete on a photo/video's toolbar and on a multi-selection's (the photos and
   videos in it, sections' contents included). Files are fetched by the page (2 at a time,
