@@ -8,6 +8,7 @@ import { itemHooks } from './actions';
 import { isLight } from '../lib/color';
 import { fetchPreview, hostOf, normalizeUrl } from '../lib/links';
 import { CommentBadge } from '../ui/Comments';
+import { useAddedBy } from './details';
 
 const LINK_ICON = { size: 18, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 
@@ -15,6 +16,8 @@ const LINK_ICON = { size: 18, strokeWidth: 1.8, strokeLinecap: 'square', strokeL
 export const LinkView = memo(function LinkView({ id }: { id: string }) {
   const item = useBoard((s) => s.items[id]);
   const link = item?.kind === 'link' ? item : null;
+  /** Who added it and when, for the hover details. */
+  const added = useAddedBy(item);
   const stackIndex = useBoard((s) => stackZ(s.items, id));
   const depth = useBoard((s) => stackDepth(s.items, id));
   const slot = useLayout((s) => (link?.parentId ? s.slots[id] : undefined));
@@ -106,7 +109,7 @@ export const LinkView = memo(function LinkView({ id }: { id: string }) {
         data-stacked={stacked}
         data-selected={selected}
         data-tone={tone}
-        title={link.url ? `${link.url}\nClick again to open` : undefined}
+        title={link.url ? [link.preview?.title, link.url, added, 'Click again to open'].filter(Boolean).join('\n') : undefined}
         style={{ width: fill ?? link.w, '--item-bg': link.color ?? undefined } as CSSProperties}
       >
         {body}

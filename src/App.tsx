@@ -28,6 +28,7 @@ import { CursorChat, PeerCursors, PeerSelections } from './ui/Presence';
 import { MediaViewer, openViewer } from './ui/MediaViewer';
 import { MediaWall, openWall } from './ui/MediaWall';
 import { AdminPage, isAdminOpen } from './ui/AdminPage';
+import { TooltipLayer } from './ui/Tooltip';
 import { CommentsPopover } from './ui/Comments';
 import { copySelection, cutSelection, duplicateSelection, paste } from './board/clipboard';
 import { camera } from './canvas/camera';
@@ -245,6 +246,7 @@ export function App() {
       <CursorChat />
       <MediaWall />
       <AdminPage />
+      <TooltipLayer />
       <MediaViewer />
       {fileDrag && <FileDropHint />}
     </>

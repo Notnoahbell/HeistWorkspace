@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import { newId } from '../lib/id';
 import type { Point } from '../canvas/camera';
-import { homeId } from '../session';
+import { homeId, session } from '../session';
 import { BOARD_WIDTH, COLUMN_WIDTH, MEDIA_WIDTH, NOTE_WIDTH } from './constants';
 
 interface ItemBase {
@@ -22,6 +22,9 @@ interface ItemBase {
   w: number;
   /** Stacking order among top-level items. */
   z: number;
+  /** Who added it and when (cards made before this was recorded don't say). */
+  createdBy?: string;
+  createdAt?: number;
 }
 
 export type TextSize = 'sm' | 'md' | 'lg';
@@ -358,7 +361,7 @@ export const useBoard = create<BoardState>()(
       addItem(kind, init) {
         const id = newId();
         const z = get().topZ + 1;
-        const item = { ...DEFAULTS[kind], ...init, id, kind, z } as unknown as Item;
+        const item = { ...DEFAULTS[kind], createdBy: session.userId, createdAt: Date.now(), ...init, id, kind, z } as unknown as Item;
         set((s) => ({ items: { ...s.items, [id]: item }, topZ: z }));
         return id;
       },

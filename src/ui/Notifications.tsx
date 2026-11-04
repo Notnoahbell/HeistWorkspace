@@ -14,6 +14,7 @@ import {
 import { camera } from '../canvas/camera';
 import { personalColor, usePresence } from '../sync/presence';
 import { Avatar, Popover } from './Collab';
+import { byLine } from '../lib/time';
 
 const ICON = { size: 16, strokeWidth: 2, 'aria-hidden': true } as const;
 
@@ -84,7 +85,7 @@ function NoticeRow({ n, unread, onOpen }: { n: Notice; unread: boolean; onOpen: 
           <strong>{name}</strong> {verb(n)} <strong>{targetLabel(target)}</strong>
         </span>
         <span className="notice-text">{c.text}</span>
-        <span className="notice-where">{boardLabel(c.boardId)} · {timeAgo(c.createdAt)}</span>
+        <span className="notice-where" title={byLine(boardLabel(c.boardId), c.createdAt)}>{boardLabel(c.boardId)} · {timeAgo(c.createdAt)}</span>
       </span>
       {unread && <span className="notice-dot" aria-label="Unread" />}
     </button>

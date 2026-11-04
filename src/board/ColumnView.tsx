@@ -8,6 +8,7 @@ import { createItem, itemHooks } from './actions';
 import { BOARD_ROW_HEIGHT, BOARD_SWATCH, COLUMN_GAP, COLUMN_HEADER, COLUMN_PAD, NOTE_MIN_HEIGHT, NOTE_WIDTH } from './constants';
 import { BoardIcon } from '../ui/BoardIcon';
 import { effectiveIcon } from '../lib/iconGuess';
+import { useAddedBy } from './details';
 import { camera } from '../canvas/camera';
 import { isLight } from '../lib/color';
 
@@ -19,6 +20,8 @@ import { isLight } from '../lib/color';
 export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
   const item = useBoard((s) => s.items[id]);
   const col = item?.kind === 'column' ? item : null;
+  /** Who added it and when, for the hover details. */
+  const added = useAddedBy(item);
   const childIds = col?.childIds ?? [];
   const parentId = col?.parentId ?? null;
   const zIndex = useBoard((s) => stackZ(s.items, id));
@@ -136,7 +139,7 @@ export const ColumnView = memo(function ColumnView({ id }: { id: string }) {
               }}
             />
           ) : (
-            <span className="column-title" data-empty={!col.title}>{col.title || 'Untitled section'}</span>
+            <span className="column-title" data-empty={!col.title} data-tip={[col.title || 'Untitled section', `${count} ${count === 1 ? 'item' : 'items'}`, added].filter(Boolean).join('\n')}>{col.title || 'Untitled section'}</span>
           )}
           <span className="column-count">{count} {count === 1 ? 'item' : 'items'}</span>
         </header>

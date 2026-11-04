@@ -257,6 +257,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   a jump takes then depends on keyframe spacing, so videos with keyframes >2s apart (first
   minute, read with ffprobe) get a 720p proxy, and proxies have a keyframe every second: in
   testing, the same footage went from 1–8s per jump to under 0.15s.
+- **2026-11-04: One tooltip style** (`src/ui/Tooltip.tsx`, mounted once). Every `title`
+  becomes it on first hover (moved to `data-tip`); `data-tip` works directly; new lines make
+  more lines (first one brighter). Text cut off with an ellipsis shows whole on hover. Cards
+  record `createdBy` / `createdAt` (older ones don't have them); media captions, board tiles,
+  links and section titles show full name, details and "Added by Name • Nov 4, 2026 at 1:22 PM"
+  (`src/board/details.ts`, `src/lib/time.ts`); comment times, versions and notifications show
+  full dates.
 - **2026-11-04: Side by side plays up to 25 (5×5) on one clock.** `src/ui/MediaWall.tsx`.
   The time belongs to a master clock, not to any one video; videos follow by nudging
   their playback rate (±8%) and only seek when >0.35s off, because 25 simultaneous seeks

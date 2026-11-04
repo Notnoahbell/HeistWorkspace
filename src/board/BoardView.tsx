@@ -8,6 +8,7 @@ import { boardSummary, enterBoard, itemHooks } from './actions';
 import { BOARD_SWATCH, NOTE_WIDTH } from './constants';
 import { BoardIcon, SquircleRing } from '../ui/BoardIcon';
 import { effectiveIcon } from '../lib/iconGuess';
+import { useAddedBy } from './details';
 
 /**
  * A board's tile on its parent board. Floating, it's an icon square with the
@@ -18,6 +19,8 @@ import { effectiveIcon } from '../lib/iconGuess';
 export const BoardView = memo(function BoardView({ id }: { id: string }) {
   const item = useBoard((s) => s.items[id]);
   const board = item?.kind === 'board' ? item : null;
+  /** Who added it and when, for the hover details. */
+  const added = useAddedBy(item);
   const parentId = board?.parentId ?? null;
   const stackIndex = useBoard((s) => stackZ(s.items, id));
   const depth = useBoard((s) => stackDepth(s.items, id));
@@ -115,7 +118,7 @@ export const BoardView = memo(function BoardView({ id }: { id: string }) {
             )}
           </div>
         )}
-        <div className="board-meta">
+        <div className="board-meta" data-tip={editing ? undefined : [name, linkTo && !target ? 'No longer shared with you' : summary, linkTo ? 'Shared with you' : '', added].filter(Boolean).join('\n')}>
           {editing && !linkTo ? (
             <BoardNameInput id={id} title={board.title} />
           ) : (

@@ -2566,3 +2566,31 @@ button, a, label { cursor: var(--cursor, default); }
 .admin-hint { margin: -2px 18px 10px; color: var(--text-dim); }
 .admin-hint-tight { margin: 0 0 8px; }
 .admin-main-head .admin-ghost:disabled { opacity: 0.6; cursor: default; }
+
+/* Hover tooltips (ui/Tooltip.tsx): a dark pill with an arrow, the same in both themes. */
+.tooltip {
+  position: fixed; z-index: 3000; max-width: 340px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: #1c1c21;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  color: #c9c9d2;
+  font: 500 13px/1.4 var(--font);
+  white-space: pre-line; overflow-wrap: anywhere;
+  pointer-events: none;
+  animation: tooltip-in 0.12s ease-out;
+}
+.tooltip::after {
+  content: ''; position: absolute; left: var(--arrow); bottom: -6px;
+  width: 10px; height: 10px; margin-left: -5px;
+  background: #1c1c21;
+  border-right: 1px solid rgb(255 255 255 / 0.12); border-bottom: 1px solid rgb(255 255 255 / 0.12);
+  transform: rotate(45deg);
+}
+.tooltip[data-below]::after { bottom: auto; top: -6px; transform: rotate(225deg); }
+.tooltip-main { color: #ececf1; }
+.tooltip-more { color: #a3a3ad; font-size: 12px; }
+@keyframes tooltip-in { from { opacity: 0; transform: translateY(2px); } }
+@media (prefers-reduced-motion: reduce) { .tooltip { animation: none; } }

@@ -146,7 +146,7 @@ export async function addMediaFiles(files: File[], at: Point) {
 
 // --- Caption text --------------------------------------------------------------
 
-const fmtSize = (n?: number) =>
+export const fmtSize = (n?: number) =>
   n == null ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 
 const fmtTime = (s?: number) => {

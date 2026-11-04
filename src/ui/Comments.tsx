@@ -20,6 +20,7 @@ import { camera } from '../canvas/camera';
 import { session } from '../session';
 import { personalColor, usePresence, type Profile } from '../sync/presence';
 import { Avatar } from './Collab';
+import { byLine, fullDate } from '../lib/time';
 import { fmtTime } from './Scrubber';
 
 const ICON = { size: 14, strokeWidth: 2.2, 'aria-hidden': true } as const;
@@ -134,7 +135,7 @@ function CommentRow({ c, reply, onSeek, onReply, number }: {
       <div className="cmt-body">
         <header className="cmt-meta">
           <span className="cmt-author" title={name}>{mine ? 'You' : name}</span>
-          <span className="cmt-when" title={new Date(c.createdAt).toLocaleString()}>
+          <span className="cmt-when" title={[byLine(name, c.createdAt), c.editedAt ? `Edited ${fullDate(c.editedAt)}` : ''].filter(Boolean).join('\n')}>
             {timeAgo(c.createdAt)}{c.editedAt ? ' · edited' : ''}
           </span>
           {look.numbered && number != null && <span className="cmt-num">#{number}</span>}

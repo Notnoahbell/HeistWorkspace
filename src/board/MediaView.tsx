@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { isTyping } from '../canvas/input';
 import { openViewer } from '../ui/MediaViewer';
 import { useCachedSrc } from '../lib/mediaCache';
+import { mediaFacts, useAddedBy } from './details';
 import { CommentBadge } from '../ui/Comments';
 import { commentVersion, statusInfo, versionOf } from './versions';
 
@@ -98,6 +99,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   // The proxy if the server made one; else a fresh upload's local copy; else the original;
   // and the copy saved on this device in place of any of those, when there is one (lib/mediaCache).
   const src = useCachedSrc(media ? playable(media.src, media.meta, local?.url) : undefined) ?? '';
+  const added = useAddedBy(media ?? undefined);
   if (!media) return null;
 
   const { width = 16, height = 9 } = media.meta;
@@ -214,7 +216,15 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
 
         {!media.captionHidden && (
           <div className="media-caption">
-            <div className="media-text">
+            <div
+              className="media-text"
+              data-tip={editing ? undefined : [
+                media.name || 'Untitled',
+                mediaFacts(media.meta, media.mediaType),
+                media.versions?.length ? `Version ${version} of ${media.versions.length + 1}` : '',
+                added,
+              ].filter(Boolean).join('\n')}
+            >
               {editing ? (
                 <input
                   className="media-name media-name-input"

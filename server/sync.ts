@@ -194,7 +194,10 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
         const owner = old ? ownerOf(old) : userId;
         if (owner !== userId) next.sharedWith = old?.sharedWith ?? [];
         else next.sharedWith = (Array.isArray(next.sharedWith) ? next.sharedWith : []).filter((u) => typeof u === 'string' && u !== userId);
-        if (JSON.stringify(old?.sharedWith ?? []) !== JSON.stringify(next.sharedWith) || old?.boardId !== next.boardId) {
+        // Who can see what changes only when its sharing changes, or an existing board moves.
+        // (A brand-new unshared board changes nothing: resending everyone's view for it raced
+        // with whatever was added just after, and the browser lost that item.)
+        if (JSON.stringify(old?.sharedWith ?? []) !== JSON.stringify(next.sharedWith) || (old && old.boardId !== next.boardId)) {
           sharingChanged = true;
         }
       }

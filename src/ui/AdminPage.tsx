@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Avatar } from './Collab';
 import { personalColor } from '../sync/presence';
+import { fullDate } from '../lib/time';
 
 const KEY_STORE = 'heist:admin-key';
 const ROUTE = '#/admin';
@@ -97,7 +98,7 @@ const fmtUntil = (t: number) => {
   if (s < 86400 * 2) return `in ${Math.ceil(s / 3600)} h`;
   return `in ${Math.ceil(s / 86400)} days`;
 };
-const fmtFull = (t: number) => new Date(t).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const fmtFull = fullDate;
 
 // --- Page ------------------------------------------------------------------------------
 

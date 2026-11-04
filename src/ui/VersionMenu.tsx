@@ -8,6 +8,7 @@ import { Check, ChevronDown, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import type { Media, ReviewStatus } from '../board/store';
 import { deleteVersion, renameVersion, restoreVersion, STATUSES, statusInfo, versionList } from '../board/versions';
 import { timeAgo } from '../board/comments';
+import { byLine } from '../lib/time';
 import { useUi } from '../board/ui';
 import { usePresence } from '../sync/presence';
 import { session } from '../session';
@@ -81,6 +82,7 @@ export function VersionMenu({ media, value, onPick, disabled, className, label, 
                     aria-checked={v.n === value}
                     disabled={disabled?.includes(v.n)}
                     onClick={() => { onPick(v.n); setOpen(false); }}
+                    title={[`v${v.n}: ${v.label || v.name || 'Untitled'}`, v.label ? v.name : '', v.addedAt || by ? `Added by ${byLine(by || 'someone', v.addedAt)}` : ''].filter(Boolean).join('\n')}
                   >
                     <span className="version-n">v{v.n}</span>
                     <span className="version-text">
