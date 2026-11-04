@@ -11,6 +11,7 @@ import { BOARD_ICONS } from '../lib/icons';
 import { useMyColor, usePresence, type Peer, type Profile } from '../sync/presence';
 import { camera } from '../canvas/camera';
 import { setProfile } from '../sync/client';
+import { NotificationBell } from './Notifications';
 
 const ICON = { size: 16, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 const PROFILE_ICONS = [
@@ -44,7 +45,7 @@ function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, close: ()
   }, [open]);
 }
 
-function Popover({ button, label, children }: { button: (open: boolean, toggle: () => void) => ReactNode; label: string; children: (close: () => void) => ReactNode }) {
+export function Popover({ button, label, children }: { button: (open: boolean, toggle: () => void) => ReactNode; label: string; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = () => setOpen(false);
@@ -241,6 +242,7 @@ export function CollabBar() {
     <div className="top-right">
       <HereNow />
       <ShareBoard />
+      <NotificationBell />
       <ProfileMenu />
     </div>
   );

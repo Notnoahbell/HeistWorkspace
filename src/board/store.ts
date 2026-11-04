@@ -145,6 +145,10 @@ export interface Comment extends ItemBase, Stacked {
   createdAt: number;
   /** Seconds into a video, or null for the item as a whole. */
   time: number | null;
+  /** The thread's first comment, for a reply (replies have no time and aren't resolved on their own). */
+  replyTo?: string | null;
+  /** User ids @mentioned in the text. */
+  mentions?: string[];
   /** Ticked off: hidden from the item, kept under "Resolved". */
   resolved: boolean;
   resolvedBy?: string | null;

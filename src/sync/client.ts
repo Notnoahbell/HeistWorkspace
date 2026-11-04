@@ -235,12 +235,13 @@ useBoard.subscribe((state, prev) => {
 
 let cursor: Point | null = null;
 let chat = '';
+let typing: string | null = null;
 let frame = 0;
 
 function sendPresenceNow() {
   frame = 0;
   if (!ready) return;
-  send({ t: 'presence', boardId: currentBoardId(), at: cursor, msg: chat });
+  send({ t: 'presence', boardId: currentBoardId(), at: cursor, msg: chat, typing });
 }
 
 const schedule = () => { if (!frame) frame = requestAnimationFrame(sendPresenceNow); };
@@ -265,6 +266,13 @@ export function setChat(text: string) {
 }
 
 export const CHAT_LIMIT = MSG_LIMIT;
+
+/** The item you're writing a comment on (null = not typing), for others' typing indicators. */
+export function setTyping(targetId: string | null) {
+  if (typing === targetId) return;
+  typing = targetId;
+  schedule();
+}
 
 export function setProfile(patch: Partial<Pick<Profile, 'name' | 'icon'>>) {
   send({ t: 'profile', ...patch });

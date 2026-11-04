@@ -1116,41 +1116,56 @@ html, body, #root {
 
 /* --- Comments ------------------------------------------------------------- */
 
-/* Open-comment count in a card's top-right corner. */
-.cmt-badge {
+/* Top-right corner of a card: typing dots, then the open-comment count. */
+.cmt-corner {
   position: absolute; top: -8px; right: -8px; z-index: 3;
+  display: flex; align-items: center; gap: 3px; pointer-events: none;
+}
+.cmt-badge {
   display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px;
   border-radius: 9px; background: var(--accent); color: #fff;
   font: 700 10.5px/1 var(--font); box-shadow: 0 0 0 2px var(--bg);
-  pointer-events: none;
 }
+.cmt-typing-bubble {
+  display: grid; place-items: center; height: 18px; padding: 0 6px; border-radius: 9px;
+  color: #fff; box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Three dots that bounce in turn. */
+.dots { display: inline-flex; gap: 2.5px; align-items: center; }
+.dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: dot-bounce 1.1s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: 0.15s; }
+.dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dot-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-2.5px); opacity: 1; } }
 
 .cmt-pop { position: fixed; z-index: 14; display: flex; flex-direction: column; }
 .cmt-quick { display: flex; flex-direction: column; gap: 6px; }
-.cmt-quick > .cmt,
+.cmt-quick > .cmt-thread,
 .cmt-pop[data-expanded] {
   background: var(--panel); border: 1px solid var(--panel-border); box-shadow: var(--panel-shadow);
 }
 .cmt-pop[data-expanded] { max-height: min(72vh, 640px); }
 
-/* Cards swing out from behind the selected item, one after another. */
-@keyframes cmt-orbit { from { opacity: 0; transform: translate(-26px, 4px) rotate(-6deg) scale(0.95); } }
-@keyframes cmt-orbit-left { from { opacity: 0; transform: translate(26px, 4px) rotate(6deg) scale(0.95); } }
+/* Threads slide down and fade in, one after another. */
+@keyframes cmt-in { from { opacity: 0; transform: translateY(-8px); } }
 .cmt-quick > * {
-  animation: cmt-orbit 0.34s cubic-bezier(0.2, 0.85, 0.25, 1) both;
-  animation-delay: calc(var(--i, var(--n, 0)) * 45ms);
-  transform-origin: -90px 50%;
+  animation: cmt-in 0.24s ease-out both;
+  animation-delay: calc(var(--i, var(--n, 0)) * 40ms);
 }
-.cmt-pop[data-side='left'] .cmt-quick > * { animation-name: cmt-orbit-left; transform-origin: calc(100% + 90px) 50%; }
 @media (prefers-reduced-motion: reduce) { .cmt-quick > * { animation: none; } }
 
 .cmt { display: grid; grid-template-columns: 24px 1fr auto; gap: 9px; padding: 10px 10px 10px 11px; color: var(--text); }
+.cmt[data-reply] { grid-template-columns: 20px 1fr; gap: 8px; padding: 7px 10px 7px 0; }
 .cmt .avatar { font-size: 9.5px; }
+.cmt[data-reply] .avatar { font-size: 8px; }
 .cmt-body { min-width: 0; }
 .cmt-meta { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
 .cmt-author { font-size: 12.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmt-when { flex: none; font-size: 11.5px; color: var(--text-dim); }
 .cmt-text { margin: 0; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.cmt[data-reply] .cmt-text { font-size: 13px; }
+.cmt-mention { color: var(--accent); font-weight: 600; }
+.cmt-mention[data-me] { background: var(--accent-soft); padding: 0 2px; }
 .cmt-time {
   display: inline-block; margin-right: 6px; padding: 0 5px; border: 0;
   background: var(--accent-soft); color: var(--accent);
@@ -1159,7 +1174,7 @@ html, body, #root {
 .cmt-time:hover:not(:disabled) { background: var(--accent); color: #fff; }
 .cmt-time:disabled { cursor: default; }
 .cmt-resolved-by { margin-top: 4px; font-size: 11.5px; color: var(--text-dim); }
-.cmt[data-resolved] .cmt-text { color: var(--text-dim); }
+.cmt-thread:has(> .cmt [aria-label='Reopen']) .cmt-text { color: var(--text-dim); }
 
 .cmt-actions { display: flex; flex-direction: column; gap: 4px; }
 .cmt-act {
@@ -1169,39 +1184,68 @@ html, body, #root {
 .cmt-act:hover { color: var(--text); border-color: var(--text-dim); }
 .cmt-check:hover { background: #30a46c; border-color: #30a46c; color: #fff; }
 .cmt-delete { width: 20px; height: 20px; margin: -3px -2px -3px auto; align-self: center; border-color: transparent; opacity: 0; }
-.cmt:hover .cmt-delete { opacity: 1; }
+.cmt:hover > .cmt-body > .cmt-meta > .cmt-delete { opacity: 1; }
 .cmt-delete:hover { color: #e5484d; border-color: transparent; }
 
-.cmt-more, .cmt-add {
-  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--text);
+.cmt-reply-btn, .cmt-earlier {
+  margin-top: 4px; padding: 0; border: 0; background: none; color: var(--text-dim);
+  font: 600 12px var(--font); cursor: pointer;
+}
+.cmt-reply-btn:hover, .cmt-earlier:hover { color: var(--accent); }
+.cmt-earlier { margin: 2px 0 4px; }
+/* Replies sit under the first comment, indented to its text. */
+.cmt-replies { margin: -4px 10px 8px 44px; padding-left: 10px; border-left: 2px solid var(--panel-border); }
+
+.cmt-more {
+  align-self: flex-start; padding: 6px 10px; border: 1px solid var(--panel-border); background: var(--panel); color: var(--accent);
   font: 600 12.5px var(--font); box-shadow: var(--panel-shadow); cursor: pointer;
 }
-.cmt-more:hover, .cmt-add:hover { background: var(--hover); }
-.cmt-more { color: var(--accent); }
+.cmt-more:hover { background: var(--hover); }
 
+/* The composer is one text box: optional timecode chip, the text, and Post once there's something to send. */
+.cmt-quick-compose { display: flex; flex-direction: column; gap: 4px; }
 .cmt-composer {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; padding: 8px;
-  background: var(--panel); border: 1px solid var(--panel-border);
+  position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 6px;
+  padding: 7px 7px 7px 10px; background: var(--panel); border: 1px solid var(--panel-border); cursor: text;
 }
-.cmt-quick > .cmt-composer { box-shadow: var(--panel-shadow); }
+.cmt-quick .cmt-composer { box-shadow: var(--panel-shadow); }
+.cmt-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .cmt-composer textarea {
-  flex: 1; min-width: 0; min-height: 30px; max-height: 120px; padding: 6px 8px; resize: none;
-  border: 1px solid var(--panel-border); background: var(--bg); color: var(--text);
-  font: 13.5px/1.35 var(--font); outline: none;
+  flex: 1; min-width: 0; min-height: 22px; padding: 2px 0; resize: none; overflow: hidden;
+  border: 0; background: none; color: var(--text); outline: none;
+  font: 13.5px/1.35 var(--font);
 }
-.cmt-composer textarea:focus { border-color: var(--accent); }
+.cmt-composer textarea::placeholder { color: var(--text-dim); }
+.cmt-composer[data-reply] { margin: 4px 0 2px; padding: 5px 6px 5px 8px; box-shadow: none; }
+.cmt-composer[data-reply] textarea { font-size: 13px; }
 .cmt-send {
-  height: 30px; padding: 0 12px; border: 0; background: var(--accent); color: #fff;
-  font: 600 12.5px var(--font); cursor: pointer;
+  flex: none; height: 24px; padding: 0 10px; border: 0; background: var(--accent); color: #fff;
+  font: 600 12px var(--font); cursor: pointer;
 }
-.cmt-send:disabled { opacity: 0.4; cursor: default; }
 .cmt-chip {
-  flex-basis: 100%; align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; width: max-content; flex-grow: 0;
-  padding: 2px 7px; border: 1px dashed var(--panel-border); background: none; color: var(--text-dim);
-  font: 600 11.5px var(--mono); cursor: pointer;
+  flex-basis: 100%; flex-grow: 0; width: max-content; display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border: 1px dashed var(--panel-border); background: none; color: var(--text-dim);
+  font: 600 11px var(--mono); cursor: pointer;
 }
 .cmt-chip[aria-pressed='true'] { border-style: solid; border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+
+/* @mention suggestions, above the box. */
+.cmt-suggest {
+  position: absolute; left: -1px; right: -1px; bottom: calc(100% + 4px); z-index: 2; padding: 4px 0;
+  background: var(--panel); border: 1px solid var(--panel-border); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+}
+.cmt-suggest button {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px; border: 0; background: none;
+  color: var(--text); font: 13px var(--font); text-align: left; cursor: pointer;
+}
+.cmt-suggest button[aria-selected='true'] { background: var(--accent-soft); }
+.cmt-suggest .avatar { font-size: 8px; }
+.cmt-suggest-empty { margin: 0; padding: 6px 10px; font-size: 12.5px; color: var(--text-dim); }
+
+.cmt-typing { display: flex; align-items: center; gap: 6px; padding: 2px 2px; font-size: 12px; color: var(--text-dim); }
+.cmt-typing .dots { color: var(--who, var(--text-dim)); }
+.cmt-full-compose { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; border-top: 1px solid var(--panel-border); }
+.cmt-full-compose .cmt-typing { padding: 2px 2px 2px; }
 
 /* Full list: tabs, scrolling list, composer. */
 .cmt-full { display: flex; flex-direction: column; min-height: 0; flex: 1; }
@@ -1215,9 +1259,35 @@ html, body, #root {
 .cmt-back { flex: none; width: 34px; border: 0; background: none; color: var(--text-dim); cursor: pointer; }
 .cmt-back:hover { color: var(--text); background: var(--hover); }
 .cmt-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.cmt-list > .cmt { border-bottom: 1px solid var(--panel-border); }
-.cmt-full .cmt-composer { border: 0; border-top: 1px solid var(--panel-border); }
+.cmt-list > .cmt-thread { border-bottom: 1px solid var(--panel-border); }
 .cmt-empty { margin: 0; padding: 18px 14px; font-size: 13px; color: var(--text-dim); text-align: center; }
+
+/* Notifications (bell in the top bar). */
+.top-bell { padding: 0 8px; }
+.bell-count { position: absolute; top: 3px; right: 1px; min-width: 15px; line-height: 15px; font-size: 9.5px; border-radius: 8px; }
+.notices { margin: -14px; }
+.notices-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; }
+.notices-head h3 { margin: 0 !important; }
+.notices-mark { padding: 2px 4px; border: 0; background: none; color: var(--accent) !important; font: 500 12px var(--font); cursor: pointer; }
+.notices-mark:hover { text-decoration: underline; }
+.notices .pop-empty { padding: 0 14px 14px; margin: 0; color: var(--text-dim); }
+.notices-list { max-height: 60vh; overflow-y: auto; }
+.notice {
+  position: relative; display: flex; gap: 10px; width: 100%; padding: 10px 26px 10px 14px; border: 0;
+  border-top: 1px solid var(--panel-border); background: none; color: var(--text); text-align: left; cursor: pointer;
+}
+.notice:hover { background: var(--hover); }
+.notice[data-unread] { background: var(--accent-soft); }
+.notice[data-unread]:hover { background: color-mix(in srgb, var(--accent-soft), var(--hover)); }
+.notice-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notice-line { font-size: 12.5px; line-height: 1.35; }
+.notice-line strong { font-weight: 650; }
+.notice-text {
+  font-size: 12.5px; color: var(--text-dim); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.notice-where { font-size: 11px; color: var(--text-dim); }
+.notice-dot { position: absolute; top: 14px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 
 /* In the player: a dark column beside the video. */
 .viewer-comments {

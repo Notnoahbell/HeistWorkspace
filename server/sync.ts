@@ -45,6 +45,8 @@ interface Conn {
   color: string | null;
   presence: { x: number; y: number } | null;
   msg: string;
+  /** Item they're writing a comment on, if any. */
+  typing: string | null;
 }
 
 /** Cursor colours, chosen to be distinct from each other. */
@@ -213,7 +215,7 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
 
   function presenceMsg(c: Conn) {
     const p = db.profiles[c.userId];
-    return { t: 'presence', connId: c.id, userId: c.userId, name: p?.name, icon: p?.icon ?? null, color: c.color, boardId: c.boardId, at: c.presence, msg: c.msg };
+    return { t: 'presence', connId: c.id, userId: c.userId, name: p?.name, icon: p?.icon ?? null, color: c.color, boardId: c.boardId, at: c.presence, msg: c.msg, typing: c.typing };
   }
 
   /** A free colour on this board (random among the unused ones). */
@@ -228,7 +230,7 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     for (const [peer] of peersOn(c.boardId, ws)) send(peer, { t: 'leave', connId: c.id });
   }
 
-  function presence(ws: WebSocket, c: Conn, boardId: string | null, at: { x: number; y: number } | null, msg: string) {
+  function presence(ws: WebSocket, c: Conn, boardId: string | null, at: { x: number; y: number } | null, msg: string, typing: string | null) {
     // Only boards this user can actually see.
     if (boardId && !isHome(boardId) && !(db.items[boardId] && accessOf(db.items[boardId]).has(c.userId))) boardId = null;
     if (boardId && isHome(boardId) && boardId !== `home:${c.userId}`) boardId = null;
@@ -242,6 +244,7 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     }
     c.presence = at;
     c.msg = msg.slice(0, MSG_LIMIT);
+    c.typing = typing ? typing.slice(0, 64) : null;
     for (const [peer] of peersOn(c.boardId, ws)) send(peer, presenceMsg(c));
   }
 
@@ -275,7 +278,7 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     const userId = userIdFor(req);
     const isNew = !db.profiles[userId];
     const profile = (db.profiles[userId] ??= defaultProfile(userId));
-    const conn: Conn = { id: randomBytes(6).toString('hex'), userId, boardId: null, color: null, presence: null, msg: '' };
+    const conn: Conn = { id: randomBytes(6).toString('hex'), userId, boardId: null, color: null, presence: null, msg: '', typing: null };
     conns.set(ws, conn);
     if (isNew) save();
     send(ws, { t: 'welcome', userId, connId: conn.id, profile });
@@ -294,7 +297,7 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
           break;
         case 'presence': {
           const at = m.at && typeof m.at === 'object' ? m.at as { x: number; y: number } : null;
-          presence(ws, conn, typeof m.boardId === 'string' ? m.boardId : null, at, typeof m.msg === 'string' ? m.msg : '');
+          presence(ws, conn, typeof m.boardId === 'string' ? m.boardId : null, at, typeof m.msg === 'string' ? m.msg : '', typeof m.typing === 'string' ? m.typing : null);
           break;
         }
         case 'profile': {

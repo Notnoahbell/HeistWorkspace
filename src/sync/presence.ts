@@ -35,6 +35,8 @@ export interface Peer {
   at: Point | null;
   /** Cursor chat: shown in place of their name while non-empty. */
   msg: string;
+  /** Item they're writing a comment on, if any. */
+  typing?: string | null;
 }
 
 interface PresenceState {

@@ -81,7 +81,8 @@ self-hosted.
 ### Phase 3 — Video review (where we surpass Milanote)
 - [ ] Video cards with scrubbable hover-preview thumbnails
 - [x] Comments on notes, to-dos, links, photos and videos; timecoded on videos (frame-accurate still to come)
-- [ ] Comment threads (replies), @mentions, notifications
+- [x] Replies, @mentions, notifications (bell + live toast), typing indicators
+- [ ] Notifications synced across devices / email digests; comment-only permission
 - [ ] Draw-on-frame annotations
 - [ ] Version stacks (v1, v2, v3…) and side-by-side / overlay compare
 - [ ] Review status workflow (e.g. In progress → Needs review → Changes → Approved)
@@ -169,6 +170,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   are deleted with their target and follow it to other boards. Resolving keeps
   them (`resolved`, `resolvedBy`) under a Resolved tab. With the real backend,
   consider a per-target index and comment-only permissions (comment without edit).
+- **2026-11-03: Replies, mentions, notifications, typing.** A reply is a comment with
+  `replyTo` (its thread's first comment); resolving/deleting the first comment covers the
+  thread, and badges count threads. `@Name` picks from the board's members (Home owner +
+  `sharedWith` up the chain) and stores their ids in `mentions`. Notifications are derived
+  on each client from the comments it can see (mentions of you, replies in threads you
+  wrote in); read state is per browser for now (`heist:notices`). "Typing" rides on
+  presence (`typing: <itemId>`), so it's per board and never stored.
 - **2026-11-03: Columns → sections (grid).** The vertical/horizontal switch is gone;
   a section has `cols` (1 = a plain column) and fills left to right, wrapping, each
   row as tall as its tallest item. Cells are one card wide, or as wide as the widest
@@ -234,7 +242,9 @@ npm run build      # typecheck + production build
   beside it (Enter posts, Shift+Enter new line); "Show all" opens Open/Resolved tabs; the
   tick resolves, ↺ reopens. On a video the comment is pinned to the card's current time
   (click the time chip for a whole-video comment); click a timecode to jump there. The
-  player lists every comment beside the video, with marks on the timeline
+  player lists every comment beside the video, with marks on the timeline. Reply under any
+  comment; type @ to mention someone who can see the board (↑/↓, Enter). The bell (top
+  right) lists mentions and replies; clicking one opens the board and selects the item
 - Sections: S (or C); double-click header to rename; double-click body to add a note;
   drag the right edge to change the number of grid columns
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
