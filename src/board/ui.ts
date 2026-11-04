@@ -38,7 +38,11 @@ interface UiState {
   /** Video the dragged video would be stacked onto, as its new version. */
   versionDrop: string | null;
   /** Brief confirmation at the bottom of the screen. */
-  toast: { text: string; boardId?: string; at: number } | null;
+  /**
+   * Message at the bottom. `icon`: a glyph before the text; `busy`: something's
+   * under way (the icon animates, and it stays until replaced).
+   */
+  toast: { text: string; boardId?: string; at: number; icon?: 'pin'; busy?: boolean } | null;
   /** Everything selected. */
   selectedIds: string[];
   /** The selected item when exactly one is selected, else null. */

@@ -86,7 +86,8 @@ export function pasteText(raw: string, at: Point): string[] {
 
 /** A Pinterest pin: fetch its video / GIF / image through the server and add it like an upload. */
 export async function importPin(url: string, at: Point) {
-  toast('Getting the pin from Pinterest…');
+  const started = Date.now();
+  useUi.getState().set({ toast: { text: 'Getting the pin from Pinterest…', icon: 'pin', busy: true, at: started } });
   try {
     const res = await fetch(`/api/pinterest?url=${encodeURIComponent(url)}`);
     const pin = await res.json() as { kind?: 'video' | 'gif' | 'image'; src?: string; name?: string; error?: string };
@@ -100,7 +101,7 @@ export async function importPin(url: string, at: Point) {
     const name = `${(pin.name || 'Pinterest pin').replace(/[\\/:*?"<>|]+/g, ' ').trim()}.${ext}`;
     // Pins come in as just the picture (name tucked away); videos loop like a GIF.
     await addMediaFiles([new File([blob], name, { type })], at, { captionHidden: true, loop: pin.kind === 'video' });
-    toast(pin.kind === 'video' ? 'Added the pin’s video' : pin.kind === 'gif' ? 'Added the pin’s GIF' : 'Added the pin’s image');
+    useUi.getState().set({ toast: { text: pin.kind === 'video' ? 'Added the pin’s video' : pin.kind === 'gif' ? 'Added the pin’s GIF' : 'Added the pin’s image', icon: 'pin', at: Date.now() } });
   } catch (e) {
     // Couldn't get the media: keep the link at least.
     const id = useBoard.getState().addItem('link', { boardId: currentBoardId(), x: at.x, y: at.y, url });
