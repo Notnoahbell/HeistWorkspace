@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
-import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, Repeat, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
@@ -60,6 +60,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     return () => { if (cardVideos.get(id) === video) cardVideos.delete(id); };
   }, [id, video]);
 
+
   const togglePlay = () => {
     if (!video) return;
     if (video.paused) void video.play(); else video.pause();
@@ -100,6 +101,22 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   // and the copy saved on this device in place of any of those, when there is one (lib/mediaCache).
   const src = useCachedSrc(media ? playable(media.src, media.meta, local?.url) : undefined) ?? '';
   const added = useAddedBy(media ?? undefined);
+  // Looping: plays on its own, silently, while it's on screen (paused when it isn't, so a
+  // board full of them stays light).
+  const looping = !!media?.loop && media.mediaType === 'video';
+  useEffect(() => {
+    if (!video) return;
+    if (!looping) { video.muted = false; return; }
+    video.muted = true;
+    video.loop = true;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) void video.play().catch(() => {});
+      else video.pause();
+    }, { threshold: 0.05 });
+    io.observe(video);
+    return () => { io.disconnect(); video.pause(); };
+    // (Again when the file changes, e.g. from the local copy to the uploaded one: that reloads it.)
+  }, [video, looping, src]);
   if (!media) return null;
 
   const { width = 16, height = 9 } = media.meta;
@@ -135,7 +152,8 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
                 ref={setVideo}
                 src={src}
                 poster={media.meta.poster}
-                preload="metadata"
+                preload={media.loop ? 'auto' : 'metadata'}
+                muted={!!media.loop}
                 playsInline
                 loop
                 onPlay={() => setPlaying(true)}
@@ -161,8 +179,9 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </>
           )}
 
-          {(version > 1 || status) && (
+          {(version > 1 || status || looping) && (
             <span className="media-tags">
+              {looping && <span className="media-version media-loop" title="Loops on its own (silently)"><Repeat size={11} strokeWidth={2.6} aria-hidden="true" /></span>}
               {version > 1 && <span className="media-version" title={`Version ${version}`}>v{version}</span>}
               {status && <span className="media-status" style={{ '--st': status.color } as CSSProperties}>{status.label}</span>}
             </span>

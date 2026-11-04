@@ -112,7 +112,7 @@ export async function retryUpload(id: string) {
  * Add files as media cards starting at a world point, in a row. Returns how
  * many were accepted (others are skipped with a message).
  */
-export async function addMediaFiles(files: File[], at: Point) {
+export async function addMediaFiles(files: File[], at: Point, extra: { captionHidden?: boolean; loop?: boolean } = {}) {
   const ok = files.filter(isMediaFile);
   const skipped = files.length - ok.length;
   if (skipped) {
@@ -134,6 +134,8 @@ export async function addMediaFiles(files: File[], at: Point) {
       boardId, x, y: snap(at.y), w,
       mediaType: file.type.startsWith('video/') ? 'video' : 'image',
       name: file.name, meta, upload: 'uploading',
+      captionHidden: extra.captionHidden ?? false,
+      ...(extra.loop && file.type.startsWith('video/') ? { loop: true } : {}),
     });
     useLocalMedia.setState({ [id]: { url, progress: 0 } });
     send(id, file);

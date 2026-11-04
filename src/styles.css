@@ -2594,3 +2594,6 @@ button, a, label { cursor: var(--cursor, default); }
 .tooltip-more { color: #a3a3ad; font-size: 12px; }
 @keyframes tooltip-in { from { opacity: 0; transform: translateY(2px); } }
 @media (prefers-reduced-motion: reduce) { .tooltip { animation: none; } }
+
+/* A looping video card's badge. */
+.media-loop { display: inline-grid; place-items: center; padding-left: 5px; padding-right: 5px; }

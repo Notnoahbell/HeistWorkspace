@@ -127,6 +127,8 @@ export interface Media extends ItemBase, Stacked {
   meta: MediaMeta;
   /** Name/subtitle tucked away behind an arrow. */
   captionHidden: boolean;
+  /** Videos: play on their own on the board, silently, on a loop (like a GIF). */
+  loop?: boolean;
   /** Set while the upload is in progress, or if it failed. */
   upload?: 'uploading' | 'failed';
   /** Earlier versions, oldest (v1) first; the item itself is the newest. */

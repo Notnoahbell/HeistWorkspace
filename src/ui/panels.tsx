@@ -4,7 +4,7 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
 import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
@@ -348,6 +348,13 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
     case 'media':
       return [
         { key: 'status', label: 'Review status', glyph: <StatusGlyph status={item.status ?? null} />, panel: 'status' },
+        ...(item.mediaType === 'video' ? [{
+          key: 'loop',
+          label: item.loop ? 'Looping: plays on its own, silently. Click to stop' : 'Loop: play on its own, silently, like a GIF',
+          glyph: <Repeat {...ICON_PROPS} size={18} />,
+          pressed: !!item.loop,
+          run: () => update(item.id, { loop: !item.loop }),
+        }] : []),
         {
           key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
           // Renames inline, in the caption (shown again if it was tucked away).

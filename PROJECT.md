@@ -262,7 +262,9 @@ Sized for ~150 users; a single modest server handles this comfortably.
   A Pinterest link (pinterest.* or pin.it) → the pin itself via `server/pinterest.ts`: the
   pin-info endpoint Pinterest's embed widgets use gives its 720p MP4 (video), original GIF, or
   original image, fetched through the server (only *.pinimg.com) and added like an upload;
-  if that fails it stays a link. Our own Ctrl+C also writes the cards' text to the system
+  if that fails it stays a link. Pins come in collapsed (no name strip); video pins loop.
+  Any video card has a Loop toggle (toolbar): plays on its own, muted, on a loop, only while
+  on screen (IntersectionObserver), with a small loop badge on the card. Our own Ctrl+C also writes the cards' text to the system
   clipboard and remembers it, so pasting that text back gives the cards, not a note. Pastes
   land under the pointer (else mid-view), stepping along when repeated.
 - **2026-11-04: One tooltip style** (`src/ui/Tooltip.tsx`, mounted once). Every `title`
