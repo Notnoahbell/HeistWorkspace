@@ -28,7 +28,7 @@ interface Listing {
   users: Record<string, { id: string; name: string; icon: string | null }>;
   total: number;
   /** How long a file sits unused before it's cleared automatically. */
-  graceHours: number;
+  graceMinutes: number;
 }
 type Scope = { kind: 'all' } | { kind: 'unused' } | { kind: 'board'; id: string };
 type SortKey = 'at' | 'size' | 'name' | 'by';
@@ -315,7 +315,7 @@ function FileManager({ data, loading, error, onRefresh, onLock, onSweep, onDelet
             )}
           </div>
           {scope.kind === 'unused' && data && (
-            <p className="admin-hint">Files that aren't on any board are deleted automatically once they've been unused for {data.graceHours} hours.</p>
+            <p className="admin-hint">Files that aren't on any board are deleted automatically once they've been unused for {data.graceMinutes >= 120 ? `${Math.round(data.graceMinutes / 60)} hours` : `${data.graceMinutes} minutes`}.</p>
           )}
           {error && <p className="admin-error" role="alert">{error}</p>}
           {notice && <p className="admin-notice" role="status" onAnimationEnd={() => setNotice(null)}>{notice}</p>}

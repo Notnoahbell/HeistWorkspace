@@ -14,7 +14,7 @@
 //
 // Unused files clear themselves: every few minutes the server looks for uploads
 // no board refers to any more. Each one gets a clock; once it has been unused for
-// ORPHAN_GRACE_HOURS (24 by default) straight, it's deleted with its posters,
+// ORPHAN_GRACE_MINUTES (10 by default) straight, it's deleted with its posters,
 // filmstrip and proxy. The wait covers an upload whose card hasn't synced yet, a
 // card cut and pasted later, undo, and a server that has just restarted and is
 // waiting for browsers to send their boards back. The clocks are kept on disk
@@ -36,8 +36,9 @@ const REF_RE = /\/uploads\/([0-9a-f]{24})\./gi;
 /** Wrong keys allowed per address per minute. */
 const MAX_FAILS = 10;
 /** How long a file must sit unused (on no board) before it's deleted. */
-export const GRACE_MS = Math.max(0, Number(process.env.ORPHAN_GRACE_HOURS ?? 24)) * 3600_000;
-const SWEEP_EVERY_MS = 10 * 60_000;
+export const GRACE_MS = Math.max(0, Number(process.env.ORPHAN_GRACE_MINUTES ?? 10)) * 60_000;
+/** Often enough that files go close to when their wait is up. */
+const SWEEP_EVERY_MS = 60_000;
 const FIRST_SWEEP_MS = 60_000;
 const ORPHANS_FILE = '.orphans.json';
 
@@ -252,7 +253,7 @@ export function createAdmin(dir: string, sync: SyncServer) {
       });
     }
     files.sort((a, b) => b.at - a.at);
-    return { files, boards, users: profiles, total, graceHours: GRACE_MS / 3600_000 };
+    return { files, boards, users: profiles, total, graceMinutes: GRACE_MS / 60_000 };
   }
 
   /** Take files off the boards, then off the disk. */
