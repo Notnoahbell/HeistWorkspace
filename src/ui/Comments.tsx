@@ -3,9 +3,9 @@
 // Open / Resolved tabs for the player, replies, reactions, @mentions and
 // typing indicators.
 
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, ChevronLeft, Clock, RotateCcw, SmilePlus, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, Clock, RotateCcw, SmilePlus, Trash2 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment } from '../board/store';
 import { useUi } from '../board/ui';
 import { useLayout } from '../board/layout';
@@ -24,8 +24,6 @@ import { fmtTime } from './Scrubber';
 const ICON = { size: 14, strokeWidth: 2.2, 'aria-hidden': true } as const;
 /** Threads shown beside a card before "Show N more". */
 const QUICK_MAX = 5;
-/** Replies shown per thread beside a card before "N earlier replies". */
-const QUICK_REPLIES = 2;
 const POP_WIDTH = 248;
 const GAP = 14;
 
@@ -95,16 +93,23 @@ function CommentText({ c }: { c: Comment }) {
 
 // --- One comment -------------------------------------------------------------------
 
-function CommentRow({ c, reply, onSeek, footer, number }: { c: Comment; reply?: boolean; onSeek?: (t: number) => void; footer?: ReactNode; number?: number }) {
+function CommentRow({ c, reply, onSeek, onReply, number }: {
+  c: Comment;
+  reply?: boolean;
+  onSeek?: (t: number) => void;
+  /** Shows Reply in the footer. */
+  onReply?: () => void;
+  number?: number;
+}) {
   const look = useContext(CommentLookContext);
   const profile = usePresence((s) => s.users[c.authorId]);
   const resolver = usePresence((s) => (c.resolvedBy ? s.users[c.resolvedBy]?.name : undefined));
   const name = profile?.name ?? c.authorName;
   const mine = c.authorId === session.userId;
   const [picking, setPicking] = useState(false);
-  const reacted = REACTIONS.some((r) => c.reactions?.[r]?.length);
+  const tools = !reply || mine;
   return (
-    <div className="cmt" data-reply={reply || undefined} data-picking={picking || undefined} onMouseLeave={() => setPicking(false)}>
+    <div className="cmt" data-reply={reply || undefined} onMouseLeave={() => setPicking(false)}>
       <Avatar profile={{ name, icon: profile?.icon ?? null }} color={personalColor(c.authorId)} size={reply ? 20 : 24} />
       <div className="cmt-body">
         <header className="cmt-meta">
@@ -121,43 +126,46 @@ function CommentRow({ c, reply, onSeek, footer, number }: { c: Comment; reply?: 
           <CommentText c={c} />
         </p>
         {!reply && c.resolved && <div className="cmt-resolved-by">Resolved{resolver ? ` by ${resolver}` : ''}</div>}
-        {(reacted || footer) && (
-          <div className="cmt-foot">
-            <Reactions c={c} />
-            {footer}
-          </div>
-        )}
+        {/* Reactions, Reply, and the react button; picking swaps in the six emoji. */}
+        <div className="cmt-foot" onKeyDown={(e) => { if (e.key === 'Escape') setPicking(false); }}>
+          {picking ? (
+            <span className="cmt-picker" role="group" aria-label="Reactions">
+              {REACTIONS.map((r) => (
+                <button key={r} className="cmt-emoji" title={`React ${r}`} aria-label={`React ${r}`} onClick={() => { toggleReaction(c.id, r); setPicking(false); }}>
+                  {r}
+                </button>
+              ))}
+            </span>
+          ) : (
+            <>
+              <Reactions c={c} />
+              {onReply && <button className="cmt-reply-btn" onClick={onReply}>Reply</button>}
+              <button className="cmt-tool cmt-react-add" title="React" aria-label="React" onClick={() => setPicking(true)}>
+                <SmilePlus {...ICON} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
-      {/* On hover: react, resolve, delete. */}
-      <div className="cmt-tools" onKeyDown={(e) => { if (e.key === 'Escape') setPicking(false); }}>
-        {picking ? (
-          REACTIONS.map((r) => (
-            <button key={r} className="cmt-tool cmt-emoji" title={`React ${r}`} aria-label={`React ${r}`} onClick={() => { toggleReaction(c.id, r); setPicking(false); }}>
-              {r}
+      {/* On hover: resolve, delete. */}
+      {tools && (
+        <div className="cmt-tools">
+          {!reply && (c.resolved ? (
+            <button className="cmt-tool" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
+              <RotateCcw {...ICON} />
             </button>
-          ))
-        ) : (
-          <>
-            <button className="cmt-tool" title="React" aria-label="React" onClick={() => setPicking(true)}>
-              <SmilePlus {...ICON} />
+          ) : (
+            <button className="cmt-tool cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
+              <Check {...ICON} />
             </button>
-            {!reply && (c.resolved ? (
-              <button className="cmt-tool" title="Reopen" aria-label="Reopen" onClick={() => setResolved(c.id, false)}>
-                <RotateCcw {...ICON} />
-              </button>
-            ) : (
-              <button className="cmt-tool cmt-check" title="Resolve" aria-label="Resolve" onClick={() => setResolved(c.id, true)}>
-                <Check {...ICON} />
-              </button>
-            ))}
-            {mine && (
-              <button className="cmt-tool cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
-                <Trash2 {...ICON} />
-              </button>
-            )}
-          </>
-        )}
-      </div>
+          ))}
+          {mine && (
+            <button className="cmt-tool cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
+              <Trash2 {...ICON} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -189,17 +197,15 @@ function Reactions({ c }: { c: Comment }) {
 /** Threads already shown once in this session. */
 const seenThreads = new Set<string>();
 
-/** A thread: the first comment, its replies, and a reply box on demand. */
-function ThreadCard({ t, targetId, onSeek, maxReplies, number }: {
+/** A thread: the first comment, its replies (folded away, like YouTube), and a reply box on demand. */
+function ThreadCard({ t, targetId, onSeek, number }: {
   t: Thread;
   number?: number;
   targetId: string;
   onSeek?: (t: number) => void;
-  /** Show only the latest few replies until "N earlier replies" is clicked. */
-  maxReplies?: number;
 }) {
   const [replying, setReplying] = useState(false);
-  const [allReplies, setAllReplies] = useState(false);
+  const [open, setOpen] = useState(false);
   const look = useContext(CommentLookContext);
   const active = look.activeId === t.root.id;
   const ref = useRef<HTMLElement>(null);
@@ -210,8 +216,7 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, number }: {
     seenThreads.add(t.root.id);
     return isNew;
   });
-  const hidden = maxReplies != null && !allReplies ? Math.max(0, t.replies.length - maxReplies) : 0;
-  const replies = hidden ? t.replies.slice(-maxReplies!) : t.replies;
+  const n = t.replies.length;
   return (
     <article
       ref={ref}
@@ -225,16 +230,17 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, number }: {
         c={t.root}
         number={number}
         onSeek={onSeek}
-        footer={!t.root.resolved && !replying && (
-          <button className="cmt-reply-btn" onClick={() => setReplying(true)}>Reply</button>
-        )}
+        onReply={!t.root.resolved && !replying ? () => { setReplying(true); setOpen(true); } : undefined}
       />
-      {(replies.length > 0 || hidden > 0 || replying) && (
+      {n > 0 && (
+        <button className="cmt-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {open ? 'Hide replies' : `${n} ${n === 1 ? 'reply' : 'replies'}`}
+          <ChevronDown size={15} strokeWidth={2.4} aria-hidden="true" />
+        </button>
+      )}
+      {((open && n > 0) || replying) && (
         <div className="cmt-replies">
-          {hidden > 0 && (
-            <button className="cmt-earlier" onClick={() => setAllReplies(true)}>{hidden} earlier {hidden === 1 ? 'reply' : 'replies'}</button>
-          )}
-          {replies.map((r) => <CommentRow key={r.id} c={r} reply />)}
+          {open && t.replies.map((r) => <CommentRow key={r.id} c={r} reply />)}
           {replying && (
             <Composer targetId={targetId} replyTo={t.root.id} autoFocus placeholder="Reply…" onDone={() => setReplying(false)} onCancel={() => setReplying(false)} />
           )}
@@ -511,7 +517,7 @@ function Panel({ id, style, video }: { id: string; style: CSSProperties; video: 
       )}
       {list.length > 0 && (
         <div className="cmt-list">
-          {list.map((t) => <ThreadCard key={t.root.id} t={t} targetId={id} onSeek={onSeek} maxReplies={QUICK_REPLIES} />)}
+          {list.map((t) => <ThreadCard key={t.root.id} t={t} targetId={id} onSeek={onSeek} />)}
           {more > 0 && <button className="cmt-show-more" onClick={() => setShowAll(true)}>Show {more} more</button>}
         </div>
       )}
