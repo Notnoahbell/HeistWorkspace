@@ -1,24 +1,24 @@
-// Player for a photo, GIF or video, laid out like a review tool: a large
-// window over the dimmed, blurred board with the picture on the left (about
-// 70% of the width), a full-width timeline with comment markers and the
-// controls under it, and every comment down the right. Opens from a
+// Player for a photo, GIF or video, laid out like a review tool: a window
+// (about 80% of the screen) over the dimmed, blurred board with the picture on
+// the left, a full-width timeline with comment markers and the controls under
+// it, and every comment down the right (which can be hidden). Opens from a
 // double-click (or Enter) on a media card; ‹ › steps through the board's media.
 //
-// Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · F full screen · Esc close
+// Keys: Space / K play-pause · ← → 5s · , . one frame · M mute · F full screen · C comments · Esc close
 // Click the timecode to switch between timecode and frame numbers.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  ChevronLeft, ChevronRight, ExternalLink, Maximize, Minimize, Pause, Play, Repeat, Volume2, VolumeX,
+  ChevronLeft, ChevronRight, ExternalLink, Maximize, MessageSquare, Minimize, Pause, Play, Repeat, Volume1, Volume2, VolumeX,
 } from 'lucide-react';
 import { onCanvas, useBoard } from '../board/store';
 import { useUi } from '../board/ui';
 import { pathTo } from '../board/nav';
 import { posOf } from '../board/actions';
 import { mediaSubtitle, useLocalMedia } from '../board/media';
-import { commentIndex } from '../board/comments';
+import { commentIndex, useOpenCount } from '../board/comments';
 import { isTyping } from '../canvas/input';
 import { personalColor, usePresence } from '../sync/presence';
 import { fmtFrames, fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
@@ -31,6 +31,8 @@ const IDLE_MS = 2200;
 /** Matches the closing animation in styles.css. */
 const CLOSE_MS = 110;
 const UNITS_KEY = 'heist:timecode';
+const VOLUME_KEY = 'heist:volume';
+const SIDE_KEY = 'heist:viewer-comments';
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 export const openViewer = (id: string, time = 0) => useUi.getState().set({ viewer: { id, time } });
@@ -45,6 +47,13 @@ export function MediaViewer() {
 function readUnits(): 'time' | 'frames' {
   try { return localStorage.getItem(UNITS_KEY) === 'frames' ? 'frames' : 'time'; } catch { return 'time'; }
 }
+function readVolume(): number {
+  try { const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? ''); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1; } catch { return 1; }
+}
+function readSide(): boolean {
+  try { return localStorage.getItem(SIDE_KEY) !== 'hidden'; } catch { return true; }
+}
+const remember = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* fine: just not remembered */ } };
 
 /** Photos and videos on the same board, top to bottom then left to right. */
 function useSiblings(boardId: string) {
@@ -64,6 +73,9 @@ function Player({ id, start }: { id: string; start: number }) {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(readVolume);
+  const [side, setSide] = useState(readSide);
+  const openCount = useOpenCount(id);
   const [loop, setLoop] = useState(false);
   const [full, setFull] = useState(false);
   const [idle, setIdle] = useState(false);
@@ -97,6 +109,7 @@ function Player({ id, start }: { id: string; start: number }) {
   useEffect(() => { if (video) drawTime(video); });
   useEffect(() => { if (video) video.playbackRate = rate; }, [video, rate]);
   useEffect(() => { if (video) video.loop = loop; }, [video, loop]);
+  useEffect(() => { if (video) video.volume = readVolume(); }, [video]);
 
   // Close the speed menu on any press outside it.
   useEffect(() => {
@@ -139,6 +152,12 @@ function Player({ id, start }: { id: string; start: number }) {
     try { localStorage.setItem(UNITS_KEY, next); } catch { /* fine: just not remembered */ }
   };
   const seek = (t: number) => { if (video) { video.pause(); video.currentTime = t; } };
+  const toggleSide = () => setSide((on) => { remember(SIDE_KEY, on ? 'hidden' : 'shown'); return !on; });
+  const toggleMute = () => {
+    if (!video) return;
+    if (video.muted || video.volume === 0) { video.muted = false; if (video.volume === 0) video.volume = 0.5; }
+    else video.muted = true;
+  };
 
   // Keys go to the player only while it's open.
   useEffect(() => {
@@ -151,8 +170,9 @@ function Player({ id, start }: { id: string; start: number }) {
         ArrowLeft: () => { if (v) v.currentTime = Math.max(0, v.currentTime - 5); },
         ArrowRight: () => { if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); },
         ',': () => { if (v) stepFrame(v, -1); }, '.': () => { if (v) stepFrame(v, 1); },
-        m: () => { if (v) v.muted = !v.muted; },
+        m: toggleMute,
         f: toggleFull,
+        c: toggleSide,
       };
       const run = keys[e.key] ?? keys[e.key.toLowerCase()];
       if (!run) return;
@@ -187,7 +207,7 @@ function Player({ id, start }: { id: string; start: number }) {
       aria-label={item.name || 'Media'}
       onPointerDown={(e) => { if (e.target === e.currentTarget) dismiss(); }}
     >
-      <div className="viewer-panel">
+      <div className="viewer-panel" data-side={side ? undefined : 'hidden'}>
         <header className="viewer-top">
           <button className="viewer-btn" onClick={dismiss} title="Back to the board (Esc)" aria-label="Close">
             <ChevronLeft {...ICON} />
@@ -226,7 +246,11 @@ function Player({ id, start }: { id: string; start: number }) {
                 onDoubleClick={toggleFull}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
-                onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
+                onVolumeChange={(e) => {
+                  setMuted(e.currentTarget.muted);
+                  setVolume(e.currentTarget.volume);
+                  remember(VOLUME_KEY, String(e.currentTarget.volume));
+                }}
               />
             ) : (
               // Photos and GIFs (GIFs just loop, like on the card).
@@ -288,14 +312,32 @@ function Player({ id, start }: { id: string; start: number }) {
                       </div>
                     )}
                   </div>
-                  <button
-                    className="viewer-btn"
-                    onClick={() => { if (video) video.muted = !video.muted; }}
-                    title={muted ? 'Unmute (M)' : 'Mute (M)'}
-                    aria-label={muted ? 'Unmute' : 'Mute'}
-                  >
-                    {muted ? <VolumeX {...ICON} /> : <Volume2 {...ICON} />}
-                  </button>
+                  <div className="viewer-volume">
+                    <button
+                      className="viewer-btn"
+                      onClick={toggleMute}
+                      title={muted || !volume ? 'Unmute (M)' : 'Mute (M)'}
+                      aria-label={muted || !volume ? 'Unmute' : 'Mute'}
+                    >
+                      {muted || !volume ? <VolumeX {...ICON} /> : volume < 0.5 ? <Volume1 {...ICON} /> : <Volume2 {...ICON} />}
+                    </button>
+                    <input
+                      type="range"
+                      className="viewer-volume-slider"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={muted ? 0 : volume}
+                      aria-label="Volume"
+                      style={{ '--p': `${(muted ? 0 : volume) * 100}%` } as CSSProperties}
+                      onChange={(e) => {
+                        if (!video) return;
+                        const v = parseFloat(e.target.value);
+                        video.volume = v;
+                        video.muted = v === 0;
+                      }}
+                    />
+                  </div>
                 </>
               )}
             </div>
@@ -309,6 +351,16 @@ function Player({ id, start }: { id: string; start: number }) {
               />
             )}
             <div className="viewer-bar-side viewer-bar-end">
+              <button
+                className="viewer-btn viewer-side-toggle"
+                aria-pressed={side}
+                onClick={toggleSide}
+                title={side ? 'Hide comments (C)' : 'Show comments (C)'}
+                aria-label={side ? 'Hide comments' : 'Show comments'}
+              >
+                <MessageSquare {...ICON} />
+                {!side && openCount > 0 && <span className="viewer-side-count">{openCount > 9 ? '9+' : openCount}</span>}
+              </button>
               <button className="viewer-btn" onClick={toggleFull} title={full ? 'Exit full screen (F)' : 'Full screen (F)'} aria-label={full ? 'Exit full screen' : 'Full screen'}>
                 {full ? <Minimize {...ICON} /> : <Maximize {...ICON} />}
               </button>
@@ -317,7 +369,7 @@ function Player({ id, start }: { id: string; start: number }) {
         </section>
 
         {/* Every comment on this item; on a video, in timecode order. */}
-        <aside className="viewer-side" onPointerDown={(e) => e.stopPropagation()}>
+        {side && <aside className="viewer-side" onPointerDown={(e) => e.stopPropagation()}>
           <CommentLookContext.Provider value={look}>
             <CommentList
               targetId={id}
@@ -325,7 +377,7 @@ function Player({ id, start }: { id: string; start: number }) {
               onSeek={isVideo ? seek : undefined}
             />
           </CommentLookContext.Provider>
-        </aside>
+        </aside>}
       </div>
     </div>
   );

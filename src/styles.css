@@ -1017,7 +1017,7 @@ html, body, #root {
 .viewer-panel {
   --side: clamp(300px, 28vw, 420px);
   --vbg: #0b0b0d; --vbar: #141418; --vline: rgb(255 255 255 / 0.08); --vdim: #9a9aa6;
-  position: absolute; inset: 20px;
+  position: absolute; inset: 10vh 10vw;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--side);
   grid-template-rows: 44px minmax(0, 1fr);
@@ -1055,17 +1055,23 @@ html, body, #root {
 
 /* Left: picture, timeline, controls (this is what goes full screen). */
 .viewer-main { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #000; }
-.viewer-picture { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 16px; }
-.viewer-picture > :is(img, video) { display: block; max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; user-select: none; }
-.viewer-main[data-full] .viewer-picture { padding: 0; }
+.viewer-picture { --pad: 16px; position: relative; flex: 1; min-height: 0; }
+/* Pinned to the area (not sized from its own width), so a wide window can't push it over the controls. */
+.viewer-picture > :is(img, video) {
+  position: absolute; left: var(--pad); top: var(--pad); width: calc(100% - 2 * var(--pad)); height: calc(100% - 2 * var(--pad));
+  display: block; object-fit: contain; user-select: none;
+}
+.viewer-main[data-full] .viewer-picture { --pad: 0px; }
 .viewer-main[data-idle] { cursor: none; }
 .viewer-main[data-idle] :is(.viewer-timeline, .viewer-bar) { opacity: 0; }
 .viewer-timeline, .viewer-bar { transition: opacity 0.2s; }
 
 /* Timeline: full width, with who-commented-where markers underneath. */
 .viewer-timeline { padding: 6px 0 0; background: var(--vbg); }
-.viewer-scrub { height: 22px; padding: 0 10px; }
-.viewer-scrub .scrub-track { height: 3px; background: rgb(255 255 255 / 0.22); box-shadow: none; }
+.viewer-scrub { height: 26px; padding: 0 10px; }
+.viewer-scrub .scrub-track { height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.22); box-shadow: none; }
+.viewer-scrub .scrub-fill { border-radius: 3px; }
+.viewer-scrub .scrub-fill::after { width: 14px; height: 14px; margin-top: -7px; right: -7px; }
 .viewer-scrub .scrub-fill { background: #6f7dff; }
 .viewer-scrub .scrub-fill::after { background: #fff; }
 .viewer-scrub .scrub-hover { bottom: 16px; }
@@ -1094,6 +1100,28 @@ html, body, #root {
 .viewer :is(.viewer-btn, .viewer-time):focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
 .viewer-time[data-units='frames']::before { content: 'f '; opacity: 0.6; }
 .viewer-speed { position: relative; flex: none; }
+.viewer-volume { display: flex; align-items: center; gap: 4px; padding-right: 6px; }
+.viewer-volume-slider {
+  --p: 100%;
+  width: 84px; height: 16px; margin: 0; background: none; cursor: pointer; appearance: none; -webkit-appearance: none;
+}
+.viewer-volume-slider::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px; background: linear-gradient(to right, #fff var(--p), rgb(255 255 255 / 0.22) var(--p));
+}
+.viewer-volume-slider::-moz-range-track { height: 4px; border-radius: 2px; background: rgb(255 255 255 / 0.22); }
+.viewer-volume-slider::-moz-range-progress { height: 4px; border-radius: 2px; background: #fff; }
+.viewer-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border: 0; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); transition: transform 0.1s;
+}
+.viewer-volume-slider::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; }
+.viewer-volume-slider:hover::-webkit-slider-thumb { transform: scale(1.2); }
+.viewer-volume-slider:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
+.viewer-side-toggle { position: relative; }
+.viewer-side-count {
+  position: absolute; top: 2px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px;
+  background: #6f7dff; color: #fff; font: 700 9.5px/15px var(--font); text-align: center;
+}
 .viewer-rate { width: auto; min-width: 40px; padding: 0 6px; font: inherit; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--vdim); }
 .viewer-rate:hover { color: #fff; }
 .viewer-rate[aria-expanded='true'] { background: rgb(255 255 255 / 0.12); color: #fff; }
@@ -1293,9 +1321,9 @@ html, body, #root {
 }
 .cmt-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .cmt-composer textarea {
-  flex: 1; min-width: 0; min-height: 24px; padding: 3px 0; resize: none; overflow: hidden;
+  flex: 1; min-width: 0; min-height: 28px; padding: 3.5px 0; resize: none; overflow: hidden;
   border: 0; background: none; color: var(--text); outline: none;
-  font: 13.5px/1.35 var(--font);
+  font: 13.5px/21px var(--font); /* 21px line + 3.5px each side = the 28px send button, so one line sits centred */
 }
 .cmt-composer textarea::placeholder { color: var(--text-dim); }
 .cmt-composer[data-reply] { margin: 4px 0 2px; padding: 7.5px 6px 7.5px 10px; box-shadow: none; border-radius: 10px; }
@@ -1396,6 +1424,8 @@ html, body, #root {
 /* Timecode chip sits in line before the text, like a prefix. */
 .viewer-side .cmt-chip { flex-basis: auto; align-self: center; }
 .viewer-side .cmt-chip[aria-pressed='true'] { background: rgb(245 190 50 / 0.16); color: #f5c542; }
+.viewer-panel[data-side='hidden'] { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1100px) { .viewer-panel { inset: 16px; } }
 @media (max-width: 900px) {
   .viewer-panel { grid-template-columns: minmax(0, 1fr); }
   .viewer-side { display: none; }
