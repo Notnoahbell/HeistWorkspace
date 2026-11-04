@@ -4,12 +4,13 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Download, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
 import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
 import { useUi, type PanelKey } from '../board/ui';
 import { confirmDelete, enterBoard, sortedChildren, sortSection } from '../board/actions';
+import { downloadItems } from '../board/download';
 import { COLOR_PRESETS } from '../lib/color';
 import { BOARD_ICONS, iconLabel } from '../lib/icons';
 import { ColorWheel } from './ColorWheel';
@@ -327,8 +328,9 @@ export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
       ui.set({ commenting: ui.commenting === item.id ? null : item.id, flyout: null, editingId: null });
     },
   };
-  const at = list.findIndex((a) => a.danger);
-  return at < 0 ? [...list, comment] : [...list.slice(0, at), comment, ...list.slice(at)];
+  // Before Download and Delete, which sit together at the end.
+  const end = list.findIndex((a) => a.key === 'download' || a.danger);
+  return end < 0 ? [...list, comment] : [...list.slice(0, end), comment, ...list.slice(end)];
 }
 
 function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
@@ -363,6 +365,10 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
             useUi.getState().set({ editingId: item.id, flyout: null });
           },
         },
+        ...(item.src && !item.upload ? [{
+          key: 'download', label: `Download ${item.mediaType === 'video' ? 'video' : 'image'}`,
+          glyph: <Download {...ICON_PROPS} size={18} />, run: () => downloadItems([item.id]),
+        }] : []),
         del,
       ];
     case 'link':

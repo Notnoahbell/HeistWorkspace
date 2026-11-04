@@ -6,7 +6,7 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Frame, LayoutGrid, Play, Trash2,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Download, Frame, LayoutGrid, Play, Trash2,
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
@@ -17,6 +17,7 @@ import { useUi } from '../board/ui';
 import { useBoardId } from '../board/nav';
 import { Flyout } from './Flyout';
 import { MAX_WALL, openWall } from './MediaWall';
+import { downloadableIn, downloadItems } from '../board/download';
 import { ICON_PROPS, itemActions, Panel } from './panels';
 
 const PANEL_WIDTH = 272;
@@ -38,6 +39,8 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   }
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
   const media = items.filter((it) => it.kind === 'media').length;
+  /** Photos and videos to download (inside selected sections too). */
+  const files = downloadableIn(ids).length;
   const actions = [
     ...(media >= 2 ? [{
       key: 'wall',
@@ -47,6 +50,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
     }] : []),
     { key: 'frame', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
     { key: 'column', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
+    ...(files ? [{ key: 'download', label: `Download ${files} ${files === 1 ? 'file' : 'files'}`, icon: <Download {...ICON_PROPS} />, run: () => downloadItems(ids) }] : []),
     { key: 'delete', label: `Delete ${items.length} items`, icon: <Trash2 {...ICON_PROPS} />, run: deleteSelection, danger: true },
   ];
 
@@ -61,7 +65,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
         <span className="toolbar-divider" role="separator" />
         {actions.map((act, i) => (
           <Fragment key={act.key}>
-            {i > 0 && (act.danger || (act.key === 'frame' && media >= 2)) && <span className="toolbar-divider" role="separator" />}
+            {i > 0 && (act.key === 'download' || (act.danger && actions[i - 1].key !== 'download') || (act.key === 'frame' && media >= 2)) && <span className="toolbar-divider" role="separator" />}
             <button data-key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
               {act.icon}
             </button>

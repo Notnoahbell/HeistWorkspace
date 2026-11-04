@@ -2615,3 +2615,47 @@ button, a, label { cursor: var(--cursor, default); }
 .toast-icon { display: grid; place-items: center; width: 17px; height: 17px; flex: none; margin-right: -4px; }
 .toast-pin { display: block; line-height: 0; color: #e60023; }
 .toast-pin svg { display: block; transform: rotate(35deg); }
+
+/* Downloads panel, bottom right: a bar per file, and one for everything. */
+.downloads {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  width: 320px; max-width: calc(100vw - 32px);
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--panel-border); border-radius: 14px;
+  box-shadow: var(--panel-shadow), 0 12px 32px rgb(0 0 0 / 0.14);
+  overflow: hidden; font: 13px/1.35 var(--font);
+  animation: toast-in-right 0.2s ease-out;
+}
+@keyframes toast-in-right { from { opacity: 0; transform: translateY(10px); } }
+.downloads-head { display: flex; align-items: center; gap: 8px; padding: 10px 8px 9px 14px; }
+.downloads-glyph { display: grid; place-items: center; color: var(--accent); }
+.downloads-glyph[data-busy] svg { animation: downloads-nudge 1.2s ease-in-out infinite; }
+@keyframes downloads-nudge { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(2px); } }
+.downloads-title { flex: 1; min-width: 0; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.downloads-btn {
+  display: grid; place-items: center; width: 26px; height: 26px; flex: none; padding: 0;
+  border: 0; border-radius: 7px; background: none; color: var(--text-dim);
+}
+.downloads-btn:hover { background: var(--hover); color: var(--text); }
+.downloads-overall { height: 2px; background: var(--hover); }
+.downloads-overall i { display: block; height: 100%; width: calc(var(--p) * 100%); background: var(--accent); transition: width 0.25s ease-out; }
+.downloads-list { list-style: none; margin: 0; padding: 6px; max-height: min(320px, 50vh); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.downloads-row { display: flex; align-items: center; gap: 10px; padding: 7px 6px 7px 8px; border-radius: 9px; }
+.downloads-row:hover { background: var(--hover); }
+.downloads-kind { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 7px; background: var(--hover); color: var(--text-dim); }
+.downloads-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.downloads-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.downloads-sub { font-size: 11.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.downloads-row[data-status='failed'] .downloads-sub { color: #e5484d; }
+.downloads-bar { position: relative; height: 4px; border-radius: 2px; background: var(--hover); overflow: hidden; }
+.downloads-bar i { position: absolute; inset: 0 auto 0 0; width: calc(var(--p) * 100%); border-radius: 2px; background: var(--accent); transition: width 0.2s ease-out; }
+.downloads-row[data-status='done'] .downloads-bar i { background: #30a46c; }
+.downloads-row[data-status='failed'] .downloads-bar i { background: #e5484d; }
+.downloads-row[data-status='queued'] .downloads-bar i, .downloads-row[data-status='cancelled'] .downloads-bar i { width: 0; }
+.downloads-bar[data-indeterminate] i { width: 30%; animation: downloads-sweep 1s ease-in-out infinite; }
+@keyframes downloads-sweep { from { left: -30%; } to { left: 100%; } }
+.downloads-done { display: grid; place-items: center; width: 26px; height: 26px; color: #30a46c; }
+.downloads-row[data-status='cancelled'] { opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) {
+  .downloads, .downloads-glyph[data-busy] svg, .downloads-bar[data-indeterminate] i { animation: none; }
+}

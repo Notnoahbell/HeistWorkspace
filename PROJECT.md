@@ -257,6 +257,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   a jump takes then depends on keyframe spacing, so videos with keyframes >2s apart (first
   minute, read with ffprobe) get a 720p proxy, and proxies have a keyframe every second: in
   testing, the same footage went from 1–8s per jump to under 0.15s.
+- **2026-11-04: Downloads** (`src/board/download.ts`, panel `src/ui/Downloads.tsx`). Download
+  sits left of Delete on a photo/video's toolbar and on a multi-selection's (the photos and
+  videos in it, sections' contents included). Files are fetched by the page (2 at a time,
+  the rest queued; a copy kept on the device is used if there is one) so each gets a
+  progress bar in the bottom-right panel, then saved via an <a download> under the card's
+  name with the file's extension. Cancel / retry per file; the panel closes itself 4s after
+  everything's saved. (`/uploads/…?dl=<name>` also serves a file as a named attachment.)
 - **2026-11-04: Pasting from elsewhere** (`src/board/pasteText.ts`). Files → photo/video cards
   (as before); a web address (one per line, up to 12) → link cards; other text → a note.
   A Pinterest link (pinterest.* or pin.it) → the pin itself via `server/pinterest.ts`: the

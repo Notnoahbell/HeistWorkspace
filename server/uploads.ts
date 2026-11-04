@@ -2,7 +2,7 @@
 // support (so videos can seek). A stand-in for real object storage later.
 //
 //   PUT /api/upload?name=<filename>   body: the file   → { url: "/uploads/<id>.<ext>" }
-//   GET /uploads/<id>.<ext>
+//   GET /uploads/<id>.<ext>            (?dl=<name>: as a download, saved under that name)
 //
 // Each upload also gets <id>.meta.json beside it: who uploaded it, when, and
 // its original name (for the admin file manager; never served).
@@ -97,6 +97,12 @@ export function createUploads(dir: string, identify?: (req: IncomingMessage) => 
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    // ?dl=<name>: save it (under its card's name) rather than show it.
+    const dl = new URL(req.url ?? '/', 'http://local').searchParams.get('dl');
+    if (dl) {
+      const safe = dl.replace(/[\r\n"\\/]+/g, ' ').slice(0, 200) || name;
+      res.setHeader('Content-Disposition', `attachment; filename="${safe.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safe)}`);
+    }
 
     // Range requests let videos seek without downloading everything first.
     const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));

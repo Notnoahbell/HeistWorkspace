@@ -29,6 +29,7 @@ import { MediaViewer, openViewer } from './ui/MediaViewer';
 import { MediaWall, openWall } from './ui/MediaWall';
 import { AdminPage, isAdminOpen } from './ui/AdminPage';
 import { TooltipLayer } from './ui/Tooltip';
+import { Downloads } from './ui/Downloads';
 import { CommentsPopover } from './ui/Comments';
 import { copySelection, cutSelection, duplicateSelection, isOwnCopy, paste } from './board/clipboard';
 import { pastePoint, pasteText } from './board/pasteText';
@@ -252,6 +253,7 @@ export function App() {
       <CursorChat />
       <MediaWall />
       <AdminPage />
+      <Downloads />
       <TooltipLayer />
       <MediaViewer />
       {fileDrag && <FileDropHint />}

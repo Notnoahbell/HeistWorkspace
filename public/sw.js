@@ -23,6 +23,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin || !url.pathname.startsWith('/uploads/')) return;
+  // Downloads (?dl=) go to the server, which names the file.
+  if (url.searchParams.has('dl')) return;
   if (IMAGE_RE.test(url.pathname)) e.respondWith(image(req, url));
 });
 
