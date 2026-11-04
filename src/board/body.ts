@@ -10,14 +10,14 @@ import { camera, type Point } from '../canvas/camera';
 import { snap } from './layout';
 import { useUi } from './ui';
 
-const FOLLOW = 90; // spring rate toward the pointer while held (1/s)
+const FOLLOW = 150; // spring rate toward the pointer while held (1/s)
 const HOME = 60; // spring rate toward a new resting position (1/s)
-const FRICTION = 22; // glide decay after a throw (1/s)
-const MAX_THROW = 1600; // world units/s
+const FRICTION = 40; // glide decay after a throw (1/s)
+const MAX_THROW = 1400; // world units/s
 const GLIDE_TO_SPRING = 160; // world units/s: below this a glide finishes on the spring
-const MIN_THROW = 700; // slower releases just settle where they are
-const TILT_PER_PX_S = 0.01; // degrees of tilt per screen px/s
-const MAX_TILT = 12; // degrees
+const MIN_THROW = 1000; // slower releases just settle where they are
+const TILT_PER_PX_S = 0.005; // degrees of tilt per screen px/s
+const MAX_TILT = 6; // degrees
 const TILT_RESPONSE = 24; // 1/s
 const LIFT_RESPONSE = 40; // 1/s
 const LIFT_SCALE = 0.015;

@@ -2,13 +2,16 @@
 // panels, or group actions when several things are selected. Rendered in
 // screen space so it stays a constant size.
 
-import { Fragment, useSyncExternalStore } from 'react';
+import { Fragment, useSyncExternalStore, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Copy, CopyPlus, Trash2 } from 'lucide-react';
+import {
+  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Trash2,
+} from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
 import { useBoard } from '../board/store';
-import { deleteSelection, groupIntoColumn, itemSize, posOf } from '../board/actions';
+import { alignSelection, canAlign, canDistribute, deleteSelection, distributeSelection, groupIntoColumn, itemSize, posOf } from '../board/actions';
 import { copySelection, duplicateSelection } from '../board/clipboard';
 import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
@@ -45,17 +48,56 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   ];
 
   return (
+    <>
+      <div
+        className="selection-toolbar"
+        style={{ left: (a.x + b.x) / 2 + camera.origin.x, top: Math.max(camera.origin.y + 8, a.y + camera.origin.y - GAP) }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <span className="toolbar-count">{items.length}</span>
+        <span className="toolbar-divider" role="separator" />
+        {actions.map((act, i) => (
+          <Fragment key={act.key}>
+            {i > 0 && (act.danger || act.key === 'copy') && <span className="toolbar-divider" role="separator" />}
+            <button title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
+              {act.icon}
+            </button>
+          </Fragment>
+        ))}
+      </div>
+      <AlignToolbar x={b.x + camera.origin.x + GAP} y={a.y + camera.origin.y} />
+    </>
+  );
+}
+
+const ALIGN: { key: string; label: string; icon: ReactNode; run: () => void; distribute?: boolean }[] = [
+  { key: 'left', label: 'Align left edges', icon: <AlignStartVertical {...ICON_PROPS} />, run: () => alignSelection('left') },
+  { key: 'hcenter', label: 'Align centres (vertical line)', icon: <AlignCenterVertical {...ICON_PROPS} />, run: () => alignSelection('hcenter') },
+  { key: 'right', label: 'Align right edges', icon: <AlignEndVertical {...ICON_PROPS} />, run: () => alignSelection('right') },
+  { key: 'top', label: 'Align top edges', icon: <AlignStartHorizontal {...ICON_PROPS} />, run: () => alignSelection('top') },
+  { key: 'vcenter', label: 'Align middles (horizontal line)', icon: <AlignCenterHorizontal {...ICON_PROPS} />, run: () => alignSelection('vcenter') },
+  { key: 'bottom', label: 'Align bottom edges', icon: <AlignEndHorizontal {...ICON_PROPS} />, run: () => alignSelection('bottom') },
+  { key: 'dist-h', label: 'Space evenly left to right', icon: <AlignHorizontalSpaceAround {...ICON_PROPS} />, run: () => distributeSelection('h'), distribute: true },
+  { key: 'dist-v', label: 'Space evenly top to bottom', icon: <AlignVerticalSpaceAround {...ICON_PROPS} />, run: () => distributeSelection('v'), distribute: true },
+];
+
+/** Beside a multi-selection: line things up and space them out (items inside sections stay put). */
+function AlignToolbar({ x, y }: { x: number; y: number }) {
+  if (!canAlign()) return null;
+  const spread = canDistribute();
+  const right = Math.min(x, window.innerWidth - 52);
+  return (
     <div
-      className="selection-toolbar"
-      style={{ left: (a.x + b.x) / 2 + camera.origin.x, top: Math.max(camera.origin.y + 8, a.y + camera.origin.y - GAP) }}
+      className="selection-toolbar align-toolbar"
+      role="toolbar"
+      aria-label="Align"
+      style={{ left: right, top: Math.max(camera.origin.y + 8, y) }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <span className="toolbar-count">{items.length}</span>
-      <span className="toolbar-divider" role="separator" />
-      {actions.map((act, i) => (
+      {ALIGN.map((act, i) => (
         <Fragment key={act.key}>
-          {i > 0 && (act.danger || act.key === 'copy') && <span className="toolbar-divider" role="separator" />}
-          <button title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
+          {(i === 3 || i === 6) && <span className="toolbar-divider" role="separator" />}
+          <button data-key={act.key} title={act.label} aria-label={act.label} disabled={act.distribute && !spread} onClick={act.run}>
             {act.icon}
           </button>
         </Fragment>

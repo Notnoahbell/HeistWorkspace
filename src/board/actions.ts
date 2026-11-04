@@ -426,6 +426,59 @@ export function deleteSelection() {
   clearSelection();
 }
 
+// --- Align & distribute ------------------------------------------------------------
+
+export type Align = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+
+/** Selected items that can be moved freely (on the open board, not inside a section). */
+function freeSelection() {
+  const { items } = board();
+  const boardId = currentBoardId();
+  return ui().selectedIds
+    .map((id) => items[id])
+    .filter((it) => it && it.boardId === boardId && !parentOf(it))
+    .map((it) => ({ it, at: posOf(it), size: itemSize(it) }));
+}
+
+export const canAlign = () => freeSelection().length >= 2;
+export const canDistribute = () => freeSelection().length >= 3;
+
+/** Line the selection up on a shared edge or centre line of their combined bounds. */
+export function alignSelection(how: Align) {
+  const sel = freeSelection();
+  if (sel.length < 2) return;
+  const x0 = Math.min(...sel.map((s) => s.at.x)), x1 = Math.max(...sel.map((s) => s.at.x + s.size.w));
+  const y0 = Math.min(...sel.map((s) => s.at.y)), y1 = Math.max(...sel.map((s) => s.at.y + s.size.h));
+  for (const { it, at, size } of sel) {
+    const p = { ...at };
+    if (how === 'left') p.x = x0;
+    else if (how === 'right') p.x = x1 - size.w;
+    else if (how === 'hcenter') p.x = Math.round((x0 + x1) / 2 - size.w / 2);
+    else if (how === 'top') p.y = y0;
+    else if (how === 'bottom') p.y = y1 - size.h;
+    else p.y = Math.round((y0 + y1) / 2 - size.h / 2);
+    if (p.x !== at.x || p.y !== at.y) board().updateItem(it.id, p);
+  }
+}
+
+/** Even gaps between the selection along one axis; the outermost two stay put. */
+export function distributeSelection(axis: 'h' | 'v') {
+  const sel = freeSelection();
+  if (sel.length < 3) return;
+  const pos = (s: (typeof sel)[number]) => (axis === 'h' ? s.at.x : s.at.y);
+  const len = (s: (typeof sel)[number]) => (axis === 'h' ? s.size.w : s.size.h);
+  sel.sort((a, b) => pos(a) - pos(b));
+  const start = pos(sel[0]);
+  const end = Math.max(...sel.map((s) => pos(s) + len(s)));
+  const gap = (end - start - sel.reduce((n, s) => n + len(s), 0)) / (sel.length - 1);
+  let at = start;
+  for (const s of sel) {
+    const p = Math.round(at);
+    if (p !== pos(s)) board().updateItem(s.it.id, axis === 'h' ? { x: p } : { y: p });
+    at += len(s) + gap;
+  }
+}
+
 /**
  * Gather the selection into a new column, in reading order (top to bottom,
  * then left to right), and start editing its title.

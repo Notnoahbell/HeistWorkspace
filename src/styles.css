@@ -762,6 +762,10 @@ html, body, #root {
 .selection-toolbar .glyph-swatch,
 .selection-toolbar .glyph-strip { width: 18px; height: 18px; }
 .selection-toolbar svg { width: 16px; height: 16px; }
+.selection-toolbar button:disabled { opacity: 0.35; background: transparent; }
+/* Align / distribute: a vertical strip to the right of a multi-selection. */
+.align-toolbar { flex-direction: column; transform: none; }
+.align-toolbar .toolbar-divider { align-self: stretch; width: auto; height: 1px; margin: 3px 6px; }
 
 /* --- Pop-up panels ------------------------------------------------------- */
 
