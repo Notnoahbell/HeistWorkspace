@@ -4,12 +4,12 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
 import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
 import { useUi, type PanelKey } from '../board/ui';
-import { confirmDelete, enterBoard } from '../board/actions';
+import { confirmDelete, enterBoard, sortedChildren, sortSection } from '../board/actions';
 import { COLOR_PRESETS } from '../lib/color';
 import { BOARD_ICONS, iconLabel } from '../lib/icons';
 import { ColorWheel } from './ColorWheel';
@@ -254,6 +254,28 @@ export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
           </div>
         </PanelSection>
       );
+    case 'sort': {
+      if (item.kind !== 'column') return null;
+      // Ticked when the cards are already in that order.
+      const now = item.childIds.join();
+      const options = [
+        { dir: 1 as const, label: 'Name, A to Z', icon: <ArrowDownAZ {...ICON_PROPS} /> },
+        { dir: -1 as const, label: 'Name, Z to A', icon: <ArrowUpZA {...ICON_PROPS} /> },
+      ];
+      return (
+        <PanelSection label="Sort cards">
+          <div className="status-options sort-options" role="radiogroup" aria-label="Sort cards">
+            {options.map((o) => (
+              <button key={o.dir} role="radio" aria-checked={item.childIds.length > 1 && sortedChildren(item.id, o.dir).join() === now} onClick={() => sortSection(item.id, o.dir)}>
+                {o.icon}
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="panel-hint">{item.childIds.length > 1 ? 'Sorts once; drag cards to reorder after.' : 'Add a few cards to sort them.'}</p>
+        </PanelSection>
+      );
+    }
     case 'layout':
       if (item.kind !== 'column') return null;
       return (
@@ -368,6 +390,7 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
           // Sections rename inline, in their header.
           run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
         },
+        { key: 'sort', label: 'Sort by name', panel: 'sort', glyph: <ArrowDownAZ {...ICON_PROPS} size={18} /> },
         {
           key: 'layout', label: 'Columns', panel: 'layout',
           // The current count, so it reads at a glance.

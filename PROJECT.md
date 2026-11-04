@@ -324,6 +324,8 @@ npm run build      # typecheck + production build
   comment; type @ to mention someone who can see the board (↑/↓, Enter). The bell (top
   right) lists mentions and replies; clicking one opens the board and selects the item
 - Sections: S (or C); double-click header to rename; double-click body to add a note;
+  Sort (toolbar) puts the cards in name order, A to Z or Z to A (natural: clip 2 before clip 10;
+  ignores case and accents; unnamed cards last), once — drag to reorder after;
   drag the right edge to change the number of grid columns
 - Frames: select several things → Wrap in a frame (Ctrl/⌘+G); click a selected frame's tag
   to rename; drag its background to move it with what's inside; drag its bottom-right corner to resize.

@@ -671,6 +671,48 @@ export function arrangeSelection(how: Arrange) {
   }
 }
 
+// --- Sorting sections --------------------------------------------------------------
+
+/** What a card is called, for sorting: its text, title, file name or link. */
+export function nameOf(it: Item | undefined): string {
+  if (!it) return '';
+  switch (it.kind) {
+    case 'note': return it.text;
+    case 'todo': return it.entries[0]?.text ?? '';
+    case 'link': return it.preview?.title || it.url;
+    case 'media': return it.name;
+    case 'board': return it.title;
+    case 'column': return it.title;
+    case 'frame': return it.title;
+    default: return '';
+  }
+}
+
+/** Natural order ("clip 2" before "clip 10"), ignoring case and accents. */
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+/** A section's cards in name order (unnamed ones last, in their current order). */
+export function sortedChildren(colId: string, dir: 1 | -1): string[] {
+  const { items } = board();
+  const col = items[colId];
+  if (col?.kind !== 'column') return [];
+  const keyed = col.childIds.map((id, i) => ({ id, i, name: nameOf(items[id]).trim() }));
+  return keyed
+    .sort((a, b) => {
+      if (!a.name || !b.name) return (a.name ? -1 : b.name ? 1 : 0) || a.i - b.i;
+      return collator.compare(a.name, b.name) * dir || a.i - b.i;
+    })
+    .map((k) => k.id);
+}
+
+/** Put a section's cards in name order, A to Z (1) or Z to A (-1). */
+export function sortSection(colId: string, dir: 1 | -1) {
+  const col = board().items[colId];
+  if (col?.kind !== 'column') return;
+  const childIds = sortedChildren(colId, dir);
+  if (childIds.some((id, i) => id !== col.childIds[i])) board().updateItem(colId, { childIds });
+}
+
 // --- Frames ----------------------------------------------------------------------
 
 /** Room around framed things, and above them for the frame's title tag. */

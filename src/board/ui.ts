@@ -12,7 +12,7 @@ export interface DropTarget {
 }
 
 /** Settings panels that open in a pop-up for the selected item. */
-export type PanelKey = 'color' | 'strip' | 'text' | 'icon' | 'rename' | 'layout' | 'status';
+export type PanelKey = 'color' | 'strip' | 'text' | 'icon' | 'rename' | 'layout' | 'status' | 'sort';
 
 export interface Flyout {
   panel: PanelKey;
