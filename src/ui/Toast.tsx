@@ -25,8 +25,7 @@ export function Toast() {
     <div className="toast" role="status" key={toast.at} data-busy={toast.busy || undefined}>
       {toast.icon === 'pin' && (
         <span className="toast-icon" data-busy={toast.busy || undefined} aria-hidden="true">
-          <span className="toast-pin"><Pin size={17} strokeWidth={2.2} fill="currentColor" fillOpacity={0.25} /></span>
-          <span className="toast-pin-shadow" />
+          <span className="toast-pin"><Pin size={17} strokeWidth={2.2} /></span>
         </span>
       )}
       <span>{toast.text}</span>
