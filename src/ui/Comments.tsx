@@ -3,9 +3,9 @@
 // Open / Resolved tabs for the player, replies, reactions, @mentions and
 // typing indicators.
 
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, ChevronDown, Clock, Pencil, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
+import { ArrowUp, Check, ChevronDown, Clock, Pencil, RotateCcw, SmilePlus, Trash2, X } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Comment } from '../board/store';
 import { useUi } from '../board/ui';
 import { useLayout } from '../board/layout';
@@ -140,7 +140,7 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
             ))}
             {mine && (
               <span className="cmt-own">
-                <button className="cmt-tool" title="Edit" aria-label="Edit" aria-pressed={editing} onClick={() => setEditing((e) => !e)}>
+                <button className="cmt-tool" title="Edit" aria-label="Edit" aria-pressed={editing} onMouseDown={(e) => e.preventDefault()} onClick={() => setEditing((e) => !e)}>
                   <Pencil {...ICON} />
                 </button>
                 <button
@@ -167,6 +167,7 @@ function CommentRow({ c, reply, onSeek, onReply, number, resolvable = !reply }: 
             onSubmit={(text) => editComment(c.id, text)}
             onDone={() => setEditing(false)}
             onCancel={() => setEditing(false)}
+            cancelOnBlur
           />
         ) : (
           <p className="cmt-text">
@@ -281,6 +282,62 @@ function Reactions({ c }: { c: Comment }) {
 /** Threads already shown once in this session. */
 const seenThreads = new Set<string>();
 
+/** Where the last comment was posted from, so it can drop into the stack from there. */
+let launch: { targetId: string; box: DOMRect; dock: Element; dockTop: number; at: number } | null = null;
+
+/**
+ * A comment you just posted lifts out of the box, slams down into its place
+ * in the stack with a squash and a bounce, and its neighbours recoil from the
+ * impact (nearest most). The box slides down to make room.
+ */
+function useDrop(ref: RefObject<HTMLElement | null>, c: Comment, fresh: boolean) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const from = launch;
+    if (!el || !fresh || !from || from.targetId !== c.targetId || c.authorId !== session.userId || Date.now() - from.at > 1500) return;
+    launch = null;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    el.scrollIntoView({ block: 'nearest' });
+    const to = el.getBoundingClientRect();
+    const dx = from.box.left - to.left;
+    const dy = from.box.top - to.top;
+    const LAND = 0.6; // impact, as a share of the drop
+    const DURATION = 640;
+    el.dataset.dropping = '';
+    const drop = el.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(0.97)`, opacity: 0.5, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' },
+      { transform: 'translate(0, -16px) scale(1.035)', opacity: 1, offset: 0.36, easing: 'cubic-bezier(0.7, 0, 1, 0.6)' },
+      { transform: 'translate(0, 3px) scale(1.015, 0.96)', offset: LAND, easing: 'cubic-bezier(0.3, 0.6, 0.4, 1)' },
+      { transform: 'translate(0, -2.5px) scale(0.995, 1.012)', offset: 0.8, easing: 'ease-in-out' },
+      { transform: 'none' },
+    ], { duration: DURATION, easing: 'linear' });
+    drop.onfinish = drop.oncancel = () => { delete el.dataset.dropping; };
+
+    // Neighbours get knocked: those above jump up, those below dip, fading with distance.
+    const stack = [...(el.parentElement?.children ?? [])].filter((n) => n.classList.contains('cmt-thread'));
+    const mine = stack.indexOf(el);
+    stack.forEach((n, i) => {
+      if (n === el) return;
+      const d = Math.abs(i - mine);
+      const dir = i < mine ? -1 : 1;
+      const amp = 6 / d;
+      (n as HTMLElement).animate([
+        { transform: 'none' },
+        { transform: `translateY(${dir * amp}px)`, offset: 0.25 },
+        { transform: `translateY(${-dir * amp * 0.35}px)`, offset: 0.6 },
+        { transform: 'none' },
+      ], { duration: 460, delay: DURATION * LAND + (d - 1) * 45, easing: 'ease-out' });
+    });
+
+    // The box was pushed down by the new comment; let it slide there instead of jumping.
+    const shift = from.dock.isConnected ? from.dock.getBoundingClientRect().top - from.dockTop : 0;
+    if (shift > 1) {
+      from.dock.animate([{ transform: `translateY(${-shift}px)` }, { transform: 'none' }],
+        { duration: 380, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
+    }
+  }, []);
+}
+
 /** A thread: the first comment, its replies (folded away, like YouTube), and a reply box on demand. */
 function ThreadCard({ t, targetId, onSeek, number }: {
   t: Thread;
@@ -300,6 +357,7 @@ function ThreadCard({ t, targetId, onSeek, number }: {
     seenThreads.add(t.root.id);
     return isNew;
   });
+  useDrop(ref, t.root, fresh);
   const n = t.replies.length;
   return (
     <article
@@ -336,12 +394,14 @@ function ThreadCard({ t, targetId, onSeek, number }: {
 
 // --- Composer: one box, @mentions, timecode -----------------------------------------------
 
-function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a comment…', onDone, onCancel, initialText, onSubmit, submitLabel }: {
+function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a comment…', onDone, onCancel, initialText, onSubmit, submitLabel, cancelOnBlur }: {
   targetId: string;
   /** Editing: start from this text, and hand the result to onSubmit instead of posting. */
   initialText?: string;
   onSubmit?: (text: string) => void;
   submitLabel?: string;
+  /** Clicking anywhere outside the box cancels (editing). */
+  cancelOnBlur?: boolean;
   /** Current video time, for timecoded comments (videos only). */
   clock?: () => number | null;
   replyTo?: string;
@@ -357,6 +417,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
   const [active, setActive] = useState(0);
   const look = useContext(CommentLookContext);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   /** Where the caret goes once a picked mention is in the text. */
   const caretTo = useRef<number | null>(initialText?.length ?? null);
   const boardId = useBoard((s) => s.items[targetId]?.boardId ?? '');
@@ -410,6 +471,10 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
 
   const submit = () => {
     if (!text.trim()) return;
+    if (!onSubmit && box.current) {
+      const from = box.current.closest('.cmt-pop-compose, .cmt-full-compose, .cmt-replies') ?? box.current;
+      launch = { targetId, box: box.current.getBoundingClientRect(), dock: from, dockTop: from.getBoundingClientRect().top, at: Date.now() };
+    }
     if (onSubmit) onSubmit(text);
     else addComment(targetId, text, { time: clock && timed ? clock() : null, replyTo });
     setText('');
@@ -419,7 +484,7 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
   };
 
   return (
-    <div className="cmt-composer" data-reply={replyTo ? 'true' : undefined} onClick={() => ref.current?.focus()}>
+    <div ref={box} className="cmt-composer" data-reply={replyTo ? 'true' : undefined} onClick={() => ref.current?.focus()}>
       {query && (
         <div className="cmt-suggest" role="listbox">
           {matches.map((p, i) => (
@@ -464,7 +529,14 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
           if (!onSubmit) noteTyping(targetId, !!e.target.value.trim());
         }}
         onSelect={(e) => findQuery(e.currentTarget.value, e.currentTarget.selectionStart)}
-        onBlur={() => { stopTyping(targetId); setTimeout(() => setQuery(null), 0); }}
+        onBlur={() => {
+          stopTyping(targetId);
+          setTimeout(() => {
+            setQuery(null);
+            // Focus went somewhere else on the page (not just to another window): give up the edit.
+            if (cancelOnBlur && document.hasFocus() && !box.current?.contains(document.activeElement)) onCancel?.();
+          }, 0);
+        }}
         onKeyDown={(e) => {
           if (query && matches.length) {
             if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (a + 1) % matches.length); return; }
@@ -481,7 +553,18 @@ function Composer({ targetId, clock, replyTo, autoFocus, placeholder = 'Add a co
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
         }}
       />
-      {text.trim() && <button className="cmt-send" onClick={(e) => { e.stopPropagation(); submit(); }}>{submitLabel ?? (replyTo ? 'Reply' : 'Post')}</button>}
+      {(onSubmit || text.trim()) && (
+        <button
+          className="cmt-send"
+          title={submitLabel ?? (replyTo ? 'Reply' : 'Post')}
+          aria-label={submitLabel ?? (replyTo ? 'Reply' : 'Post')}
+          disabled={!text.trim()}
+          onMouseDown={(e) => e.preventDefault()} // keep focus in the box
+          onClick={(e) => { e.stopPropagation(); submit(); }}
+        >
+          {onSubmit ? <Check size={16} strokeWidth={2.6} aria-hidden="true" /> : <ArrowUp size={16} strokeWidth={2.6} aria-hidden="true" />}
+        </button>
+      )}
     </div>
   );
 }
@@ -544,13 +627,15 @@ const flatten = (threads: Thread[]) => threads.flatMap((t) => [t.root, ...t.repl
 
 /** A comment in a conversation: its own card, no thread of its own. */
 function FlatComment({ c }: { c: Comment }) {
+  const ref = useRef<HTMLElement>(null);
   const [fresh] = useState(() => {
     const isNew = !seenThreads.has(c.id) && Date.now() - c.createdAt < 1500;
     seenThreads.add(c.id);
     return isNew;
   });
+  useDrop(ref, c, fresh);
   return (
-    <article className="cmt-thread" data-fresh={fresh || undefined} data-resolved={c.resolved || undefined}>
+    <article ref={ref} className="cmt-thread" data-fresh={fresh || undefined} data-resolved={c.resolved || undefined}>
       <CommentRow c={c} resolvable={c.resolved} />
     </article>
   );

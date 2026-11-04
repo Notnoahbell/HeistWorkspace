@@ -1221,7 +1221,14 @@ html, body, #root {
 .cmt-delete[data-confirm] { background: #e5484d; color: #fff; }
 .cmt-delete[data-confirm]:hover { background: #d13438; color: #fff; }
 .cmt-tool[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
-.cmt[data-editing] .cmt-composer { margin: 4px 0 2px; }
+/* Editing in place: the text stays where it was (box edge pulled out to the left), same type. */
+.cmt[data-editing] .cmt-composer { margin: 1px -6px 2px -11px; padding: 5px 5px 5px 10px; align-items: flex-end; border-radius: 10px; }
+.cmt[data-editing] .cmt-composer textarea { font-size: 14px; line-height: 1.5; padding: 0; min-height: 21px; align-self: center; }
+/* Mid-drop: lifted on a card of its own, until it lands. */
+.cmt-thread[data-dropping] {
+  position: relative; z-index: 2; animation: none;
+  background: var(--panel); border-radius: 12px; box-shadow: 0 10px 28px rgb(0 0 0 / 0.18), 0 0 0 1px var(--panel-border);
+}
 
 /* Under the text: reaction chips, Reply, the react button (or the six emoji while picking). */
 .cmt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0 -2px; min-height: 30px; }
@@ -1290,10 +1297,15 @@ html, body, #root {
 .cmt-composer textarea::placeholder { color: var(--text-dim); }
 .cmt-composer[data-reply] { margin: 4px 0 2px; padding: 7.5px 6px 7.5px 10px; box-shadow: none; border-radius: 10px; }
 .cmt-composer[data-reply] textarea { font-size: 13px; }
+/* Send / save: a small square icon button at the end of the box. */
 .cmt-send {
-  flex: none; height: 24px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--accent); color: #fff;
-  font: 600 12px var(--font); cursor: pointer;
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px;
+  background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+  transition: filter 0.1s, transform 0.08s, opacity 0.1s;
 }
+.cmt-send:hover:not(:disabled) { filter: brightness(1.1); }
+.cmt-send:active:not(:disabled) { transform: scale(0.92); }
+.cmt-send:disabled { opacity: 0.35; cursor: default; }
 .cmt-chip {
   flex-basis: 100%; flex-grow: 0; width: max-content; display: inline-flex; align-items: center; gap: 4px;
   padding: 1px 6px; border: 1px dashed var(--panel-border); border-radius: 6px; background: none; color: var(--text-dim);
