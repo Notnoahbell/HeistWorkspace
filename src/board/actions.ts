@@ -2,6 +2,7 @@
 // and board-level commands used by the sidebar and keyboard shortcuts.
 
 import { camera, type Point, type Rect } from '../canvas/camera';
+import { GRID_SIZE } from '../canvas/grid';
 import { bodies, type Body, type BodyHooks } from './body';
 import { BOARD_HEIGHT, COLUMN_HEADER, COLUMN_WIDTH, NOTE_MIN_HEIGHT, NOTE_WIDTH } from './constants';
 import { dropIndex, snap, stackedSize, useLayout, type Size } from './layout';
@@ -426,9 +427,17 @@ export function deleteSelection() {
   clearSelection();
 }
 
-// --- Align & distribute ------------------------------------------------------------
+// --- Arrange (align, space out, tidy) ---------------------------------------------
 
-export type Align = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+/**
+ * Ways to arrange a selection. Aligning on a vertical line (left / centre /
+ * right) also makes a column, and on a horizontal line (top / middle /
+ * bottom) a row, so nothing ends up on top of anything else.
+ */
+export type Arrange = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' | 'spread-h' | 'spread-v' | 'grid';
+
+/** Space kept between arranged items. */
+const ARRANGE_GAP = GRID_SIZE * 2;
 
 /** Selected items that can be moved freely (on the open board, not inside a section). */
 function freeSelection() {
@@ -437,45 +446,96 @@ function freeSelection() {
   return ui().selectedIds
     .map((id) => items[id])
     .filter((it) => it && it.boardId === boardId && !parentOf(it))
-    .map((it) => ({ it, at: posOf(it), size: itemSize(it) }));
+    .map((it) => {
+      const at = posOf(it), size = itemSize(it);
+      return { id: it.id, x: at.x, y: at.y, w: size.w, h: size.h };
+    });
 }
 
-export const canAlign = () => freeSelection().length >= 2;
-export const canDistribute = () => freeSelection().length >= 3;
+export type Placed = ReturnType<typeof freeSelection>[number];
 
-/** Line the selection up on a shared edge or centre line of their combined bounds. */
-export function alignSelection(how: Align) {
-  const sel = freeSelection();
-  if (sel.length < 2) return;
-  const x0 = Math.min(...sel.map((s) => s.at.x)), x1 = Math.max(...sel.map((s) => s.at.x + s.size.w));
-  const y0 = Math.min(...sel.map((s) => s.at.y)), y1 = Math.max(...sel.map((s) => s.at.y + s.size.h));
-  for (const { it, at, size } of sel) {
-    const p = { ...at };
-    if (how === 'left') p.x = x0;
-    else if (how === 'right') p.x = x1 - size.w;
-    else if (how === 'hcenter') p.x = Math.round((x0 + x1) / 2 - size.w / 2);
-    else if (how === 'top') p.y = y0;
-    else if (how === 'bottom') p.y = y1 - size.h;
-    else p.y = Math.round((y0 + y1) / 2 - size.h / 2);
-    if (p.x !== at.x || p.y !== at.y) board().updateItem(it.id, p);
+export const canArrange = (how: Arrange) => freeSelection().length >= (how === 'spread-h' || how === 'spread-v' ? 3 : 2);
+
+/** Next free position after an item ending at `end` (on the grid when snapping is on). */
+const after = (end: number) => {
+  const v = end + ARRANGE_GAP;
+  return ui().snap ? Math.ceil(v / GRID_SIZE) * GRID_SIZE : v;
+};
+
+/**
+ * Lay items out along one axis in their current order: each keeps its place
+ * unless that would overlap the one before, in which case it moves just past it.
+ */
+function unoverlap(list: Placed[], axis: 'x' | 'y') {
+  const len = axis === 'x' ? 'w' : 'h';
+  list.sort((a, b) => a[axis] - b[axis] || (axis === 'x' ? a.y - b.y : a.x - b.x));
+  for (let i = 1; i < list.length; i++) {
+    const prev = list[i - 1];
+    if (list[i][axis] < prev[axis] + prev[len] + ARRANGE_GAP) list[i][axis] = after(prev[axis] + prev[len]);
   }
 }
 
-/** Even gaps between the selection along one axis; the outermost two stay put. */
-export function distributeSelection(axis: 'h' | 'v') {
+/** Reading order: rows top to bottom (things roughly level count as one row), left to right within a row. */
+function readingOrder(list: Placed[]) {
+  const byY = [...list].sort((a, b) => a.y - b.y);
+  const rows: Placed[][] = [];
+  for (const it of byY) {
+    const row = rows[rows.length - 1];
+    const top = row && Math.min(...row.map((r) => r.y));
+    const mid = row && Math.min(...row.map((r) => r.y + r.h / 2));
+    if (row && it.y < Math.max(mid, top + ARRANGE_GAP)) row.push(it);
+    else rows.push([it]);
+  }
+  return rows.flatMap((r) => r.sort((a, b) => a.x - b.x));
+}
+
+/** Where each item would go. Nothing is moved; see arrangeSelection. */
+export function planArrange(how: Arrange): Placed[] {
   const sel = freeSelection();
-  if (sel.length < 3) return;
-  const pos = (s: (typeof sel)[number]) => (axis === 'h' ? s.at.x : s.at.y);
-  const len = (s: (typeof sel)[number]) => (axis === 'h' ? s.size.w : s.size.h);
-  sel.sort((a, b) => pos(a) - pos(b));
-  const start = pos(sel[0]);
-  const end = Math.max(...sel.map((s) => pos(s) + len(s)));
-  const gap = (end - start - sel.reduce((n, s) => n + len(s), 0)) / (sel.length - 1);
-  let at = start;
-  for (const s of sel) {
-    const p = Math.round(at);
-    if (p !== pos(s)) board().updateItem(s.it.id, axis === 'h' ? { x: p } : { y: p });
-    at += len(s) + gap;
+  if (!canArrange(how)) return [];
+  const plan = sel.map((s) => ({ ...s }));
+  const x0 = Math.min(...plan.map((s) => s.x)), x1 = Math.max(...plan.map((s) => s.x + s.w));
+  const y0 = Math.min(...plan.map((s) => s.y)), y1 = Math.max(...plan.map((s) => s.y + s.h));
+
+  if (how === 'left' || how === 'hcenter' || how === 'right') {
+    for (const s of plan) s.x = how === 'left' ? x0 : how === 'right' ? x1 - s.w : Math.round((x0 + x1) / 2 - s.w / 2);
+    unoverlap(plan, 'y');
+  } else if (how === 'top' || how === 'vcenter' || how === 'bottom') {
+    for (const s of plan) s.y = how === 'top' ? y0 : how === 'bottom' ? y1 - s.h : Math.round((y0 + y1) / 2 - s.h / 2);
+    unoverlap(plan, 'x');
+  } else if (how === 'spread-h' || how === 'spread-v') {
+    // Even gaps between the outermost two; if they don't fit, a fixed gap instead.
+    const axis = how === 'spread-h' ? 'x' : 'y', len = how === 'spread-h' ? 'w' : 'h';
+    plan.sort((a, b) => a[axis] - b[axis]);
+    const start = plan[0][axis];
+    const end = Math.max(...plan.map((s) => s[axis] + s[len]));
+    const gap = Math.max(ARRANGE_GAP, (end - start - plan.reduce((n, s) => n + s[len], 0)) / (plan.length - 1));
+    let at = start;
+    for (const s of plan) { s[axis] = Math.round(at); at += s[len] + gap; }
+  } else {
+    // Tidy grid: roughly square, in reading order; columns as wide as their widest item.
+    const order = readingOrder(plan);
+    const cols = Math.ceil(Math.sqrt(order.length));
+    const colW: number[] = [], rowH: number[] = [];
+    order.forEach((s, i) => {
+      const c = i % cols, r = Math.floor(i / cols);
+      colW[c] = Math.max(colW[c] ?? 0, s.w);
+      rowH[r] = Math.max(rowH[r] ?? 0, s.h);
+    });
+    const colX = [x0], rowY = [y0];
+    for (let c = 1; c < cols; c++) colX[c] = after(colX[c - 1] + colW[c - 1]);
+    for (let r = 1; r < rowH.length; r++) rowY[r] = after(rowY[r - 1] + rowH[r - 1]);
+    order.forEach((s, i) => { s.x = colX[i % cols]; s.y = rowY[Math.floor(i / cols)]; });
+  }
+  return plan;
+}
+
+/** Arrange the selection (items slide to their new places). */
+export function arrangeSelection(how: Arrange) {
+  const { items } = board();
+  for (const p of planArrange(how)) {
+    const it = items[p.id];
+    if (it && (it.x !== p.x || it.y !== p.y)) board().updateItem(p.id, { x: p.x, y: p.y });
   }
 }
 

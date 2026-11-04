@@ -2,16 +2,16 @@
 // panels, or group actions when several things are selected. Rendered in
 // screen space so it stays a constant size.
 
-import { Fragment, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Trash2,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, LayoutGrid, Trash2,
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
 import { useBoard } from '../board/store';
-import { alignSelection, canAlign, canDistribute, deleteSelection, distributeSelection, groupIntoColumn, itemSize, posOf } from '../board/actions';
+import { arrangeSelection, canArrange, deleteSelection, groupIntoColumn, itemSize, planArrange, posOf, type Arrange } from '../board/actions';
 import { copySelection, duplicateSelection } from '../board/clipboard';
 import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
@@ -70,39 +70,65 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   );
 }
 
-const ALIGN: { key: string; label: string; icon: ReactNode; run: () => void; distribute?: boolean }[] = [
-  { key: 'left', label: 'Align left edges', icon: <AlignStartVertical {...ICON_PROPS} />, run: () => alignSelection('left') },
-  { key: 'hcenter', label: 'Align centres (vertical line)', icon: <AlignCenterVertical {...ICON_PROPS} />, run: () => alignSelection('hcenter') },
-  { key: 'right', label: 'Align right edges', icon: <AlignEndVertical {...ICON_PROPS} />, run: () => alignSelection('right') },
-  { key: 'top', label: 'Align top edges', icon: <AlignStartHorizontal {...ICON_PROPS} />, run: () => alignSelection('top') },
-  { key: 'vcenter', label: 'Align middles (horizontal line)', icon: <AlignCenterHorizontal {...ICON_PROPS} />, run: () => alignSelection('vcenter') },
-  { key: 'bottom', label: 'Align bottom edges', icon: <AlignEndHorizontal {...ICON_PROPS} />, run: () => alignSelection('bottom') },
-  { key: 'dist-h', label: 'Space evenly left to right', icon: <AlignHorizontalSpaceAround {...ICON_PROPS} />, run: () => distributeSelection('h'), distribute: true },
-  { key: 'dist-v', label: 'Space evenly top to bottom', icon: <AlignVerticalSpaceAround {...ICON_PROPS} />, run: () => distributeSelection('v'), distribute: true },
+const ARRANGE: { key: Arrange; label: string; icon: ReactNode }[] = [
+  { key: 'left', label: 'Line up left edges (in a column)', icon: <AlignStartVertical {...ICON_PROPS} /> },
+  { key: 'hcenter', label: 'Line up centres (in a column)', icon: <AlignCenterVertical {...ICON_PROPS} /> },
+  { key: 'right', label: 'Line up right edges (in a column)', icon: <AlignEndVertical {...ICON_PROPS} /> },
+  { key: 'top', label: 'Line up top edges (in a row)', icon: <AlignStartHorizontal {...ICON_PROPS} /> },
+  { key: 'vcenter', label: 'Line up middles (in a row)', icon: <AlignCenterHorizontal {...ICON_PROPS} /> },
+  { key: 'bottom', label: 'Line up bottom edges (in a row)', icon: <AlignEndHorizontal {...ICON_PROPS} /> },
+  { key: 'spread-h', label: 'Space evenly left to right', icon: <AlignHorizontalSpaceAround {...ICON_PROPS} /> },
+  { key: 'spread-v', label: 'Space evenly top to bottom', icon: <AlignVerticalSpaceAround {...ICON_PROPS} /> },
+  { key: 'grid', label: 'Tidy into a grid', icon: <LayoutGrid {...ICON_PROPS} /> },
 ];
 
-/** Beside a multi-selection: line things up and space them out (items inside sections stay put). */
+/**
+ * Beside a multi-selection: line things up, space them out or tidy them into
+ * a grid. Hovering a button outlines where everything would go.
+ */
 function AlignToolbar({ x, y }: { x: number; y: number }) {
-  if (!canAlign()) return null;
-  const spread = canDistribute();
-  const right = Math.min(x, window.innerWidth - 52);
+  const [hover, setHover] = useState<Arrange | null>(null);
+  if (!canArrange('left')) return null;
+  const preview = hover ? planArrange(hover) : [];
   return (
-    <div
-      className="selection-toolbar align-toolbar"
-      role="toolbar"
-      aria-label="Align"
-      style={{ left: right, top: Math.max(camera.origin.y + 8, y) }}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      {ALIGN.map((act, i) => (
-        <Fragment key={act.key}>
-          {(i === 3 || i === 6) && <span className="toolbar-divider" role="separator" />}
-          <button data-key={act.key} title={act.label} aria-label={act.label} disabled={act.distribute && !spread} onClick={act.run}>
-            {act.icon}
-          </button>
-        </Fragment>
-      ))}
-    </div>
+    <>
+      {preview.map((p) => {
+        const s = camera.worldToScreen(p.x, p.y);
+        return (
+          <div
+            key={p.id}
+            className="arrange-ghost"
+            style={{ left: s.x + camera.origin.x, top: s.y + camera.origin.y, width: p.w * camera.z, height: p.h * camera.z }}
+          />
+        );
+      })}
+      <div
+        className="selection-toolbar align-toolbar"
+        role="toolbar"
+        aria-label="Arrange"
+        style={{ left: Math.min(x, window.innerWidth - 52), top: Math.max(camera.origin.y + 8, y) }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerLeave={() => setHover(null)}
+      >
+        {ARRANGE.map((act, i) => (
+          <Fragment key={act.key}>
+            {(i === 3 || i === 6) && <span className="toolbar-divider" role="separator" />}
+            <button
+              data-key={act.key}
+              title={act.label}
+              aria-label={act.label}
+              disabled={!canArrange(act.key)}
+              onPointerEnter={() => setHover(act.key)}
+              onFocus={() => setHover(act.key)}
+              onBlur={() => setHover(null)}
+              onClick={() => { arrangeSelection(act.key); setHover(null); }}
+            >
+              {act.icon}
+            </button>
+          </Fragment>
+        ))}
+      </div>
+    </>
   );
 }
 
