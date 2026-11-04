@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, RotateCw } from 'lucide-react';
-import { stackDepth, stackTone, stackZ, useBoard } from './store';
+import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
@@ -38,6 +38,9 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
+  /** Hover-scrub: where across the card the pointer is (0–1), while the video isn't playing. */
+  const [skim, setSkim] = useState<number | null>(null);
+  const dragging = useUi((s) => s.dragId != null);
   const tone = useContrastTone(video);
   // Open timecoded comments on the current version, as marks on the timeline.
   const version = media ? versionOf(media) : 1;
@@ -108,7 +111,18 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
       onClick={onClick}
     >
       <div ref={visRef} className="media" data-selected={selected} data-stacked={stacked} data-version-drop={versionTarget || undefined} style={{ width: fill ?? media.w }}>
-        <div className="media-frame" style={{ aspectRatio: `${width} / ${height}` }}>
+        <div
+          className="media-frame"
+          style={{ aspectRatio: `${width} / ${height}` }}
+          onPointerMove={media.mediaType === 'video' ? (e) => {
+            // Skim through it by moving across (not over its controls, not mid-drag, not while it plays).
+            const over = (e.target as Element).closest('button:not(.media-play), .media-scrub');
+            if (playing || dragging || over || e.buttons) { if (skim != null) setSkim(null); return; }
+            const r = e.currentTarget.getBoundingClientRect();
+            setSkim(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+          } : undefined}
+          onPointerLeave={() => setSkim(null)}
+        >
           {src ? (
             media.mediaType === 'video' ? (
               <video
@@ -128,6 +142,9 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             <div className="media-pending">{failed ? 'Upload failed' : 'Uploading…'}</div>
           )}
 
+          {media.mediaType === 'video' && src && skim != null && (
+            <Skim video={video} at={skim} strip={media.meta.strip} />
+          )}
           {media.mediaType === 'video' && src && (
             <>
               {/* One large button in the middle; like the timeline, it shows on hover. */}
@@ -214,3 +231,37 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     </div>
   );
 });
+
+/**
+ * Hover-scrub: the frame at the pointer, from the filmstrip the server made
+ * (instant). Without one yet, the card's own video jumps there instead, and
+ * goes back to where it was afterwards.
+ */
+function Skim({ video, at, strip }: { video: HTMLVideoElement | null; at: number; strip: MediaMeta['strip'] }) {
+  const was = useRef<number | null>(null);
+  useEffect(() => {
+    if (strip || !video || !Number.isFinite(video.duration)) return;
+    if (was.current == null) was.current = video.currentTime;
+    video.currentTime = at * video.duration;
+  }, [at, strip, video]);
+  useEffect(() => () => {
+    if (video && was.current != null) video.currentTime = was.current;
+  }, [video]);
+  const frame = strip ? Math.min(strip.frames - 1, Math.floor(at * strip.frames)) : 0;
+  return (
+    <>
+      {strip && (
+        <div
+          className="media-skim"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url(${strip.url})`,
+            backgroundSize: `${strip.frames * 100}% 100%`,
+            backgroundPosition: `${(frame / Math.max(1, strip.frames - 1)) * 100}% 0`,
+          }}
+        />
+      )}
+      <div className="media-skim-line" aria-hidden="true" style={{ left: `${at * 100}%` }} />
+    </>
+  );
+}

@@ -1185,6 +1185,13 @@ html, body, #root {
 .media-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(0 0 0 / 0.25); }
 .media-progress > span { display: block; height: 100%; background: var(--accent); transition: width 0.15s; }
 .media-retry { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 7px 12px !important; font-size: 13px; font-weight: 600; }
+/* Hover-scrub: the filmstrip frame under the pointer, and a line where it is. */
+.media-skim { position: absolute; inset: 0; background-repeat: no-repeat; pointer-events: none; }
+.media-skim-line {
+  position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.25); pointer-events: none;
+}
+
 /* Version tag (v2, v3…) in the top-left corner, and the "drop to add as v3" target. */
 .media-version {
   position: absolute; left: 8px; top: 8px; z-index: 1; padding: 2px 7px; border-radius: 6px;
