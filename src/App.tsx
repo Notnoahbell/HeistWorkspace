@@ -24,7 +24,7 @@ import { SelectionToolbar } from './ui/SelectionToolbar';
 import { Marquee, startMarquee } from './ui/Marquee';
 import { ContextMenu } from './ui/ContextMenu';
 import { Toast } from './ui/Toast';
-import { CursorChat, PeerCursors } from './ui/Presence';
+import { CursorChat, PeerCursors, PeerSelections } from './ui/Presence';
 import { MediaViewer, openViewer } from './ui/MediaViewer';
 import { MediaWall, openWall } from './ui/MediaWall';
 import { CommentsPopover } from './ui/Comments';
@@ -239,6 +239,7 @@ export function App() {
       <Marquee />
       <ContextMenu />
       <Toast />
+      <PeerSelections />
       <PeerCursors />
       <CursorChat />
       <MediaWall />

@@ -301,6 +301,9 @@ npm run build      # typecheck + production build
   to rename; drag its background to move it with what's inside; drag its bottom-right corner to resize.
   The strip beside a multi-selection lines things up, spaces them out or tidies them into a
   grid (hover a button to preview)
+- Others' selections: what anyone else on the board has selected gets an outline in their
+  cursor colour with their avatar on its top-right corner (several people stack there).
+  Sent with presence, only when it changes, not with every cursor move
 - Selecting: click; Ctrl/⌘-click adds or removes; Shift-click adds or removes on the
   canvas, but inside a section selects the run from the last card you picked (like a file
   list). Drag on empty canvas to box-select (Shift adds); Shift-drag inside a section or

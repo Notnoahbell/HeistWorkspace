@@ -37,6 +37,8 @@ export interface Peer {
   msg: string;
   /** Item they're writing a comment on, if any. */
   typing?: string | null;
+  /** What they have selected. */
+  sel?: string[];
 }
 
 interface PresenceState {

@@ -47,6 +47,8 @@ interface Conn {
   msg: string;
   /** Item they're writing a comment on, if any. */
   typing: string | null;
+  /** What they have selected on this board. */
+  sel: string[];
 }
 
 /** Cursor colours, chosen to be distinct from each other. */
@@ -64,6 +66,8 @@ const ANIMALS = [
   'Puffin', 'Ocelot', 'Tapir', 'Kestrel', 'Narwhal', 'Pika', 'Stoat', 'Toucan', 'Quokka', 'Mole', 'Crane', 'Newt',
 ];
 const MSG_LIMIT = 60;
+/** Most selected items shown to others (beyond this, the rest just aren't outlined). */
+const SEL_LIMIT = 200;
 const NAME_LIMIT = 32;
 
 const isHome = (id: string) => id.startsWith('home:');
@@ -213,9 +217,13 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     return [...conns].filter(([ws, c]) => ws !== except && boardId && c.boardId === boardId);
   }
 
-  function presenceMsg(c: Conn) {
+  /** A peer's presence; their selection only when it's new to the receiver (it's sent on change, not with every cursor move). */
+  function presenceMsg(c: Conn, withSel = true) {
     const p = db.profiles[c.userId];
-    return { t: 'presence', connId: c.id, userId: c.userId, name: p?.name, icon: p?.icon ?? null, color: c.color, boardId: c.boardId, at: c.presence, msg: c.msg, typing: c.typing };
+    return {
+      t: 'presence', connId: c.id, userId: c.userId, name: p?.name, icon: p?.icon ?? null, color: c.color, boardId: c.boardId,
+      at: c.presence, msg: c.msg, typing: c.typing, ...(withSel ? { sel: c.sel } : {}),
+    };
   }
 
   /** A free colour on this board (random among the unused ones). */
@@ -230,13 +238,15 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     for (const [peer] of peersOn(c.boardId, ws)) send(peer, { t: 'leave', connId: c.id });
   }
 
-  function presence(ws: WebSocket, c: Conn, boardId: string | null, at: { x: number; y: number } | null, msg: string, typing: string | null) {
+  function presence(ws: WebSocket, c: Conn, boardId: string | null, at: { x: number; y: number } | null, msg: string, typing: string | null, sel?: string[]) {
     // Only boards this user can actually see.
     if (boardId && !isHome(boardId) && !(db.items[boardId] && accessOf(db.items[boardId]).has(c.userId))) boardId = null;
     if (boardId && isHome(boardId) && boardId !== `home:${c.userId}`) boardId = null;
-    if (boardId !== c.boardId) {
+    const moved = boardId !== c.boardId;
+    if (moved) {
       leaveBoard(ws, c);
       c.boardId = boardId;
+      c.sel = [];
       c.color = boardId ? pickColor(boardId, ws) : null;
       send(ws, { t: 'you', color: c.color });
       // Catch up on who's already here.
@@ -245,7 +255,8 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     c.presence = at;
     c.msg = msg.slice(0, MSG_LIMIT);
     c.typing = typing ? typing.slice(0, 64) : null;
-    for (const [peer] of peersOn(c.boardId, ws)) send(peer, presenceMsg(c));
+    if (sel) c.sel = sel.filter((id) => typeof id === 'string').slice(0, SEL_LIMIT).map((id) => id.slice(0, 64));
+    for (const [peer] of peersOn(c.boardId, ws)) send(peer, presenceMsg(c, moved || !!sel));
   }
 
   // --- Connections -------------------------------------------------------------------
@@ -278,7 +289,7 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
     const userId = userIdFor(req);
     const isNew = !db.profiles[userId];
     const profile = (db.profiles[userId] ??= defaultProfile(userId));
-    const conn: Conn = { id: randomBytes(6).toString('hex'), userId, boardId: null, color: null, presence: null, msg: '', typing: null };
+    const conn: Conn = { id: randomBytes(6).toString('hex'), userId, boardId: null, color: null, presence: null, msg: '', typing: null, sel: [] };
     conns.set(ws, conn);
     if (isNew) save();
     send(ws, { t: 'welcome', userId, connId: conn.id, profile });
@@ -297,7 +308,8 @@ export function createSyncServer({ dataFile }: { dataFile: string }) {
           break;
         case 'presence': {
           const at = m.at && typeof m.at === 'object' ? m.at as { x: number; y: number } : null;
-          presence(ws, conn, typeof m.boardId === 'string' ? m.boardId : null, at, typeof m.msg === 'string' ? m.msg : '', typeof m.typing === 'string' ? m.typing : null);
+          presence(ws, conn, typeof m.boardId === 'string' ? m.boardId : null, at, typeof m.msg === 'string' ? m.msg : '', typeof m.typing === 'string' ? m.typing : null,
+            Array.isArray(m.sel) ? m.sel as string[] : undefined);
           break;
         }
         case 'profile': {

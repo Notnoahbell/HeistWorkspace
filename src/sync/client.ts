@@ -13,6 +13,7 @@
 import type { Point } from '../canvas/camera';
 import { useBoard, type Item } from '../board/store';
 import { currentBoardId, refreshBoard, subscribeBoard } from '../board/nav';
+import { useUi } from '../board/ui';
 import { homeId, isHome, session, setSessionUser } from '../session';
 import { usePresence, type Peer, type Profile } from './presence';
 import { newId } from '../lib/id';
@@ -121,6 +122,7 @@ function onMessage(m: ServerMsg) {
     case 'snapshot':
       remote(() => Object.fromEntries(m.items.map((it) => [it.id, it])));
       ready = true;
+      selDirty = true;
       syncShortcuts();
       refreshBoard();
       sendPresenceNow();
@@ -138,8 +140,12 @@ function onMessage(m: ServerMsg) {
       usePresence.setState({ myColor: m.color });
       break;
     case 'presence': {
-      const peer: Peer = { ...m, at: m.at };
-      usePresence.setState((s) => ({ peers: { ...s.peers, [m.connId]: peer } }));
+      // Their selection only comes when it changes: keep the one we have otherwise.
+      usePresence.setState((s) => {
+        const before = s.peers[m.connId];
+        const peer: Peer = { ...m, at: m.at, sel: m.sel ?? (before?.boardId === m.boardId ? before?.sel : undefined) ?? [] };
+        return { peers: { ...s.peers, [m.connId]: peer } };
+      });
       break;
     }
     case 'leave':
@@ -237,12 +243,23 @@ let cursor: Point | null = null;
 let chat = '';
 let typing: string | null = null;
 let frame = 0;
+/** Selection not yet sent (it goes out on change, not with every cursor move). */
+let selDirty = true;
 
 function sendPresenceNow() {
   frame = 0;
   if (!ready) return;
-  send({ t: 'presence', boardId: currentBoardId(), at: cursor, msg: chat, typing });
+  const sel = selDirty ? useUi.getState().selectedIds : undefined;
+  selDirty = false;
+  send({ t: 'presence', boardId: currentBoardId(), at: cursor, msg: chat, typing, ...(sel ? { sel } : {}) });
 }
+
+// Others see what you have selected.
+useUi.subscribe((s, prev) => {
+  if (s.selectedIds === prev.selectedIds) return;
+  selDirty = true;
+  schedule();
+});
 
 const schedule = () => { if (!frame) frame = requestAnimationFrame(sendPresenceNow); };
 
@@ -250,6 +267,7 @@ const schedule = () => { if (!frame) frame = requestAnimationFrame(sendPresenceN
 subscribeBoard(() => {
   usePresence.setState({ peers: {}, myColor: null });
   cursor = null;
+  selDirty = true;
   sendPresenceNow();
 });
 

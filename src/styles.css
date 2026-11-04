@@ -2319,3 +2319,18 @@ button, a, label { cursor: var(--cursor, default); }
 
 /* Shift held: sections and frames can be box-selected inside. */
 :root[data-shift] :is(.column, .frame) { cursor: crosshair; }
+
+/* Someone else's selection: an outline in their colour, their avatar on the top-right corner. */
+.peer-sel-layer { z-index: 13; }
+.peer-sel {
+  position: absolute; left: 0; top: 0;
+  border: 2px solid var(--peer);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.35);
+}
+.peer-sel-who {
+  position: absolute; right: -10px; top: -10px;
+  display: flex; flex-direction: row-reverse;
+}
+.peer-sel-who > span + span { margin-right: -5px; }
+.peer-sel-who .avatar { font-size: 8px; box-shadow: 0 0 0 2px var(--bg), 0 1px 3px rgb(0 0 0 / 0.3); }
