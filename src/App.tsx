@@ -26,6 +26,7 @@ import { ContextMenu } from './ui/ContextMenu';
 import { Toast } from './ui/Toast';
 import { CursorChat, PeerCursors } from './ui/Presence';
 import { MediaViewer, openViewer } from './ui/MediaViewer';
+import { MediaWall, openWall } from './ui/MediaWall';
 import { CommentsPopover } from './ui/Comments';
 import { copySelection, cutSelection, duplicateSelection, paste } from './board/clipboard';
 import { camera } from './canvas/camera';
@@ -71,7 +72,7 @@ const ADD_KEYS: Record<string, ItemKind> = { n: 'note', l: 'link', t: 'todo', b:
 export function App() {
   const boardId = useBoardId();
   // Back/forward navigation shouldn't keep a selection from another board.
-  useEffect(() => { useUi.getState().set({ selectedIds: [], editingId: null, contextMenu: null, viewer: null }); }, [boardId]);
+  useEffect(() => { useUi.getState().set({ selectedIds: [], editingId: null, contextMenu: null, viewer: null, wall: null }); }, [boardId]);
 
   // A settings pop-up belongs to the item it was opened for.
   const selectedId = useUi((s) => s.selectedId);
@@ -86,7 +87,7 @@ export function App() {
         return;
       }
       // The player has its own keys.
-      if (isTyping(e) || ui.viewer) return;
+      if (isTyping(e) || ui.viewer || ui.wall) return;
       const selected = ui.selectedId ? useBoard.getState().items[ui.selectedId] : undefined;
 
       // Ctrl/Cmd shortcuts: select all, copy, cut, paste, duplicate.
@@ -115,6 +116,9 @@ export function App() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && ui.selectedIds.length) {
         e.preventDefault();
         deleteSelection();
+      } else if (e.key === 'Enter' && ui.selectedIds.length > 1) {
+        // Several photos / videos: play them side by side.
+        if (openWall(ui.selectedIds)) e.preventDefault();
       } else if (e.key === 'Enter' && selected) {
         e.preventDefault();
         if (selected.kind === 'board' && selected.id !== boardId) enterBoard(selected.id);
@@ -139,7 +143,7 @@ export function App() {
   // otherwise it's our own clipboard (copied cards).
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (isTyping(e) || useUi.getState().viewer) return;
+      if (isTyping(e) || useUi.getState().viewer || useUi.getState().wall) return;
       e.preventDefault();
       const files = [...(e.clipboardData?.files ?? [])];
       if (files.length) void addMediaFiles(files, viewportCenterWorld());
@@ -223,6 +227,7 @@ export function App() {
       <Toast />
       <PeerCursors />
       <CursorChat />
+      <MediaWall />
       <MediaViewer />
       {fileDrag && <FileDropHint />}
     </>

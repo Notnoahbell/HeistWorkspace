@@ -10,14 +10,10 @@ import { isLight } from '../lib/color';
 const MIN_W = 160;
 const MIN_H = 96;
 
-/** Resize handles: which edges each one moves. */
-const HANDLES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
-type Handle = (typeof HANDLES)[number];
-
 /**
  * A frame: a titled, tinted box behind things that groups them loosely.
- * Drag it and whatever sits wholly inside comes along; drag its edges or
- * corners to resize it. Frames always sit behind everything else, smaller
+ * Drag it and whatever sits wholly inside comes along; drag its bottom-right
+ * corner to resize it. Frames always sit behind everything else, smaller
  * ones in front of bigger ones so frames can nest.
  */
 export const FrameView = memo(function FrameView({ id }: { id: string }) {
@@ -27,11 +23,11 @@ export const FrameView = memo(function FrameView({ id }: { id: string }) {
   const editing = useUi((s) => s.editingId === id);
   const lifted = useLiftedZ(id);
   const tagRef = useRef<HTMLDivElement>(null);
-  const resize = useRef<{ handle: Handle; sx: number; sy: number; x: number; y: number; w: number; h: number } | null>(null);
+  const resize = useRef<{ sx: number; sy: number; x: number; y: number; w: number; h: number } | null>(null);
   const [resizing, setResizing] = useState(false);
 
   const rest = frame ? { x: frame.x, y: frame.y } : null;
-  const { body, posRef, visRef, onPointerDown, onClick, onContextMenu } = useBody(id, itemHooks, rest, undefined, undefined,
+  const { posRef, visRef, onPointerDown, onClick, onContextMenu } = useBody(id, itemHooks, rest, undefined, undefined,
     // Clicking a selected frame's tag renames it.
     (e) => {
       const r = tagRef.current?.getBoundingClientRect();
@@ -43,11 +39,11 @@ export const FrameView = memo(function FrameView({ id }: { id: string }) {
   if (!frame) return null;
   const update = useBoard.getState().updateItem;
 
-  const startResize = (handle: Handle) => (e: ReactPointerEvent) => {
+  const startResize = (e: ReactPointerEvent) => {
     e.stopPropagation();
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    resize.current = { handle, sx: e.clientX, sy: e.clientY, x: frame.x, y: frame.y, w: frame.w, h: frame.h };
+    resize.current = { sx: e.clientX, sy: e.clientY, x: frame.x, y: frame.y, w: frame.w, h: frame.h };
     setResizing(true);
     useUi.getState().set({ selectedIds: [id], editingId: null });
   };
@@ -56,14 +52,9 @@ export const FrameView = memo(function FrameView({ id }: { id: string }) {
     if (!r) return;
     const dx = (e.clientX - r.sx) / camera.z, dy = (e.clientY - r.sy) / camera.z;
     const fit = (v: number) => (useUi.getState().snap && !e.altKey ? snap(v) : Math.round(v));
-    let x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
-    if (r.handle.includes('w')) x0 = Math.min(fit(r.x + dx), x1 - MIN_W);
-    if (r.handle.includes('e')) x1 = Math.max(fit(r.x + r.w + dx), x0 + MIN_W);
-    if (r.handle.includes('n')) y0 = Math.min(fit(r.y + dy), y1 - MIN_H);
-    if (r.handle.includes('s')) y1 = Math.max(fit(r.y + r.h + dy), y0 + MIN_H);
-    // The top-left follows the pointer exactly rather than springing there.
-    if (x0 !== frame.x || y0 !== frame.y) body.place(x0, y0);
-    update(id, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+    const w = Math.max(fit(r.x + r.w + dx) - r.x, MIN_W);
+    const h = Math.max(fit(r.y + r.h + dy) - r.y, MIN_H);
+    if (w !== frame.w || h !== frame.h) update(id, { w, h });
   };
   const endResize = () => { resize.current = null; setResizing(false); };
 
@@ -105,18 +96,17 @@ export const FrameView = memo(function FrameView({ id }: { id: string }) {
             <span className="frame-title" data-empty={!frame.title}>{frame.title || 'Untitled frame'}</span>
           )}
         </div>
-        {selected && HANDLES.map((h) => (
+        {selected && (
           <div
-            key={h}
             className="frame-handle"
-            data-h={h}
-            onPointerDown={startResize(h)}
+            title="Drag to resize — hold Alt to ignore the grid"
+            onPointerDown={startResize}
             onPointerMove={moveResize}
             onPointerUp={endResize}
             onPointerCancel={endResize}
             onClick={(e) => e.stopPropagation()}
           />
-        ))}
+        )}
       </div>
     </div>
   );

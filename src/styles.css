@@ -2226,7 +2226,6 @@ button, a, label { cursor: var(--cursor, default); }
 
 .frame {
   position: relative;
-  border-radius: 10px;
   background: color-mix(in srgb, var(--frame-color, var(--frame-default)) var(--frame-tint), transparent);
   border: 1.5px solid color-mix(in srgb, var(--frame-color, var(--frame-default)) 45%, transparent);
   transform-origin: 50% 50%;
@@ -2238,7 +2237,6 @@ button, a, label { cursor: var(--cursor, default); }
   left: 10px;
   max-width: calc(100% - 20px);
   padding: 4px 10px;
-  border-radius: 6px;
   background: var(--frame-color, var(--frame-default));
   color: var(--frame-ink, #fff);
   font: 600 13px/1.35 var(--font);
@@ -2260,22 +2258,59 @@ button, a, label { cursor: var(--cursor, default); }
 }
 .frame-title-input::placeholder { color: inherit; opacity: 0.6; }
 
-/* Resize: corners are visible squares, edges are invisible grab strips. */
-.frame-handle { position: absolute; z-index: 2; touch-action: none; }
-.frame-handle[data-h='n'], .frame-handle[data-h='s'] { left: 12px; right: 12px; height: 10px; cursor: ns-resize; }
-.frame-handle[data-h='e'], .frame-handle[data-h='w'] { top: 12px; bottom: 12px; width: 10px; cursor: ew-resize; }
-.frame-handle[data-h='n'] { top: -6px; }
-.frame-handle[data-h='s'] { bottom: -6px; }
-.frame-handle[data-h='e'] { right: -6px; }
-.frame-handle[data-h='w'] { left: -6px; }
-.frame-handle[data-h$='e'][data-h^='n'], .frame-handle[data-h$='w'][data-h^='n'],
-.frame-handle[data-h$='e'][data-h^='s'], .frame-handle[data-h$='w'][data-h^='s'] {
-  width: 12px; height: 12px;
+/* Resize from the bottom-right corner only. */
+.frame-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  z-index: 2;
+  width: 12px;
+  height: 12px;
   background: var(--panel);
   border: 2px solid var(--accent);
-  border-radius: 3px;
+  cursor: nwse-resize;
+  touch-action: none;
 }
-.frame-handle[data-h='nw'] { top: -8px; left: -8px; cursor: nwse-resize; }
-.frame-handle[data-h='se'] { bottom: -8px; right: -8px; cursor: nwse-resize; }
-.frame-handle[data-h='ne'] { top: -8px; right: -8px; cursor: nesw-resize; }
-.frame-handle[data-h='sw'] { bottom: -8px; left: -8px; cursor: nesw-resize; }
+
+/* Side by side: several photos / videos in a grid on one timeline (MediaWall). */
+.wall-panel { grid-template-columns: minmax(0, 1fr); }
+.wall-grid {
+  position: relative; flex: 1; min-height: 0;
+  display: grid; gap: 2px; padding: 2px;
+  background: #000;
+}
+.viewer-main[data-full] .wall-grid { padding: 0; }
+.wall-tile { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #050506; }
+.wall-tile > :is(video, img) {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; object-fit: contain; user-select: none;
+}
+.wall-tile[data-loud] { box-shadow: inset 0 0 0 2px #6f7dff; }
+/* Solid backgrounds, not blur: a blurred overlay on 25 playing videos would be redrawn every frame. */
+.wall-label {
+  position: absolute; left: 6px; bottom: 6px; z-index: 1; max-width: calc(100% - 12px);
+  display: flex; align-items: center; gap: 6px; padding: 3px 7px 3px 4px;
+  background: rgb(0 0 0 / 0.62); color: #fff;
+  font: 600 11.5px/1.3 var(--font); white-space: nowrap; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.wall-label b { min-width: 16px; padding: 0 3px; background: rgb(255 255 255 / 0.16); text-align: center; font-variant-numeric: tabular-nums; }
+.wall-label span { overflow: hidden; text-overflow: ellipsis; }
+.wall-v { flex: none; color: var(--vdim); }
+.wall-sound {
+  position: absolute; right: 6px; top: 6px; z-index: 1;
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0;
+  background: rgb(0 0 0 / 0.62); color: #fff; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s;
+}
+.wall-tile:hover .wall-sound, .wall-sound:focus-visible, .wall-sound[aria-pressed='true'] { opacity: 1; }
+.wall-sound[aria-pressed='true'] { background: #6f7dff; }
+.wall-sound:hover { background: rgb(0 0 0 / 0.85); }
+.wall-sound[aria-pressed='true']:hover { background: #5d6cf5; }
+.viewer-main[data-idle] :is(.wall-label, .wall-sound) { opacity: 0; }
+.wall-waiting {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 2;
+  padding: 5px 12px; background: rgb(0 0 0 / 0.75); color: #fff; font: 600 12px var(--font);
+  pointer-events: none; opacity: 0; transition: opacity 0.15s;
+}
+.viewer-main[data-waiting] .wall-waiting { opacity: 1; transition-delay: 0.3s; }

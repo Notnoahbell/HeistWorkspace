@@ -55,6 +55,8 @@ interface UiState {
   commenting: string | null;
   /** Media card open in the full-size player, and where to start a video (s). */
   viewer: { id: string; time: number } | null;
+  /** Photos and videos open side by side on one timeline (see MediaWall). */
+  wall: string[] | null;
   /**
    * Patch UI state. Setting either selection field keeps the other in step,
    * so single-selection code can keep using `selectedId`.
@@ -81,6 +83,7 @@ export const useUi = create<UiState>()(
       flyout: null,
       contextMenu: null,
       viewer: null,
+      wall: null,
       commenting: null,
       set: (patch) => {
         if ('selectedIds' in patch && !('selectedId' in patch)) {

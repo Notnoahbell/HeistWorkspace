@@ -217,6 +217,15 @@ Sized for ~150 users; a single modest server handles this comfortably.
   if the box encloses it, so selecting within one picks its contents. Deleting a frame
   leaves its contents. Arrange (align / spread / grid) never stacks things on top of
   each other: aligning on a vertical line also makes a column, on a horizontal line a row.
+  Frames are square-cornered and resize from the bottom-right corner only.
+- **2026-11-04: Side by side plays up to 25 (5×5) on one clock.** `src/ui/MediaWall.tsx`.
+  The time belongs to a master clock, not to any one video; videos follow by nudging
+  their playback rate (±8%) and only seek when >0.35s off, because 25 simultaneous seeks
+  is what stutters. Scrubbing coalesces seeks (each video re-seeks to the latest time once
+  its last seek lands). If a video runs out of data the clock waits and the rest pause.
+  Only one tile has sound. The timeline is the longest video; shorter ones hold their last
+  frame. 25 is the cap because browsers start falling back to software decoding past
+  ~16–32 simultaneous hardware decoders, and at 5×5 tiles are already ~300px wide.
 
 - **2026-11-03: Boards are items.** All items live in one flat map tagged with
   `boardId`; a board's tile *is* the board. Each user's root is a virtual Home
@@ -289,9 +298,13 @@ npm run build      # typecheck + production build
 - Sections: S (or C); double-click header to rename; double-click body to add a note;
   drag the right edge to change the number of grid columns
 - Frames: select several things → Wrap in a frame (Ctrl/⌘+G); click a selected frame's tag
-  to rename; drag its background to move it with what's inside; drag edges / corners to resize.
+  to rename; drag its background to move it with what's inside; drag its bottom-right corner to resize.
   The strip beside a multi-selection lines things up, spaces them out or tidies them into a
   grid (hover a button to preview)
+- Side by side: select several photos / videos → Play together (group toolbar) or Enter.
+  Up to 25 in a grid on one timeline (Space, K, ←/→ 5s, , and . a frame, Home, M sound,
+  Esc close); a tile's speaker picks whose sound you hear; double-click a tile to open it
+  in the full player at the same moment (Esc comes back)
 - Sidebar Add buttons: click to add at centre, or drag the button out — a preview tile
   follows the cursor and becomes a real item once it clears the sidebar
 - Drag and flick to throw; Delete removes; G toggles snap, hold Alt to place freely

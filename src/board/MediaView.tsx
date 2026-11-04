@@ -85,7 +85,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   useEffect(() => {
     if (!selected || !video) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e) || useUi.getState().viewer) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e) || useUi.getState().viewer || useUi.getState().wall) return;
       if (e.key !== ',' && e.key !== '.') return;
       e.preventDefault();
       stepFrame(video, e.key === '.' ? 1 : -1, media?.meta.fps);

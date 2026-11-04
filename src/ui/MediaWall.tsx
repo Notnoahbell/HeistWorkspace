@@ -1,0 +1,530 @@
+// Several photos and videos at once: a grid in the player window, every video
+// on one shared timeline so they play, pause and scrub together. No comments
+// here; double-click a tile to open that one in the full player at the same
+// moment (Esc comes back to the grid).
+//
+// Keeping 25 videos in step cheaply:
+// - A master clock (not any one video) owns the time. It looks enough like a
+//   <video> for the Scrubber and frame stepping to drive it.
+// - Videos follow it by nudging their playback rate a few percent; they only
+//   seek when they're well off (a seek on 25 decoders at once is what stutters).
+// - While scrubbing, each video seeks to the latest time once its last seek
+//   has landed, instead of queuing a seek per pointer move.
+// - If one runs out of data the clock waits for it (and the others pause), so
+//   they never drift apart over a slow load.
+// - Per frame only the timecode and the timeline fill are touched, straight in
+//   the DOM; React renders when the set of tiles or the controls change.
+// - Proxies (720p) play where the server has made them; only one tile has sound.
+//
+// Keys: Space play-pause · K stop · ← → 5s · , . one frame · Home start · M sound · Esc close.
+
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
+import { useShallow } from 'zustand/react/shallow';
+import { ChevronLeft, Maximize, Minimize, Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react';
+import { useBoard, type Media } from '../board/store';
+import { useUi } from '../board/ui';
+import { pathTo } from '../board/nav';
+import { posOf } from '../board/actions';
+import { playable, useLocalMedia } from '../board/media';
+import { versionInfo, versionOf } from '../board/versions';
+import { isTyping } from '../canvas/input';
+import { fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
+
+/** Most tiles at once (5 × 5). Past that, decoding and bandwidth stop keeping up on an ordinary laptop. */
+export const MAX_WALL = 25;
+const ICON = { size: 18, strokeWidth: 2, 'aria-hidden': true } as const;
+const CLOSE_MS = 110;
+const IDLE_MS = 2200;
+const SPEEDS = [0.25, 0.5, 1, 1.5, 2];
+/** How far a playing video may be off before it's re-seeked rather than nudged. */
+const SEEK_DRIFT = 0.35;
+/** Most a video's rate is nudged by to catch up (±). */
+const NUDGE = 0.08;
+/** How close a paused video must be to the clock. */
+const STILL_DRIFT = 0.02;
+const SYNC_MS = 200;
+const VOLUME_KEY = 'heist:volume';
+
+/** Open these together (the media among them, in reading order, at most MAX_WALL). */
+export function openWall(ids: string[]) {
+  const { items } = useBoard.getState();
+  const media = ids.map((id) => items[id]).filter((it): it is Media => it?.kind === 'media')
+    .map((it) => ({ id: it.id, p: posOf(it) }))
+    .sort((a, b) => a.p.y - b.p.y || a.p.x - b.p.x)
+    .map((e) => e.id);
+  if (media.length < 2) return false;
+  const shown = media.slice(0, MAX_WALL);
+  useUi.getState().set({
+    wall: shown,
+    contextMenu: null,
+    flyout: null,
+    toast: media.length > MAX_WALL ? { text: `Playing the first ${MAX_WALL} of ${media.length} — ${MAX_WALL} at most at once`, at: Date.now() } : null,
+  });
+  return true;
+}
+
+/** How many photos and videos are in a selection. */
+export const mediaCount = (ids: string[]) => {
+  const { items } = useBoard.getState();
+  return ids.filter((id) => items[id]?.kind === 'media').length;
+};
+
+/**
+ * The shared time. Runs off the wall clock, so no one video's hiccups move
+ * it; `hold` stops it while a video catches up. Shaped like a <video> (time,
+ * duration, paused, play/pause, the same events) for Scrubber and stepFrame.
+ */
+class Clock extends EventTarget {
+  duration = NaN;
+  paused = true;
+  loop = false;
+  private t = 0;
+  private since = 0;
+  private rate = 1;
+  private held = false;
+
+  private now() { return performance.now() / 1000; }
+  private emit(...names: string[]) { for (const n of names) this.dispatchEvent(new Event(n)); }
+  private get end() { return Number.isFinite(this.duration) ? this.duration : Infinity; }
+
+  get currentTime() {
+    if (this.paused || this.held) return this.t;
+    return Math.min(this.end, this.t + (this.now() - this.since) * this.rate);
+  }
+  set currentTime(v: number) {
+    this.t = Math.max(0, Math.min(this.end, v));
+    this.since = this.now();
+    this.emit('seeking', 'seeked', 'timeupdate');
+  }
+  get playbackRate() { return this.rate; }
+  set playbackRate(r: number) {
+    this.t = this.currentTime;
+    this.since = this.now();
+    this.rate = r;
+    this.emit('ratechange');
+  }
+  get waiting() { return this.held && !this.paused; }
+  setDuration(d: number) {
+    if (d === this.duration) return;
+    this.duration = d;
+    this.emit('durationchange');
+  }
+  play() {
+    if (!this.paused) return Promise.resolve();
+    if (this.t >= this.end - 0.01) this.t = 0;
+    this.paused = false;
+    this.since = this.now();
+    this.emit('play');
+    return Promise.resolve();
+  }
+  pause() {
+    if (this.paused) return;
+    this.t = this.currentTime;
+    this.paused = true;
+    this.held = false;
+    this.emit('pause');
+  }
+  /** Stop the clock (true) while something buffers, and carry on (false). */
+  hold(on: boolean) {
+    if (on === this.held) return;
+    this.t = this.currentTime;
+    this.since = this.now();
+    this.held = on;
+    this.emit(on ? 'waiting' : 'playing');
+  }
+}
+
+/** Columns that make the tiles as big as possible for this area and picture shape. */
+function bestColumns(n: number, w: number, h: number, aspect: number) {
+  let best = 1, area = 0;
+  for (let c = 1; c <= n; c++) {
+    const r = Math.ceil(n / c);
+    const cw = w / c, ch = h / r;
+    const fit = Math.min(cw, ch * aspect);
+    if (fit * (fit / aspect) > area + 0.5) { area = fit * (fit / aspect); best = c; }
+  }
+  return best;
+}
+
+/**
+ * A video's length: its own, or the server's figure while the browser doesn't
+ * know (recorded WebM reports Infinity until it's been read to the end).
+ */
+function lengthOf(v: HTMLVideoElement) {
+  if (Number.isFinite(v.duration) && v.duration > 0) return v.duration;
+  const d = parseFloat(v.dataset.duration ?? '');
+  return Number.isFinite(d) && d > 0 ? d : null;
+}
+
+function readVolume(): number {
+  try { const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? ''); return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1; } catch { return 1; }
+}
+
+export function MediaWall() {
+  const ids = useUi((s) => s.wall);
+  if (!ids?.length) return null;
+  return createPortal(<Wall key={ids.join()} ids={ids} />, document.body);
+}
+
+function Wall({ ids }: { ids: string[] }) {
+  const items = useBoard(useShallow((s) => ids.map((id) => s.items[id]).filter((it): it is Media => it?.kind === 'media')));
+  const locals = useLocalMedia(useShallow((s) => ids.map((id) => s[id]?.url)));
+  const single = useUi((s) => s.viewer != null);
+  const clock = useMemo(() => new Clock(), []);
+  const videos = useRef(new Map<string, HTMLVideoElement>());
+  const everyVideo = useRef(new Set<HTMLVideoElement>());
+  const refFns = useRef(new Map<string, (el: HTMLVideoElement | null) => void>());
+  const panel = useRef<HTMLDivElement>(null);
+  const grid = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLElement>(null);
+  const timeRef = useRef<HTMLButtonElement>(null);
+  const [size, setSize] = useState({ w: 1200, h: 700 });
+  const [playing, setPlaying] = useState(false);
+  const [loop, setLoop] = useState(true);
+  const [rate, setRate] = useState(1);
+  const [speedMenu, setSpeedMenu] = useState(false);
+  const [audible, setAudible] = useState<string | null>(null);
+  const [hasTime, setHasTime] = useState(false);
+  const [full, setFull] = useState(false);
+  const [idle, setIdle] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  const crumbs = useBoard(useShallow((s) => (items[0] ? pathTo(items[0].boardId, s.items).map((c) => c.title) : [])));
+  const fps = items.find((it) => it.mediaType === 'video' && it.meta.fps)?.meta.fps ?? FPS;
+  const fmt = (t: number) => fmtTimecode(t, fps);
+
+  // --- Keeping the videos on the clock --------------------------------------------
+  const waitTicks = useRef(0);
+  /** Bring every video to the clock. `exact`: seek anything that's off at all (after a jump), not just far off. */
+  const sync = (exact = false) => {
+    const t = clock.currentTime;
+    const run = !clock.paused;
+    const held = clock.waiting;
+    let unready = false, unloaded = false;
+    for (const v of videos.current.values()) {
+      if (v.error) continue;
+      const length = lengthOf(v);
+      if (v.readyState < 1 || length == null) { unloaded = true; continue; }
+      const last = Math.max(0, length - 0.04);
+      const due = t < last; // still has picture to play at this time (shorter ones stop on their last frame)
+      if (!run || held || !due) {
+        if (!v.paused) v.pause();
+        if (!held && !v.seeking && Math.abs(v.currentTime - Math.min(t, last)) > STILL_DRIFT) v.currentTime = Math.min(t, last);
+        if (held && due && v.readyState < 3) unready = true;
+        continue;
+      }
+      if (v.seeking) { if (v.readyState < 3) unready = true; continue; }
+      const drift = v.currentTime - t;
+      if (Math.abs(drift) > (exact ? STILL_DRIFT : SEEK_DRIFT)) {
+        v.currentTime = t;
+        v.playbackRate = clock.playbackRate;
+      } else {
+        // Behind: a touch faster; ahead: a touch slower.
+        v.playbackRate = clock.playbackRate * (1 - Math.max(-NUDGE, Math.min(NUDGE, drift * 0.8)));
+      }
+      if (v.paused) void v.play().catch(() => {});
+      if (v.readyState < 3) unready = true;
+    }
+    // Wait for a video that's run out of data — after a moment, so one blip doesn't stop them all.
+    waitTicks.current = unready ? waitTicks.current + 1 : 0;
+    const hold = run && (unloaded || (held ? unready : waitTicks.current >= 2));
+    if (hold !== held) {
+      clock.hold(hold);
+      stage.current?.toggleAttribute('data-waiting', hold);
+      if (!hold) sync(); // carry on together from where the clock stopped
+    }
+  };
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+
+  // Clock events → videos. Seeks are coalesced to one per frame.
+  useEffect(() => {
+    let raf = 0;
+    const later = (hard: boolean) => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => syncRef.current(hard)); };
+    const onPlay = () => { setPlaying(true); later(true); };
+    const onPause = () => { setPlaying(false); stage.current?.removeAttribute('data-waiting'); syncRef.current(); };
+    const onSeek = () => later(!clock.paused);
+    const onRate = () => syncRef.current(true);
+    clock.addEventListener('play', onPlay);
+    clock.addEventListener('pause', onPause);
+    clock.addEventListener('seeked', onSeek);
+    clock.addEventListener('ratechange', onRate);
+    const tick = setInterval(() => { if (!clock.paused) syncRef.current(); }, SYNC_MS);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(tick);
+      clock.removeEventListener('play', onPlay);
+      clock.removeEventListener('pause', onPause);
+      clock.removeEventListener('seeked', onSeek);
+      clock.removeEventListener('ratechange', onRate);
+    };
+  }, [clock]);
+
+  /** The timeline is as long as the longest video. */
+  const measure = () => {
+    let d = 0;
+    for (const it of items) if (it.mediaType === 'video') d = Math.max(d, versionInfo(it, versionOf(it)).meta.duration ?? 0);
+    for (const v of videos.current.values()) d = Math.max(d, lengthOf(v) ?? 0);
+    clock.setDuration(d || NaN);
+    setHasTime(d > 0);
+  };
+  useEffect(measure, [items]);
+  const videoRef = (id: string) => {
+    let fn = refFns.current.get(id);
+    if (!fn) {
+      fn = (el) => {
+        if (el) {
+          el.muted = true;
+          videos.current.set(id, el);
+          everyVideo.current.add(el);
+        } else videos.current.delete(id);
+      };
+      refFns.current.set(id, fn);
+    }
+    return fn;
+  };
+  // On close, let go of the decoders now (just unmounting can leave them busy for a while).
+  // Only ones really gone from the page: development mode rehearses unmounting.
+  useEffect(() => () => {
+    for (const v of everyVideo.current) {
+      if (v.isConnected) continue;
+      v.pause(); v.removeAttribute('src'); v.load();
+      everyVideo.current.delete(v);
+    }
+  }, []);
+  // Start playing straight away (muted, so the browser allows it); the clock waits for them to load.
+  useEffect(() => { if (items.some((it) => it.mediaType === 'video')) void clock.play(); }, [clock]);
+
+  // Sound from one tile at a time.
+  useEffect(() => {
+    const vol = readVolume();
+    for (const [id, v] of videos.current) { v.muted = id !== audible; v.volume = vol; }
+  }, [audible, items.length]);
+
+  useEffect(() => { if (timeRef.current) timeRef.current.textContent = fmt(clock.currentTime); });
+  // Every frame while playing: the timecode, and stopping or looping at the end.
+  useVideoFrame(clock as unknown as HTMLVideoElement, () => {
+    const t = clock.currentTime;
+    if (timeRef.current) timeRef.current.textContent = fmt(t);
+    if (!clock.paused && Number.isFinite(clock.duration) && t >= clock.duration - 0.005) {
+      if (loop) clock.currentTime = 0;
+      else clock.pause();
+    }
+  });
+
+  // --- Layout ---------------------------------------------------------------------
+  useEffect(() => {
+    const el = grid.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const aspects = items.map((it) => (it.meta.width && it.meta.height ? it.meta.width / it.meta.height : 16 / 9)).sort((a, b) => a - b);
+  const aspect = aspects[Math.floor(aspects.length / 2)] ?? 16 / 9;
+  const cols = bestColumns(items.length, size.w, size.h, aspect);
+  const rows = Math.ceil(items.length / cols);
+
+  // --- Window -----------------------------------------------------------------------
+  const dismiss = () => {
+    if (closing) return;
+    clock.pause();
+    setClosing(true);
+    setTimeout(() => useUi.getState().set({ wall: null }), CLOSE_MS);
+  };
+  const toggleFull = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void stage.current?.requestFullscreen().catch(() => {});
+  };
+  useEffect(() => {
+    const onFs = () => setFull(document.fullscreenElement === stage.current);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
+  useEffect(() => {
+    if (!playing || !full) { setIdle(false); return; }
+    let t = setTimeout(() => setIdle(true), IDLE_MS);
+    const wake = () => { setIdle(false); clearTimeout(t); t = setTimeout(() => setIdle(true), IDLE_MS); };
+    window.addEventListener('pointermove', wake);
+    return () => { clearTimeout(t); window.removeEventListener('pointermove', wake); };
+  }, [playing, full]);
+  useEffect(() => {
+    if (!speedMenu) return;
+    const off = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.viewer-speed')) setSpeedMenu(false); };
+    window.addEventListener('pointerdown', off, true);
+    return () => window.removeEventListener('pointerdown', off, true);
+  }, [speedMenu]);
+  // Opening one tile in the full player stops these; back here, they carry on from there.
+  useEffect(() => { if (single) clock.pause(); }, [single, clock]);
+
+  const togglePlay = () => { if (!hasTime) return; if (clock.paused) void clock.play(); else clock.pause(); };
+  const pickRate = (r: number) => { setRate(r); clock.playbackRate = r; setSpeedMenu(false); };
+  const firstVideo = items.find((it) => it.mediaType === 'video')?.id ?? null;
+  const toggleSound = () => setAudible((a) => (a ? null : firstVideo));
+  const openOne = (id: string) => {
+    clock.pause();
+    const v = videos.current.get(id);
+    useUi.getState().set({ viewer: { id, time: v ? Math.min(clock.currentTime, lengthOf(v) ?? 0) : 0 } });
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (useUi.getState().viewer) return; // the full player on top has the keys
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e)) return;
+      const c = clock;
+      const keys: Record<string, () => void> = {
+        Escape: () => { if (speedMenu) setSpeedMenu(false); else if (!document.fullscreenElement) dismiss(); },
+        ' ': togglePlay,
+        k: () => c.pause(),
+        ArrowLeft: () => { c.currentTime = c.currentTime - 5; },
+        ArrowRight: () => { c.currentTime = c.currentTime + 5; },
+        Home: () => { c.currentTime = 0; },
+        ',': () => stepFrame(c as unknown as HTMLVideoElement, -1, fps),
+        '.': () => stepFrame(c as unknown as HTMLVideoElement, 1, fps),
+        m: toggleSound,
+      };
+      const run = keys[e.key] ?? keys[e.key.toLowerCase()];
+      if (!run) return;
+      e.preventDefault();
+      e.stopPropagation();
+      run();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
+
+  const nVideos = items.filter((it) => it.mediaType === 'video').length;
+  const nPhotos = items.length - nVideos;
+  const summary = [nVideos && `${nVideos} video${nVideos === 1 ? '' : 's'}`, nPhotos && `${nPhotos} photo${nPhotos === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+
+  return (
+    <div
+      className="viewer wall"
+      data-closing={closing || undefined}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${items.length} side by side`}
+      onPointerDown={(e) => { if (e.target === e.currentTarget) dismiss(); }}
+    >
+      <div ref={panel} className="viewer-panel wall-panel">
+        <header className="viewer-top">
+          <button className="viewer-btn" onClick={dismiss} title="Back to the board (Esc)" aria-label="Close">
+            <ChevronLeft {...ICON} />
+          </button>
+          <nav className="viewer-path" aria-label="Where these are">
+            {crumbs.map((c, i) => <span key={i} className="viewer-crumb">{c}</span>)}
+            <span className="viewer-file">Side by side</span>
+            <span className="viewer-meta">{summary}</span>
+          </nav>
+        </header>
+
+        <section ref={stage} className="viewer-main" data-idle={idle || undefined} data-full={full || undefined}>
+          <div
+            ref={grid}
+            className="wall-grid"
+            style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` } as CSSProperties}
+          >
+            {items.map((it, i) => {
+              const info = versionInfo(it, versionOf(it));
+              const src = playable(info.src, info.meta, info.current ? locals[ids.indexOf(it.id)] : undefined);
+              const video = it.mediaType === 'video';
+              const loud = audible === it.id;
+              return (
+                <div key={it.id} className="wall-tile" data-loud={loud || undefined} onDoubleClick={() => openOne(it.id)} title="Double-click to open on its own">
+                  {video ? (
+                    <video
+                      ref={videoRef(it.id)}
+                      src={src || undefined}
+                      poster={info.meta.poster}
+                      data-duration={info.meta.duration}
+                      preload="auto"
+                      playsInline
+                      muted
+                      disablePictureInPicture
+                      onLoadedMetadata={() => { measure(); syncRef.current(); }}
+                      onDurationChange={measure}
+                      onSeeked={() => { if (clock.paused) syncRef.current(); }}
+                      onCanPlay={() => { if (clock.waiting) syncRef.current(); }}
+                      onClick={togglePlay}
+                    />
+                  ) : (
+                    <img src={src || undefined} alt={it.name} draggable={false} loading="eager" decoding="async" />
+                  )}
+                  <span className="wall-label">
+                    <b>{i + 1}</b>
+                    <span>{info.name || it.name || 'Untitled'}</span>
+                    {info.n > 1 && <span className="wall-v">v{info.n}</span>}
+                  </span>
+                  {video && (
+                    <button
+                      className="wall-sound"
+                      aria-pressed={loud}
+                      onClick={(e) => { e.stopPropagation(); setAudible(loud ? null : it.id); }}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                      title={loud ? 'Mute this one' : 'Hear this one (the others go quiet)'}
+                      aria-label={loud ? 'Mute' : 'Sound from this one'}
+                    >
+                      {loud ? <Volume2 size={15} strokeWidth={2} aria-hidden="true" /> : <VolumeX size={15} strokeWidth={2} aria-hidden="true" />}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <span className="wall-waiting" aria-live="polite">Loading…</span>
+          </div>
+
+          {hasTime && (
+            <div className="viewer-timeline">
+              <Scrubber video={clock as unknown as HTMLVideoElement} className="viewer-scrub" format={fmt} />
+            </div>
+          )}
+
+          <div className="viewer-bar">
+            <div className="viewer-bar-side">
+              {hasTime && (
+                <>
+                  <button className="viewer-btn" onClick={togglePlay} title={playing ? 'Pause all (Space)' : 'Play all (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
+                    {playing ? <Pause {...ICON} fill="currentColor" /> : <Play {...ICON} fill="currentColor" />}
+                  </button>
+                  <button className="viewer-btn" aria-pressed={loop} onClick={() => setLoop((l) => !l)} title="Loop" aria-label="Loop">
+                    <Repeat size={17} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                  <div className="viewer-speed">
+                    <button className="viewer-btn viewer-rate" aria-haspopup="menu" aria-expanded={speedMenu} title="Playback speed" onClick={() => setSpeedMenu((o) => !o)}>
+                      {rate}x
+                    </button>
+                    {speedMenu && (
+                      <div className="viewer-speed-menu" role="menu">
+                        {[...SPEEDS].reverse().map((r) => (
+                          <button key={r} role="menuitemradio" aria-checked={r === rate} onClick={() => pickRate(r)}>
+                            {r === 1 ? 'Normal' : `${r}×`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="viewer-btn"
+                    onClick={toggleSound}
+                    disabled={!firstVideo}
+                    title={audible ? 'Mute (M)' : 'Sound on (M) — or pick a tile’s speaker'}
+                    aria-label={audible ? 'Mute' : 'Sound on'}
+                  >
+                    {audible ? <Volume2 {...ICON} /> : <VolumeX {...ICON} />}
+                  </button>
+                </>
+              )}
+            </div>
+            {hasTime && <button ref={timeRef} className="viewer-time" title="Timecode (the longest video sets the length)" tabIndex={-1} />}
+            <div className="viewer-bar-side viewer-bar-end">
+              <button className="viewer-btn" onClick={toggleFull} title={full ? 'Exit full screen' : 'Full screen'} aria-label={full ? 'Exit full screen' : 'Full screen'}>
+                {full ? <Minimize {...ICON} /> : <Maximize {...ICON} />}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

@@ -6,7 +6,7 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Frame, LayoutGrid, Trash2,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Frame, Grid2x2, LayoutGrid, Trash2,
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
@@ -17,6 +17,7 @@ import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
 import { useBoardId } from '../board/nav';
 import { Flyout } from './Flyout';
+import { MAX_WALL, openWall } from './MediaWall';
 import { ICON_PROPS, itemActions, Panel } from './panels';
 
 const PANEL_WIDTH = 272;
@@ -38,7 +39,14 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   }
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
   const copyable = items.some((it) => it.kind !== 'board');
+  const media = items.filter((it) => it.kind === 'media').length;
   const actions = [
+    ...(media >= 2 ? [{
+      key: 'wall',
+      label: media > MAX_WALL ? `Play together (Enter) — the first ${MAX_WALL} of ${media}` : `Play ${media} together (Enter)`,
+      icon: <Grid2x2 {...ICON_PROPS} />,
+      run: () => openWall(ids),
+    }] : []),
     { key: 'frame', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
     { key: 'column', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
     ...(copyable ? [
@@ -59,7 +67,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
         <span className="toolbar-divider" role="separator" />
         {actions.map((act, i) => (
           <Fragment key={act.key}>
-            {i > 0 && (act.danger || act.key === 'copy') && <span className="toolbar-divider" role="separator" />}
+            {i > 0 && (act.danger || act.key === 'copy' || (act.key === 'frame' && media >= 2)) && <span className="toolbar-divider" role="separator" />}
             <button data-key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
               {act.icon}
             </button>

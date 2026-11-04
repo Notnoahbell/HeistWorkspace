@@ -689,7 +689,7 @@ function FlatComment({ c }: { c: Comment }) {
 export function CommentsPopover() {
   const boardId = useBoardId();
   const id = useUi((s) => s.selectedId);
-  const hidden = useUi((s) => s.movingId != null || s.dragId != null || s.flyout != null || s.viewer != null || s.contextMenu != null);
+  const hidden = useUi((s) => s.movingId != null || s.dragId != null || s.flyout != null || s.viewer != null || s.wall != null || s.contextMenu != null);
   const item = useBoard((s) => (id ? s.items[id] : undefined));
   const slot = useLayout((s) => (id ? s.slots[id] : undefined));
   const commenting = useUi((s) => s.commenting);
