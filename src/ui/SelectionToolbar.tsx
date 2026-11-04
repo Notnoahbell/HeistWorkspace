@@ -6,13 +6,12 @@ import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Copy, CopyPlus, Frame, LayoutGrid, Play, Trash2,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalSpaceAround, Frame, LayoutGrid, Play, Trash2,
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
 import { useBoard } from '../board/store';
 import { arrangeSelection, canArrange, deleteSelection, groupIntoColumn, itemSize, planArrange, posOf, wrapInFrame, type Arrange } from '../board/actions';
-import { copySelection, duplicateSelection } from '../board/clipboard';
 import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
 import { useBoardId } from '../board/nav';
@@ -38,26 +37,16 @@ function GroupToolbar({ ids }: { ids: string[] }) {
     x1 = Math.max(x1, at.x + itemSize(it).w);
   }
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
-  const copyable = items.some((it) => it.kind !== 'board');
   const media = items.filter((it) => it.kind === 'media').length;
   const actions = [
     ...(media >= 2 ? [{
       key: 'wall',
       label: media > MAX_WALL ? `Play together (Enter) — the first ${MAX_WALL} of ${media}` : `Play ${media} together (Enter)`,
-      icon: (
-        <span className="toolbar-play">
-          <Play {...ICON_PROPS} fill="currentColor" />
-          <span className="toolbar-badge">{Math.min(media, MAX_WALL)}</span>
-        </span>
-      ),
+      icon: <Play {...ICON_PROPS} fill="currentColor" />,
       run: () => openWall(ids),
     }] : []),
     { key: 'frame', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
     { key: 'column', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
-    ...(copyable ? [
-      { key: 'copy', label: 'Copy (Ctrl+C)', icon: <Copy {...ICON_PROPS} />, run: copySelection },
-      { key: 'dup', label: 'Duplicate (Ctrl+D)', icon: <CopyPlus {...ICON_PROPS} />, run: duplicateSelection },
-    ] : []),
     { key: 'delete', label: `Delete ${items.length} items`, icon: <Trash2 {...ICON_PROPS} />, run: deleteSelection, danger: true },
   ];
 
@@ -72,7 +61,7 @@ function GroupToolbar({ ids }: { ids: string[] }) {
         <span className="toolbar-divider" role="separator" />
         {actions.map((act, i) => (
           <Fragment key={act.key}>
-            {i > 0 && (act.danger || act.key === 'copy' || (act.key === 'frame' && media >= 2)) && <span className="toolbar-divider" role="separator" />}
+            {i > 0 && (act.danger || (act.key === 'frame' && media >= 2)) && <span className="toolbar-divider" role="separator" />}
             <button data-key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
               {act.icon}
             </button>

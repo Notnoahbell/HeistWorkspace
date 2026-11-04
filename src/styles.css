@@ -2315,17 +2315,7 @@ button, a, label { cursor: var(--cursor, default); }
 }
 .viewer-main[data-waiting] .wall-waiting { opacity: 1; transition-delay: 0.3s; }
 
-/* Play together: a play button with how many will play. */
-.toolbar-play { position: relative; display: grid; place-items: center; }
-.toolbar-badge {
-  position: absolute; top: -7px; right: -10px;
-  min-width: 15px; height: 15px; padding: 0 3px;
-  display: grid; place-items: center;
-  border-radius: 8px; background: var(--accent); color: #fff;
-  box-shadow: 0 0 0 2px var(--panel);
-  font: 700 9.5px/1 var(--font); font-variant-numeric: tabular-nums;
-}
-.selection-toolbar button[data-key='wall'] { min-width: 38px; color: var(--accent); }
+.selection-toolbar button[data-key='wall'] { color: var(--accent); }
 
 /* Shift held: sections and frames can be box-selected inside. */
 :root[data-shift] :is(.column, .frame) { cursor: crosshair; }
