@@ -14,6 +14,7 @@ import { createSyncServer } from './sync.ts';
 import { createUploads } from './uploads.ts';
 import { createDerive } from './derive.ts';
 import { createAdmin } from './admin.ts';
+import { handlePinterest } from './pinterest.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = resolve(import.meta.dirname, '..');
@@ -44,6 +45,7 @@ const server = createServer((req, res) => {
   if (url.pathname.startsWith('/uploads/')) return uploads.serve(req, res);
   if (url.pathname === '/api/derive') return derive.handle(req, res);
   if (url.pathname.startsWith('/api/admin/')) return void admin.handle(req, res);
+  if (url.pathname.startsWith('/api/pinterest')) return void handlePinterest(req, res);
 
   // Static files from dist/, falling back to index.html (the app routes itself).
   const path = normalize(join(DIST, decodeURIComponent(url.pathname)));

@@ -6,6 +6,7 @@ import { createSyncServer } from './server/sync.ts';
 import { createUploads } from './server/uploads.ts';
 import { createDerive } from './server/derive.ts';
 import { createAdmin } from './server/admin.ts';
+import { handlePinterest } from './server/pinterest.ts';
 
 /** Real-time sync (/sync) and media uploads while developing (same as `npm run serve`). */
 function syncPlugin(): Plugin {
@@ -20,6 +21,7 @@ function syncPlugin(): Plugin {
       server.middlewares.use('/uploads', uploads.serve);
       server.middlewares.use('/api/derive', createDerive(join(data, 'uploads')).handle);
       const admin = createAdmin(join(data, 'uploads'), sync);
+      server.middlewares.use('/api/pinterest', (req, res) => { req.url = '/api/pinterest' + (req.url === '/' ? '' : req.url ?? ''); void handlePinterest(req, res); });
       server.middlewares.use('/api/admin', (req, res) => { req.url = '/api/admin' + (req.url ?? ''); void admin.handle(req, res); });
     },
   };

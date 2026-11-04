@@ -30,7 +30,8 @@ import { MediaWall, openWall } from './ui/MediaWall';
 import { AdminPage, isAdminOpen } from './ui/AdminPage';
 import { TooltipLayer } from './ui/Tooltip';
 import { CommentsPopover } from './ui/Comments';
-import { copySelection, cutSelection, duplicateSelection, paste } from './board/clipboard';
+import { copySelection, cutSelection, duplicateSelection, isOwnCopy, paste } from './board/clipboard';
+import { pastePoint, pasteText } from './board/pasteText';
 import { camera } from './canvas/camera';
 
 function useIds(boardId: string, kind: ItemKind) {
@@ -162,7 +163,12 @@ export function App() {
       if (isTyping(e) || useUi.getState().viewer || useUi.getState().wall || isAdminOpen()) return;
       e.preventDefault();
       const files = [...(e.clipboardData?.files ?? [])];
-      if (files.length) void addMediaFiles(files, viewportCenterWorld());
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      // Where the pointer is (else the middle of the view).
+      if (files.length) void addMediaFiles(files, pastePoint());
+      // Text from elsewhere: a link card (a Pinterest pin as its media), or a note.
+      else if (text.trim() && !isOwnCopy(text)) pasteText(text, pastePoint());
+      // Cards copied here.
       else paste();
     };
     window.addEventListener('paste', onPaste);

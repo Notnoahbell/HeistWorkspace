@@ -22,6 +22,8 @@ interface Clip {
   /** Every copied item (roots and their column contents). */
   items: Item[];
   boardId: string;
+  /** What went on the system clipboard with it, so a paste can tell it's ours. */
+  text?: string;
 }
 
 let pasteCount = 0;
@@ -76,13 +78,39 @@ function clone(clip: Clip, place: (root: { id: string; at: Point }) => Point) {
   return { copies, ids };
 }
 
+/** Plain text for copied cards (for pasting elsewhere): note text, list items, links, names. */
+function plainText(roots: string[]): string {
+  const { items } = board();
+  const one = (id: string): string => {
+    const it = items[id];
+    if (!it) return '';
+    switch (it.kind) {
+      case 'note': return it.text;
+      case 'todo': return it.entries.map((e) => `${e.done ? '[x]' : '[ ]'} ${e.text}`).join('\n');
+      case 'link': return it.url;
+      case 'media': return it.name;
+      case 'column': return [it.title, ...it.childIds.map(one)].filter(Boolean).join('\n');
+      case 'frame': return it.title;
+      default: return '';
+    }
+  };
+  return roots.map(one).filter((t) => t.trim()).join('\n\n');
+}
+
 export function copySelection() {
   const roots = copyable(ui().selectedIds);
   if (!roots.length) return false;
-  try { localStorage.setItem(KEY, JSON.stringify(snapshot(roots))); } catch { return false; }
+  // On the system clipboard too (pasting elsewhere gets the text). Something always goes
+  // there, so a later paste can tell these cards from text copied in another app.
+  const text = plainText(roots) || `${roots.length} Heist ${roots.length === 1 ? 'card' : 'cards'}`;
+  try { localStorage.setItem(KEY, JSON.stringify({ ...snapshot(roots), text })); } catch { return false; }
+  void navigator.clipboard?.writeText(text).catch(() => {});
   pasteCount = 0;
   return true;
 }
+
+/** Whether text on the system clipboard is what our own last copy put there. */
+export const isOwnCopy = (text: string) => !!text && readClip()?.text?.trim() === text.trim();
 
 export function cutSelection() {
   const roots = copyable(ui().selectedIds);

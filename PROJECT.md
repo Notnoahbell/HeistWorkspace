@@ -257,6 +257,14 @@ Sized for ~150 users; a single modest server handles this comfortably.
   a jump takes then depends on keyframe spacing, so videos with keyframes >2s apart (first
   minute, read with ffprobe) get a 720p proxy, and proxies have a keyframe every second: in
   testing, the same footage went from 1–8s per jump to under 0.15s.
+- **2026-11-04: Pasting from elsewhere** (`src/board/pasteText.ts`). Files → photo/video cards
+  (as before); a web address (one per line, up to 12) → link cards; other text → a note.
+  A Pinterest link (pinterest.* or pin.it) → the pin itself via `server/pinterest.ts`: the
+  pin-info endpoint Pinterest's embed widgets use gives its 720p MP4 (video), original GIF, or
+  original image, fetched through the server (only *.pinimg.com) and added like an upload;
+  if that fails it stays a link. Our own Ctrl+C also writes the cards' text to the system
+  clipboard and remembers it, so pasting that text back gives the cards, not a note. Pastes
+  land under the pointer (else mid-view), stepping along when repeated.
 - **2026-11-04: One tooltip style** (`src/ui/Tooltip.tsx`, mounted once). Every `title`
   becomes it on first hover (moved to `data-tip`); `data-tip` works directly; new lines make
   more lines (first one brighter). Text cut off with an ellipsis shows whole on hover. Cards
