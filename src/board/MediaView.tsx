@@ -5,7 +5,7 @@ import { useLayout } from './layout';
 import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
 import { itemHooks } from './actions';
-import { mediaSubtitle, retryUpload, useLocalMedia } from './media';
+import { ensureDerived, mediaSubtitle, playable, retryUpload, useLocalMedia } from './media';
 import { Scrubber, stepFrame, useContrastTone } from '../ui/Scrubber';
 import { cardVideos, commentIndex } from './comments';
 import { useShallow } from 'zustand/react/shallow';
@@ -71,6 +71,11 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   });
   useReportHeight(id, visRef);
 
+  // Have the server work out its frame rate, poster, filmstrip (and a proxy if needed), once.
+  useEffect(() => {
+    if (media?.mediaType === 'video' && media.src) ensureDerived(media.src, media.meta);
+  }, [media?.mediaType, media?.src, media?.meta.derived]);
+
   // , and . step a selected video a frame at a time.
   useEffect(() => {
     if (!selected || !video) return;
@@ -78,7 +83,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e) || useUi.getState().viewer) return;
       if (e.key !== ',' && e.key !== '.') return;
       e.preventDefault();
-      stepFrame(video, e.key === '.' ? 1 : -1);
+      stepFrame(video, e.key === '.' ? 1 : -1, media?.meta.fps);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -86,7 +91,8 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
 
   if (!media) return null;
 
-  const src = local?.url || media.src;
+  // The proxy if the server made one; else a fresh upload's local copy; else the original.
+  const src = playable(media.src, media.meta, local?.url);
   const { width = 16, height = 9 } = media.meta;
   const failed = media.upload === 'failed';
   const uploading = media.upload === 'uploading';
@@ -108,6 +114,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
               <video
                 ref={setVideo}
                 src={src}
+                poster={media.meta.poster}
                 preload="metadata"
                 playsInline
                 loop

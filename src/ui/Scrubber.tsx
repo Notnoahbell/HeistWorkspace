@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 /** Assumed frame rate for frame counts and stepping — browsers don't expose the real one. */
+/** Frame rate when a video's real one isn't known (yet). */
 export const FPS = 24;
 
 export const fmtTime = (s: number) => {
@@ -12,23 +13,25 @@ export const fmtTime = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
   return `${h ? `${h}:${String(m).padStart(2, '0')}` : m}:${String(sec).padStart(2, '0')}`;
 };
-/** HH:MM:SS:FF at the assumed frame rate, e.g. 00:00:01:25. */
-export const fmtTimecode = (s: number) => {
-  const f = Number.isFinite(s) && s > 0 ? Math.floor(s * FPS + 1e-6) : 0;
+/** HH:MM:SS:FF, e.g. 00:00:01:25 (frames counted at the nominal rate: 29.97 counts 0–29). */
+export const fmtTimecode = (s: number, fps = FPS) => {
+  const t = Number.isFinite(s) && s > 0 ? s : 0;
+  const whole = Math.floor(t + 1e-6);
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(Math.floor(f / (FPS * 3600)))}:${p(Math.floor(f / (FPS * 60)) % 60)}:${p(Math.floor(f / FPS) % 60)}:${p(f % FPS)}`;
+  const ff = Math.min(Math.round(fps) - 1, Math.floor((t - whole) * fps + 1e-6));
+  return `${p(Math.floor(whole / 3600))}:${p(Math.floor(whole / 60) % 60)}:${p(whole % 60)}:${p(ff)}`;
 };
-export const fmtFrames = (s: number) => String(Number.isFinite(s) && s > 0 ? Math.floor(s * FPS + 1e-6) : 0);
+export const fmtFrames = (s: number, fps = FPS) => String(Number.isFinite(s) && s > 0 ? Math.floor(s * fps + 1e-6) : 0);
 
 /**
  * Pause and move one frame back or forward. Lands mid-frame so decoders
  * agree on which frame that is; a held key keeps stepping from the target.
  */
-export function stepFrame(v: HTMLVideoElement, dir: 1 | -1) {
+export function stepFrame(v: HTMLVideoElement, dir: 1 | -1, fps = FPS) {
   v.pause();
-  const frame = Math.floor(v.currentTime * FPS + 1e-6) + dir;
-  const last = Number.isFinite(v.duration) ? Math.floor(v.duration * FPS - 1e-6) : Infinity;
-  v.currentTime = (Math.max(0, Math.min(last, frame)) + 0.5) / FPS;
+  const frame = Math.floor(v.currentTime * fps + 1e-6) + dir;
+  const last = Number.isFinite(v.duration) ? Math.floor(v.duration * fps - 1e-6) : Infinity;
+  v.currentTime = (Math.max(0, Math.min(last, frame)) + 0.5) / fps;
 }
 
 /** Calls `draw` every frame while the video plays, and once after any jump. */

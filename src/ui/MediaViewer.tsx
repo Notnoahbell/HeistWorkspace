@@ -20,9 +20,9 @@ import { onCanvas, useBoard } from '../board/store';
 import { useUi } from '../board/ui';
 import { pathTo } from '../board/nav';
 import { posOf } from '../board/actions';
-import { mediaSubtitle, useLocalMedia } from '../board/media';
+import { ensureDerived, mediaSubtitle, playable, useLocalMedia } from '../board/media';
 import { commentIndex, useOpenCount } from '../board/comments';
-import { commentVersion, versionInfo, versionOf } from '../board/versions';
+import { commentVersion, versionInfo, versionList, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
 import { personalColor, usePresence } from '../sync/presence';
 import { fmtFrames, fmtTimecode, FPS, Scrubber, stepFrame, useVideoFrame } from './Scrubber';
@@ -113,7 +113,10 @@ function Player({ id, start }: { id: string; start: number }) {
     if (to) useUi.getState().set({ viewer: { id: to, time: 0 }, selectedIds: [to] });
   };
 
-  const fmt = units === 'frames' ? fmtFrames : fmtTimecode;
+  // The version on screen's own frame rate (24 until the server has read it).
+  const fps = item?.kind === 'media' ? versionInfo(item, version).meta.fps ?? FPS : FPS;
+  const timecode = (t: number) => fmtTimecode(t, fps);
+  const fmt = units === 'frames' ? (t: number) => fmtFrames(t, fps) : timecode;
   const drawTime = (v: HTMLVideoElement) => {
     if (timeRef.current) timeRef.current.textContent = fmt(v.currentTime);
     const d = Number.isFinite(v.duration) ? v.duration : 0;
@@ -223,7 +226,7 @@ function Player({ id, start }: { id: string; start: number }) {
         ' ': togglePlay, k: togglePlay,
         ArrowLeft: () => { if (v) v.currentTime = Math.max(0, v.currentTime - 5); },
         ArrowRight: () => { if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); },
-        ',': () => { if (v) stepFrame(v, -1); }, '.': () => { if (v) stepFrame(v, 1); },
+        ',': () => { if (v) stepFrame(v, -1, fps); }, '.': () => { if (v) stepFrame(v, 1, fps); },
         m: toggleMute,
         c: toggleSide,
       };
@@ -240,16 +243,20 @@ function Player({ id, start }: { id: string; start: number }) {
 
   const isVideo = item?.kind === 'media' && item.mediaType === 'video';
   const look: CommentLook = useMemo(() => ({
-    fmt: fmtTimecode,
+    fmt: timecode,
     numbered: true,
     activeId,
     onPick: (c) => { setActiveId(c.id); if (isVideo && c.time != null) seek(c.time); },
     version,
-  }), [activeId, isVideo, video, version]);
+  }), [activeId, isVideo, video, version, fps]);
+  // Every version gets its frame rate / poster / proxy worked out (older uploads catch up here).
+  useEffect(() => {
+    if (item?.kind === 'media' && item.mediaType === 'video') for (const v of versionList(item)) ensureDerived(v.src, v.meta);
+  }, [item]);
 
   if (item?.kind !== 'media') return null;
   const shown = versionInfo(item, version);
-  const src = shown.current ? local?.url || item.src : shown.src;
+  const src = playable(shown.src, shown.meta, shown.current ? local?.url : undefined);
   const versioned = isVideo && current > 1;
   const comparing = versioned && compareWith != null;
   const otherInfo = comparing ? versionInfo(item, compareWith!) : null;
@@ -334,7 +341,7 @@ function Player({ id, start }: { id: string; start: number }) {
             </div>
             {comparing && otherInfo && (
               <div className="viewer-pane" data-side={otherInfo.n > version ? 'right' : 'left'}>
-                <video key={otherInfo.src} ref={setOther} src={otherInfo.src} playsInline muted onClick={togglePlay} />
+                <video key={otherInfo.src} ref={setOther} src={playable(otherInfo.src, otherInfo.meta)} poster={otherInfo.meta.poster} playsInline muted onClick={togglePlay} />
                 <VersionMenu
                   media={item}
                   value={otherInfo.n}
@@ -360,7 +367,7 @@ function Player({ id, start }: { id: string; start: number }) {
                       className="viewer-marker"
                       data-active={c.id === activeId || undefined}
                       style={{ left: `${Math.min(1, c.time! / duration) * 100}%` }}
-                      title={`${p?.name ?? c.authorName} · ${fmtTimecode(c.time!)}\n${c.text}`}
+                      title={`${p?.name ?? c.authorName} · ${timecode(c.time!)}\n${c.text}`}
                       onClick={() => { setActiveId(c.id); seek(c.time!); }}
                     >
                       <Avatar profile={{ name: p?.name ?? c.authorName, icon: p?.icon ?? null }} color={personalColor(c.authorId)} size={16} />
@@ -435,7 +442,7 @@ function Player({ id, start }: { id: string; start: number }) {
                 ref={timeRef}
                 className="viewer-time"
                 data-units={units}
-                title={units === 'frames' ? `Frame number at ${FPS} fps — click for timecode` : 'Timecode — click for frame numbers'}
+                title={units === 'frames' ? `Frame number at ${fps} fps — click for timecode` : 'Timecode — click for frame numbers'}
                 onClick={toggleUnits}
               />
             )}

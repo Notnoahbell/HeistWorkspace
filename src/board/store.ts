@@ -81,6 +81,17 @@ export interface MediaMeta {
   height?: number;
   /** Seconds (videos). */
   duration?: number;
+  /** Videos, worked out by the server (see server/derive.ts): */
+  /** Real frame rate (e.g. 23.976, 25, 29.97). */
+  fps?: number;
+  /** A still to show before it plays. */
+  poster?: string;
+  /** Evenly spaced frames side by side in one image, for hover-scrub. */
+  strip?: { url: string; frames: number; w: number; h: number };
+  /** A browser-friendly copy to play instead of the original; 'pending' while it's made. */
+  proxy?: string | 'pending' | null;
+  /** 'done' once the server has looked at it ('unavailable' without ffmpeg). */
+  derived?: 'working' | 'done' | 'unavailable';
 }
 
 /** An earlier version of a video (stacked over by a newer one). */

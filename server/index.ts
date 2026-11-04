@@ -1,5 +1,5 @@
 // Standalone server: the built app (dist/), link previews (/api/unfurl),
-// media uploads (/api/upload, /uploads/…) and real-time sync (/sync) on one port. For hosting on a machine on the LAN:
+// media uploads (/api/upload, /uploads/…, /api/derive) and real-time sync (/sync) on one port. For hosting on a machine on the LAN:
 //
 //   npm run build && npm run serve      → http://<this machine's IP>:8080
 //
@@ -12,6 +12,7 @@ import { networkInterfaces } from 'node:os';
 import { handleUnfurl } from './unfurl.ts';
 import { createSyncServer } from './sync.ts';
 import { createUploads } from './uploads.ts';
+import { createDerive } from './derive.ts';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = resolve(import.meta.dirname, '..');
@@ -21,6 +22,7 @@ const DIST = join(ROOT, 'dist');
 const DATA_DIR = process.env.DATA_DIR ?? join(ROOT, 'data');
 const sync = createSyncServer({ dataFile: join(DATA_DIR, 'server-db.json') });
 const uploads = createUploads(join(DATA_DIR, 'uploads'));
+const derive = createDerive(join(DATA_DIR, 'uploads'));
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -38,6 +40,7 @@ const server = createServer((req, res) => {
   if (url.pathname === '/api/unfurl') return void handleUnfurl(req, res);
   if (url.pathname === '/api/upload') return uploads.upload(req, res);
   if (url.pathname.startsWith('/uploads/')) return uploads.serve(req, res);
+  if (url.pathname === '/api/derive') return derive.handle(req, res);
 
   // Static files from dist/, falling back to index.html (the app routes itself).
   const path = normalize(join(DIST, decodeURIComponent(url.pathname)));

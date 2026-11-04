@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { unfurlPlugin } from './server/unfurl.ts';
 import { createSyncServer } from './server/sync.ts';
 import { createUploads } from './server/uploads.ts';
+import { createDerive } from './server/derive.ts';
 
 /** Real-time sync (/sync) and media uploads while developing (same as `npm run serve`). */
 function syncPlugin(): Plugin {
@@ -16,6 +17,7 @@ function syncPlugin(): Plugin {
       const uploads = createUploads(join(data, 'uploads'));
       server.middlewares.use('/api/upload', uploads.upload);
       server.middlewares.use('/uploads', uploads.serve);
+      server.middlewares.use('/api/derive', createDerive(join(data, 'uploads')).handle);
     },
   };
 }

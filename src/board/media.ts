@@ -54,6 +54,8 @@ function send(id: string, file: File) {
     try { body = JSON.parse(xhr.responseText); } catch {}
     if (xhr.status !== 200 || !body.url) return fail();
     useBoard.getState().updateItem(id, { src: body.url, upload: undefined });
+    const it = useBoard.getState().items[id];
+    if (it?.kind === 'media' && it.mediaType === 'video') ensureDerived(body.url, it.meta);
   };
   xhr.send(file);
 }
@@ -122,3 +124,67 @@ export function mediaSubtitle(meta: MediaMeta): string {
   const dims = meta.width && meta.height ? `${meta.width}×${meta.height}` : '';
   return [type, fmtTime(meta.duration), dims, fmtSize(meta.size)].filter(Boolean).join(' · ');
 }
+
+// --- What the server works out from a video (frame rate, poster, filmstrip, proxy) ----
+
+interface Derived {
+  status: 'ready' | 'working' | 'unavailable';
+  fps?: number; duration?: number; width?: number; height?: number;
+  poster?: string; strip?: MediaMeta['strip']; proxy?: string | 'pending' | null;
+}
+
+/** Asked about (or being polled) this session. */
+const deriving = new Set<string>();
+const POLL_MS = 3000;
+
+/** Put derived details on whichever card (or earlier version) has this file. */
+function applyDerived(src: string, d: Derived) {
+  const meta: Partial<MediaMeta> = {
+    derived: d.status === 'ready' ? 'done' : d.status,
+    ...(d.fps ? { fps: d.fps } : {}),
+    ...(d.duration ? { duration: d.duration } : {}),
+    ...(d.poster ? { poster: d.poster } : {}),
+    ...(d.strip ? { strip: d.strip } : {}),
+    ...(d.proxy !== undefined ? { proxy: d.proxy } : {}),
+  };
+  const { items, updateItem } = useBoard.getState();
+  for (const it of Object.values(items)) {
+    if (it.kind !== 'media') continue;
+    if (it.src === src) updateItem(it.id, { meta: { ...it.meta, ...meta } });
+    const versions = it.versions;
+    if (versions?.some((v) => v.src === src)) {
+      updateItem(it.id, { versions: versions.map((v) => (v.src === src ? { ...v, meta: { ...v.meta, ...meta } } : v)) });
+    }
+  }
+}
+
+/**
+ * Make sure the server has looked at this video (once per file; whoever is
+ * looking at it asks, so older uploads catch up too), and keep asking while
+ * a proxy is being made.
+ */
+export function ensureDerived(src: string, meta: MediaMeta | undefined) {
+  if (!src.startsWith('/uploads/') || deriving.has(src)) return;
+  if (meta?.derived === 'done' || meta?.derived === 'unavailable') return;
+  deriving.add(src);
+  const ask = async () => {
+    try {
+      const r = await fetch(`/api/derive?src=${encodeURIComponent(src)}`);
+      if (!r.ok) return;
+      const d = (await r.json()) as Derived;
+      applyDerived(src, d);
+      if (d.status === 'working') setTimeout(ask, POLL_MS);
+    } catch {
+      setTimeout(() => deriving.delete(src), POLL_MS * 10); // try again later
+    }
+  };
+  void ask();
+}
+
+/**
+ * The file to play: the proxy once there is one (even over a fresh upload's
+ * local copy, which the browser may not be able to play, e.g. ProRes), else
+ * the local copy, else the original.
+ */
+export const playable = (src: string, meta: MediaMeta | undefined, local?: string) =>
+  meta?.proxy && meta.proxy !== 'pending' ? meta.proxy : local || src;
