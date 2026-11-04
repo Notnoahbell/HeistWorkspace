@@ -260,10 +260,12 @@ Sized for ~150 users; a single modest server handles this comfortably.
 - **2026-11-04: Toolbar hierarchy** (`itemActions` in `src/ui/panels.tsx`). Every toolbar is
   the same groups in the same order, a divider between them: **primary** (first, accent icon;
   button with a word: Open for boards and links, Play / View for videos and images, Play N
-  for a selection) · **review** (status, comment) · **look** (colour, text, strip, icon) ·
+  for a selection) · **review** (comment) · **look** (colour, text, strip, icon) ·
   **organise** (rename, edit link, sort, columns, loop; frame / section for a selection) ·
   **file** (download) · **danger** (delete, last, neutral until hovered). A selection's
-  toolbar starts "N selected"; the arrange strip stays to its right.
+  toolbar starts "N selected"; the arrange strip stays to its right. Toolbar icons share one stroke
+  (2). A media card's review status lives in its top-left corner (the tag, click to change;
+  a "Status" button on hover when unset), not the toolbar.
 - **2026-11-04: Downloads** (`src/board/download.ts`, panel `src/ui/Downloads.tsx`). Download
   sits left of Delete on a photo/video's toolbar and on a multi-selection's (the photos and
   videos in it, sections' contents included). Files are fetched by the page (2 at a time,

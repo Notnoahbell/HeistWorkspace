@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, Repeat, RotateCw } from 'lucide-react';
-import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta } from './store';
+import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta, type ReviewStatus } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
 import { useBody, useLiftedZ, useReportHeight } from './useBody';
@@ -14,7 +15,8 @@ import { openViewer } from '../ui/MediaViewer';
 import { useCachedSrc } from '../lib/mediaCache';
 import { mediaFacts, useAddedBy } from './details';
 import { CommentBadge } from '../ui/Comments';
-import { commentVersion, statusInfo, versionOf } from './versions';
+import { commentVersion, setStatus, STATUSES, statusInfo, versionOf } from './versions';
+import { Check } from 'lucide-react';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -50,7 +52,6 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
     .flatMap((c) => (c.time != null && commentVersion(c) === version ? [c.time] : []))));
   // Another video is being dragged over this one: it would become the next version.
   const versionTarget = useUi((s) => s.versionDrop === id);
-  const status = statusInfo(media?.status);
   const incoming = useVersionUploads((s) => s[id]);
 
   // Let comments read and set this card's video time.
@@ -179,13 +180,12 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             </>
           )}
 
-          {(version > 1 || status || looping) && (
-            <span className="media-tags">
-              {looping && <span className="media-version media-loop" title="Loops on its own (silently)"><Repeat size={11} strokeWidth={2.6} aria-hidden="true" /></span>}
-              {version > 1 && <span className="media-version" title={`Version ${version}`}>v{version}</span>}
-              {status && <span className="media-status" style={{ '--st': status.color } as CSSProperties}>{status.label}</span>}
-            </span>
-          )}
+          {/* Top-left corner: the status (set right there), then the version and loop tags. */}
+          <span className="media-tags">
+            {!uploading && !failed && <CardStatus id={id} version={version} value={media.status ?? null} />}
+            {version > 1 && <span className="media-version" title={`Version ${version}`}>v{version}</span>}
+            {looping && <span className="media-version media-loop" title="Loops on its own (silently)"><Repeat size={11} strokeWidth={2.6} aria-hidden="true" /></span>}
+          </span>
           {versionTarget && (
             <div className="media-version-drop" aria-hidden="true">
               <Layers size={20} {...ICON} />
@@ -308,5 +308,76 @@ function Skim({ video, at, strip }: { video: HTMLVideoElement | null; at: number
       )}
       <div className="media-skim-line" aria-hidden="true" style={{ left: `${at * 100}%` }} />
     </>
+  );
+}
+
+/**
+ * Review status, in the card's top-left corner: the status tag when there is one
+ * (click to change it), or a faint "Status" button while the card is hovered or
+ * selected. Picks for the version on show. The list opens as a pop-up above the
+ * board (so the card can't clip it, and it's the same size at any zoom).
+ */
+function CardStatus({ id, version, value }: { id: string; version: number; value: ReviewStatus | null }) {
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  const ctl = useRef<HTMLSpanElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const st = statusInfo(value);
+  const open = !!at;
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setAt(null);
+    const off = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !ctl.current?.contains(t)) close();
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    window.addEventListener('pointerdown', off, true);
+    window.addEventListener('keydown', esc, true);
+    window.addEventListener('wheel', close, { passive: true });
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('pointerdown', off, true);
+      window.removeEventListener('keydown', esc, true);
+      window.removeEventListener('wheel', close);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+  // Its own clicks don't pick up or select the card.
+  const keep = { onPointerDown: (e: SyntheticEvent) => e.stopPropagation(), onClick: (e: SyntheticEvent) => e.stopPropagation(), onDoubleClick: (e: SyntheticEvent) => e.stopPropagation() };
+  return (
+    <span ref={ctl} className="media-status-ctl" data-set={st ? true : undefined} data-open={open || undefined} {...keep}>
+      <button
+        className="media-status"
+        style={st ? ({ '--st': st.color } as CSSProperties) : undefined}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={st ? `Review status: ${st.label} (click to change)` : 'Set a review status'}
+        onClick={(e) => {
+          if (open) { setAt(null); return; }
+          const r = e.currentTarget.getBoundingClientRect();
+          setAt({ left: Math.min(r.left, window.innerWidth - 180), top: r.bottom + 6 });
+        }}
+      >
+        {st ? st.label : 'Status'}
+        <ChevronDown size={11} strokeWidth={2.6} aria-hidden="true" />
+      </button>
+      {at && createPortal(
+        <div ref={menu} className="media-status-menu" role="menu" style={{ left: at.left, top: at.top }}>
+          {[...STATUSES, null].map((s) => (
+            <button
+              key={s?.value ?? 'none'}
+              role="menuitemradio"
+              aria-checked={(s?.value ?? null) === value}
+              onClick={() => { setStatus(id, version, s?.value ?? null); setAt(null); }}
+            >
+              <span className="review-dot" style={{ background: s?.color ?? 'transparent' }} data-none={!s || undefined} />
+              <span>{s?.label ?? 'No status'}</span>
+              {(s?.value ?? null) === value && <Check size={13} strokeWidth={2.6} aria-hidden="true" />}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </span>
   );
 }

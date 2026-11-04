@@ -2664,3 +2664,33 @@ button, a, label { cursor: var(--cursor, default); }
 @media (prefers-reduced-motion: reduce) {
   .downloads, .downloads-glyph[data-busy] svg, .downloads-bar[data-indeterminate] i { animation: none; }
 }
+
+/* Review status in a media card's top-left corner, first in the row of tags: the tag
+   (click to change), or a faint "Status" button on hover / when selected (taking no
+   room otherwise). */
+.media-status-ctl { position: relative; pointer-events: auto; }
+/* (More specific than the card's own overlay-button rule, which would make it a floating grey square.) */
+.media-frame .media-status-ctl > .media-status {
+  position: static; display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px 2px 7px; border: 0; border-radius: 6px; white-space: nowrap;
+  background: var(--st); color: #fff; cursor: pointer;
+}
+.media-frame .media-status-ctl > .media-status svg { opacity: 0.85; }
+.media-frame .media-status-ctl:not([data-set]) > .media-status { background: rgb(0 0 0 / 0.6); text-shadow: none; }
+.media-frame .media-status-ctl:not([data-set]) > .media-status:hover { background: rgb(0 0 0 / 0.78); }
+.media-tags > .media-version { flex: none; }
+.media:not(:hover):not([data-selected='true']) .media-status-ctl:not([data-set]):not([data-open]) { display: none; }
+.media-frame .media-status-ctl[data-set] > .media-status:hover { background: var(--st); filter: brightness(1.1); }
+.media-status-menu {
+  position: fixed; z-index: 70;
+  display: flex; flex-direction: column; gap: 1px; min-width: 150px; padding: 4px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: var(--panel-shadow), 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.media-status-menu button {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 7px;
+  background: none; color: inherit; font: 12.5px var(--font); text-align: left; cursor: pointer;
+}
+.media-status-menu button:hover { background: var(--hover); }
+.media-status-menu button > span:nth-child(2) { flex: 1; }
+.media-status-menu button[aria-checked='true'] { font-weight: 650; }

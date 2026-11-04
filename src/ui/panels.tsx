@@ -6,8 +6,8 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Download, Maximize2, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
-import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
-import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
+import { COMMENTABLE, useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
+import { setStatus, STATUSES, versionOf } from '../board/versions';
 import { useUi, type PanelKey } from '../board/ui';
 import { confirmDelete, enterBoard, sortedChildren, sortSection } from '../board/actions';
 import { downloadItems } from '../board/download';
@@ -22,7 +22,7 @@ import { effectiveIcon, guessIcon } from '../lib/iconGuess';
 type Patch = Parameters<ReturnType<typeof useBoard.getState>['updateItem']>[1];
 const update = (id: string, patch: Patch) => useBoard.getState().updateItem(id, patch);
 
-export const ICON_PROPS = { size: 16, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter' } as const;
+export const ICON_PROPS = { size: 16, strokeWidth: 2, strokeLinecap: 'square', strokeLinejoin: 'miter' } as const;
 
 function PanelSection({ label, children }: { label?: string; children: ReactNode }) {
   return (
@@ -294,11 +294,6 @@ export function Panel({ item, panel }: { item: Item; panel: PanelKey }) {
   }
 }
 
-/** Toolbar glyph for review status: a ring, filled with the status colour once set. */
-function StatusGlyph({ status }: { status: ReviewStatus | null }) {
-  const st = statusInfo(status);
-  return <span className="status-glyph" style={{ '--st': st?.color ?? 'currentColor' } as CSSProperties} data-set={!!st || undefined} aria-hidden="true" />;
-}
 
 // --- Actions -----------------------------------------------------------------
 
@@ -378,7 +373,6 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
           glyph: <Maximize2 {...ICON_PROPS} size={16} />,
           run: () => useUi.getState().set({ viewer: { id: item.id, time: cardVideos.get(item.id)?.currentTime ?? 0 }, flyout: null }),
         },
-        { key: 'status', label: 'Review status', group: 'review', glyph: <StatusGlyph status={item.status ?? null} />, panel: 'status' },
         {
           ...rename(),
           // Renames inline, in the caption (shown again if it was tucked away).
