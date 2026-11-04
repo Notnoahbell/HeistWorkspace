@@ -757,8 +757,19 @@ html, body, #root {
 .toolbar-divider { flex: none; align-self: stretch; width: 1px; margin: 6px 3px; background: var(--panel-border); }
 .selection-toolbar button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
 .selection-toolbar button[data-danger='true'] { color: #e5484d; }
+/* The main action: filled, with a word, first. */
+.selection-toolbar button[data-group='primary'] {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; margin-right: 2px;
+  border-radius: 8px; background: var(--accent); color: #fff; font: 650 12.5px var(--font);
+}
+.selection-toolbar button[data-group='primary']:hover { background: color-mix(in srgb, var(--accent) 86%, #000); }
+.selection-toolbar button[data-group='primary'] svg { width: 14px; height: 14px; }
+.toolbar-text { white-space: nowrap; }
 /* Comment stands out from the formatting buttons. */
 .selection-toolbar button[data-key='comment'] { color: var(--accent); }
+/* Delete: neutral until you're on it, so it doesn't shout. */
+.selection-toolbar button[data-danger='true']:not(:hover) { color: var(--text-dim); }
+.selection-toolbar button[data-danger='true']:hover { background: rgb(229 72 77 / 0.12); color: #e5484d; }
 .selection-toolbar .glyph-swatch,
 .selection-toolbar .glyph-strip { width: 18px; height: 18px; }
 .selection-toolbar svg { width: 16px; height: 16px; }
@@ -2387,7 +2398,7 @@ button, a, label { cursor: var(--cursor, default); }
   .wall-ring-spin, .wall-tile[data-loading]::before { animation: none; }
 }
 
-.selection-toolbar button[data-key='wall'] { color: var(--accent); }
+
 
 /* Shift held: sections and frames can be box-selected inside. */
 :root[data-shift] :is(.column, .frame) { cursor: crosshair; }

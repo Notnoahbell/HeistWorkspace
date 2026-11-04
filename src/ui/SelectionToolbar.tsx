@@ -18,7 +18,7 @@ import { useBoardId } from '../board/nav';
 import { Flyout } from './Flyout';
 import { MAX_WALL, openWall } from './MediaWall';
 import { downloadableIn, downloadItems } from '../board/download';
-import { ICON_PROPS, itemActions, Panel } from './panels';
+import { ICON_PROPS, itemActions, Panel, type ActionGroup } from './panels';
 
 const PANEL_WIDTH = 272;
 const GAP = 12;
@@ -41,17 +41,17 @@ function GroupToolbar({ ids }: { ids: string[] }) {
   const media = items.filter((it) => it.kind === 'media').length;
   /** Photos and videos to download (inside selected sections too). */
   const files = downloadableIn(ids).length;
-  const actions = [
+  const actions: ToolAction[] = [
     ...(media >= 2 ? [{
-      key: 'wall',
-      label: media > MAX_WALL ? `Play together (Enter) — the first ${MAX_WALL} of ${media}` : `Play ${media} together (Enter)`,
-      icon: <Play {...ICON_PROPS} fill="currentColor" />,
+      key: 'wall', group: 'primary' as const, text: `Play ${Math.min(media, MAX_WALL)}`,
+      label: media > MAX_WALL ? `Play together (Enter): the first ${MAX_WALL} of ${media}` : `Play ${media} together (Enter)`,
+      icon: <Play {...ICON_PROPS} size={14} fill="currentColor" />,
       run: () => openWall(ids),
     }] : []),
-    { key: 'frame', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
-    { key: 'column', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
-    ...(files ? [{ key: 'download', label: `Download ${files} ${files === 1 ? 'file' : 'files'}`, icon: <Download {...ICON_PROPS} />, run: () => downloadItems(ids) }] : []),
-    { key: 'delete', label: `Delete ${items.length} items`, icon: <Trash2 {...ICON_PROPS} />, run: deleteSelection, danger: true },
+    { key: 'frame', group: 'organise', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
+    { key: 'column', group: 'organise', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
+    ...(files ? [{ key: 'download', group: 'file' as const, label: `Download ${files} ${files === 1 ? 'file' : 'files'}`, icon: <Download {...ICON_PROPS} />, run: () => downloadItems(ids) }] : []),
+    { key: 'delete', group: 'danger', label: `Delete ${items.length} items (Del)`, icon: <Trash2 {...ICON_PROPS} />, run: deleteSelection, danger: true },
   ];
 
   return (
@@ -61,19 +61,37 @@ function GroupToolbar({ ids }: { ids: string[] }) {
         style={{ left: (a.x + b.x) / 2 + camera.origin.x, top: Math.max(camera.origin.y + 8, a.y + camera.origin.y - GAP) }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <span className="toolbar-count">{items.length}</span>
+        <span className="toolbar-count">{items.length} selected</span>
         <span className="toolbar-divider" role="separator" />
         {actions.map((act, i) => (
           <Fragment key={act.key}>
-            {i > 0 && (act.key === 'download' || (act.danger && actions[i - 1].key !== 'download') || (act.key === 'frame' && media >= 2)) && <span className="toolbar-divider" role="separator" />}
-            <button data-key={act.key} title={act.label} aria-label={act.label} data-danger={act.danger} onClick={act.run}>
-              {act.icon}
-            </button>
+            {i > 0 && actions[i - 1].group !== act.group && <span className="toolbar-divider" role="separator" />}
+            <ToolButton act={act} />
           </Fragment>
         ))}
       </div>
       <AlignToolbar x={b.x + camera.origin.x + GAP} y={a.y + camera.origin.y} />
     </>
+  );
+}
+
+interface ToolAction { key: string; group: ActionGroup; label: string; icon: ReactNode; text?: string; danger?: boolean; pressed?: boolean; run?: () => void }
+
+function ToolButton({ act, ...rest }: { act: ToolAction } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      data-key={act.key}
+      data-group={act.group}
+      data-danger={act.danger}
+      title={act.label}
+      aria-label={act.label}
+      aria-pressed={act.pressed}
+      onClick={act.run}
+      {...rest}
+    >
+      {act.icon}
+      {act.text && <span className="toolbar-text">{act.text}</span>}
+    </button>
   );
 }
 
@@ -139,9 +157,6 @@ function AlignToolbar({ x, y }: { x: number; y: number }) {
   );
 }
 
-/** How it looks · what it does · delete — a divider goes between groups. */
-const LOOK = new Set(['color', 'strip', 'text', 'icon']);
-const actionGroup = (a: { key: string; danger?: boolean }) => (a.danger ? 'danger' : LOOK.has(a.key) ? 'look' : 'do');
 
 export function SelectionToolbar() {
   const ids = useUi((s) => s.selectedIds);
@@ -183,22 +198,20 @@ function SingleToolbar() {
       >
         {itemActions(item).map((a, i, all) => (
           <Fragment key={a.key}>
-          {i > 0 && actionGroup(all[i - 1]) !== actionGroup(a) && <span className="toolbar-divider" role="separator" />}
-          <button
-            data-flyout-trigger
-            data-key={a.key}
-            data-danger={a.danger}
-            title={a.label}
-            aria-label={a.label}
-            aria-pressed={a.panel ? flyout?.panel === a.panel : a.pressed}
-            onClick={() => {
-              if (!a.panel) { a.run?.(); return; }
-              const open = flyout?.panel === a.panel;
-              useUi.getState().set({ flyout: open ? null : { panel: a.panel, from: 'toolbar' } });
-            }}
-          >
-            {a.glyph}
-          </button>
+            {i > 0 && all[i - 1].group !== a.group && <span className="toolbar-divider" role="separator" />}
+            <ToolButton
+              data-flyout-trigger
+              act={{
+                ...a,
+                icon: a.glyph,
+                pressed: a.panel ? flyout?.panel === a.panel : a.pressed,
+                run: () => {
+                  if (!a.panel) { a.run?.(); return; }
+                  const open = flyout?.panel === a.panel;
+                  useUi.getState().set({ flyout: open ? null : { panel: a.panel, from: 'toolbar' } });
+                },
+              }}
+            />
           </Fragment>
         ))}
       </div>

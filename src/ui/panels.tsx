@@ -4,13 +4,14 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Download, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowDownAZ, ArrowUpRight, ArrowUpZA, Bold, Download, Maximize2, Play, Repeat, ExternalLink, Link2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
 import { COMMENTABLE, useBoard, type Item, type ReviewStatus, type TextAlign, type TextSize } from '../board/store';
 import { setStatus, STATUSES, statusInfo, versionOf } from '../board/versions';
 import { useUi, type PanelKey } from '../board/ui';
 import { confirmDelete, enterBoard, sortedChildren, sortSection } from '../board/actions';
 import { downloadItems } from '../board/download';
+import { cardVideos } from '../board/comments';
 import { COLOR_PRESETS } from '../lib/color';
 import { BOARD_ICONS, iconLabel } from '../lib/icons';
 import { ColorWheel } from './ColorWheel';
@@ -301,11 +302,23 @@ function StatusGlyph({ status }: { status: ReviewStatus | null }) {
 
 // --- Actions -----------------------------------------------------------------
 
+/**
+ * Toolbar groups, left to right, the same for every kind of card:
+ * the main thing you'd do (highlighted, with a word) · reviewing it · how it looks ·
+ * organising it · the file · deleting it. A divider goes between groups.
+ */
+export type ActionGroup = 'primary' | 'review' | 'look' | 'organise' | 'file' | 'danger';
+export const GROUP_ORDER: ActionGroup[] = ['primary', 'review', 'look', 'organise', 'file', 'danger'];
+
 export interface ItemAction {
   key: string;
   label: string;
   /** Small visual for the button: a swatch preview or an icon. */
   glyph: ReactNode;
+  /** Which group it belongs to (see GROUP_ORDER). */
+  group: ActionGroup;
+  /** Primary actions show a word beside the icon ("Open", "Play"). */
+  text?: string;
   /** Opens this panel… */
   panel?: PanelKey;
   /** …or runs this. */
@@ -315,82 +328,95 @@ export interface ItemAction {
   pressed?: boolean;
 }
 
-/** What you can do with an item, in display order. `isOpenBoard` = the board you're inside. */
+/** What you can do with an item, in toolbar order. `isOpenBoard` = the board you're inside. */
 export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
   const list = kindActions(item, isOpenBoard);
-  if (!COMMENTABLE.has(item.kind)) return list;
-  // Comment: opens the comment box beside the item (again to close it).
-  const comment: ItemAction = {
-    key: 'comment', label: 'Comment', glyph: <MessageSquare {...ICON_PROPS} size={18} />,
-    pressed: useUi.getState().commenting === item.id,
-    run: () => {
-      const ui = useUi.getState();
-      ui.set({ commenting: ui.commenting === item.id ? null : item.id, flyout: null, editingId: null });
-    },
-  };
-  // Before Download and Delete, which sit together at the end.
-  const end = list.findIndex((a) => a.key === 'download' || a.danger);
-  return end < 0 ? [...list, comment] : [...list.slice(0, end), comment, ...list.slice(end)];
+  if (COMMENTABLE.has(item.kind)) {
+    // Comment: opens the comment box beside the item (again to close it).
+    list.push({
+      key: 'comment', label: 'Comment', group: 'review', glyph: <MessageSquare {...ICON_PROPS} size={18} />,
+      pressed: useUi.getState().commenting === item.id,
+      run: () => {
+        const ui = useUi.getState();
+        ui.set({ commenting: ui.commenting === item.id ? null : item.id, flyout: null, editingId: null });
+      },
+    });
+  }
+  // Group order; within a group, the order they were listed in.
+  return list
+    .map((x, i) => ({ x, i }))
+    .sort((p, q) => GROUP_ORDER.indexOf(p.x.group) - GROUP_ORDER.indexOf(q.x.group) || p.i - q.i)
+    .map((e) => e.x);
 }
 
 function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
   const colorGlyph = <span className="glyph-swatch" style={{ background: ('color' in item && item.color) || `var(--${item.kind}-default)` }} />;
-  const color: ItemAction = { key: 'color', label: 'Colour', glyph: colorGlyph, panel: 'color' };
+  const color: ItemAction = { key: 'color', label: 'Colour', group: 'look', glyph: colorGlyph, panel: 'color' };
   const del: ItemAction = {
-    key: 'delete', label: 'Delete', glyph: <Trash2 {...ICON_PROPS} size={18} />, run: () => confirmDelete(item.id), danger: true,
+    key: 'delete', label: 'Delete (Del)', group: 'danger', glyph: <Trash2 {...ICON_PROPS} size={18} />, run: () => confirmDelete(item.id), danger: true,
   };
+  const pen = <PenLine {...ICON_PROPS} size={18} />;
+  /** Renames in place (the card's own name field). */
+  const rename = (label = 'Rename'): ItemAction => ({
+    key: 'rename', label, group: 'organise', glyph: pen,
+    run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
+  });
 
   switch (item.kind) {
     case 'note':
-      return [color, { key: 'text', label: 'Text', panel: 'text', glyph: <Type {...ICON_PROPS} size={18} /> }, del];
+      return [color, { key: 'text', label: 'Text style', group: 'look', panel: 'text', glyph: <Type {...ICON_PROPS} size={18} /> }, del];
     case 'comment':
       return [];
     case 'todo':
       return [color, del];
-    case 'media':
+    case 'media': {
+      const video = item.mediaType === 'video';
       return [
-        { key: 'status', label: 'Review status', glyph: <StatusGlyph status={item.status ?? null} />, panel: 'status' },
-        ...(item.mediaType === 'video' ? [{
-          key: 'loop',
-          label: item.loop ? 'Looping: plays on its own, silently. Click to stop' : 'Loop: play on its own, silently, like a GIF',
-          glyph: <Repeat {...ICON_PROPS} size={18} />,
-          pressed: !!item.loop,
-          run: () => update(item.id, { loop: !item.loop }),
-        }] : []),
         {
-          key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
+          key: 'view', label: video ? 'Play in the player (Enter)' : 'View full size (Enter)', group: 'primary', text: video ? 'Play' : 'View',
+          glyph: video ? <Play {...ICON_PROPS} size={16} fill="currentColor" /> : <Maximize2 {...ICON_PROPS} size={16} />,
+          run: () => useUi.getState().set({ viewer: { id: item.id, time: cardVideos.get(item.id)?.currentTime ?? 0 }, flyout: null }),
+        },
+        { key: 'status', label: 'Review status', group: 'review', glyph: <StatusGlyph status={item.status ?? null} />, panel: 'status' },
+        {
+          ...rename(),
           // Renames inline, in the caption (shown again if it was tucked away).
           run: () => {
             update(item.id, { captionHidden: false });
             useUi.getState().set({ editingId: item.id, flyout: null });
           },
         },
+        ...(video ? [{
+          key: 'loop', group: 'organise' as const,
+          label: item.loop ? 'Looping: plays on its own, silently. Click to stop' : 'Loop: play on its own, silently, like a GIF',
+          glyph: <Repeat {...ICON_PROPS} size={18} />,
+          pressed: !!item.loop,
+          run: () => update(item.id, { loop: !item.loop }),
+        }] : []),
         ...(item.src && !item.upload ? [{
-          key: 'download', label: `Download ${item.mediaType === 'video' ? 'video' : 'image'}`,
+          key: 'download', group: 'file' as const, label: `Download ${video ? 'video' : 'image'}`,
           glyph: <Download {...ICON_PROPS} size={18} />, run: () => downloadItems([item.id]),
         }] : []),
         del,
       ];
+    }
     case 'link':
       return [
-        color,
-        {
-          key: 'edit', label: 'Edit link', glyph: <Link2 {...ICON_PROPS} size={18} />,
-          run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
-        },
         ...(item.url
           ? [{
-              key: 'open', label: 'Open', glyph: <ExternalLink {...ICON_PROPS} size={18} />,
+              key: 'open', label: `Open ${item.url}`, group: 'primary' as const, text: 'Open', glyph: <ExternalLink {...ICON_PROPS} size={16} />,
               run: () => window.open(item.url, '_blank', 'noopener,noreferrer'),
             }]
           : []),
+        color,
+        { key: 'edit', label: 'Edit link', group: 'organise', glyph: <Link2 {...ICON_PROPS} size={18} />, run: () => useUi.getState().set({ editingId: item.id, flyout: null }) },
         del,
       ];
     case 'column':
       return [
         color,
         {
-          key: 'strip', label: 'Strip', panel: 'strip',
+          key: 'strip', label: 'Strip', group: 'look', panel: 'strip',
           // A card with a band across the top: the strip colour, or hatched when there's none yet.
           glyph: (
             <span className="glyph-strip" data-empty={!item.strip || undefined} style={{ '--strip': item.strip ?? 'transparent' } as CSSProperties}>
@@ -398,59 +424,35 @@ function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
             </span>
           ),
         },
-        {
-          key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
-          // Sections rename inline, in their header.
-          run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
-        },
-        { key: 'sort', label: 'Sort by name', panel: 'sort', glyph: <ArrowDownAZ {...ICON_PROPS} size={18} /> },
-        {
-          key: 'layout', label: 'Columns', panel: 'layout',
-          // The current count, so it reads at a glance.
-          glyph: <span className="glyph-cols">{gridCols(item)}</span>,
-        },
+        // Sections rename inline, in their header.
+        rename(),
+        { key: 'sort', label: 'Sort by name', group: 'organise', panel: 'sort', glyph: <ArrowDownAZ {...ICON_PROPS} size={18} /> },
+        // The current count, so it reads at a glance.
+        { key: 'layout', label: 'Columns', group: 'organise', panel: 'layout', glyph: <span className="glyph-cols">{gridCols(item)}</span> },
         del,
       ];
     case 'frame':
       return [
         color,
-        {
-          key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
-          // Frames rename inline, in their tag.
-          run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
-        },
-        {
-          key: 'delete', label: 'Remove frame (keeps what was in it)', danger: true, glyph: <Trash2 {...ICON_PROPS} size={18} />,
-          run: () => confirmDelete(item.id),
-        },
+        // Frames rename inline, in their tag.
+        rename(),
+        { ...del, label: 'Remove frame (keeps what was in it)' },
       ];
     case 'board': {
       if (item.linkTo) {
         const target = item.linkTo;
         return [
-          { key: 'open', label: 'Open', glyph: <ArrowUpRight {...ICON_PROPS} size={18} />, run: () => enterBoard(target) },
-          {
-            key: 'delete', label: 'Remove', danger: true, glyph: <Trash2 {...ICON_PROPS} size={18} />,
-            run: () => confirmDelete(item.id),
-          },
+          { key: 'open', label: 'Open board', group: 'primary', text: 'Open', glyph: <ArrowUpRight {...ICON_PROPS} size={16} />, run: () => enterBoard(target) },
+          { ...del, label: 'Remove shortcut' },
         ];
       }
-      const actions: ItemAction[] = [
-        color,
-        { key: 'icon', label: 'Icon', panel: 'icon', glyph: <BoardIcon icon={effectiveIcon(item)} color={item.color} size={14} className="glyph-board" /> },
-        isOpenBoard
-          // The board you're inside has no tile on screen: rename in a pop-up.
-          ? { key: 'rename', label: 'Rename', panel: 'rename', glyph: <PenLine {...ICON_PROPS} size={18} /> }
-          : {
-              key: 'rename', label: 'Rename', glyph: <PenLine {...ICON_PROPS} size={18} />,
-              run: () => useUi.getState().set({ editingId: item.id, flyout: null }),
-            },
+      const icon: ItemAction = { key: 'icon', label: 'Icon', group: 'look', panel: 'icon', glyph: <BoardIcon icon={effectiveIcon(item)} color={item.color} size={14} className="glyph-board" /> };
+      // The board you're inside has no tile on screen: rename in a pop-up.
+      if (isOpenBoard) return [color, icon, { key: 'rename', label: 'Rename', group: 'organise', panel: 'rename', glyph: pen }];
+      return [
+        { key: 'open', label: 'Open board (Enter)', group: 'primary', text: 'Open', glyph: <ArrowUpRight {...ICON_PROPS} size={16} />, run: () => enterBoard(item.id) },
+        color, icon, rename(), del,
       ];
-      if (!isOpenBoard) {
-        actions.push({ key: 'open', label: 'Open', glyph: <ArrowUpRight {...ICON_PROPS} size={18} />, run: () => enterBoard(item.id) });
-        actions.push(del);
-      }
-      return actions;
     }
   }
 }

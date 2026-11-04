@@ -257,6 +257,13 @@ Sized for ~150 users; a single modest server handles this comfortably.
   a jump takes then depends on keyframe spacing, so videos with keyframes >2s apart (first
   minute, read with ffprobe) get a 720p proxy, and proxies have a keyframe every second: in
   testing, the same footage went from 1–8s per jump to under 0.15s.
+- **2026-11-04: Toolbar hierarchy** (`itemActions` in `src/ui/panels.tsx`). Every toolbar is
+  the same groups in the same order, a divider between them: **primary** (filled accent
+  button with a word: Open for boards and links, Play / View for videos and images, Play N
+  for a selection) · **review** (status, comment) · **look** (colour, text, strip, icon) ·
+  **organise** (rename, edit link, sort, columns, loop; frame / section for a selection) ·
+  **file** (download) · **danger** (delete, last, neutral until hovered). A selection's
+  toolbar starts "N selected"; the arrange strip stays to its right.
 - **2026-11-04: Downloads** (`src/board/download.ts`, panel `src/ui/Downloads.tsx`). Download
   sits left of Delete on a photo/video's toolbar and on a multi-selection's (the photos and
   videos in it, sections' contents included). Files are fetched by the page (2 at a time,
