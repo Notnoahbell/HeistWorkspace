@@ -47,6 +47,8 @@ interface UiState {
    * empty canvas (offers "add here"); otherwise it acts on the selection.
    */
   contextMenu: { x: number; y: number; world?: { x: number; y: number } } | null;
+  /** Item whose comment box is open (from the toolbar's comment button). */
+  commenting: string | null;
   /** Media card open in the full-size player, and where to start a video (s). */
   viewer: { id: string; time: number } | null;
   /**
@@ -73,6 +75,7 @@ export const useUi = create<UiState>()(
       flyout: null,
       contextMenu: null,
       viewer: null,
+      commenting: null,
       set: (patch) => {
         if ('selectedIds' in patch && !('selectedId' in patch)) {
           const ids = patch.selectedIds ?? [];

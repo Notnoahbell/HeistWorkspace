@@ -4,9 +4,9 @@
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, ExternalLink, Link2, Maximize2, PenLine, Search, Trash2, Type,
+  AlignCenter, AlignLeft, AlignRight, ArrowUpRight, Bold, ChevronDown, ChevronUp, ExternalLink, Link2, Maximize2, MessageSquare, PenLine, Search, Trash2, Type,
 } from 'lucide-react';
-import { useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
+import { COMMENTABLE, useBoard, type Item, type TextAlign, type TextSize } from '../board/store';
 import { useUi, type PanelKey } from '../board/ui';
 import { confirmDelete, enterBoard } from '../board/actions';
 import { COLOR_PRESETS } from '../lib/color';
@@ -267,10 +267,28 @@ export interface ItemAction {
   /** …or runs this. */
   run?: () => void;
   danger?: boolean;
+  /** Shown pressed (for toggles that aren't panels). */
+  pressed?: boolean;
 }
 
 /** What you can do with an item, in display order. `isOpenBoard` = the board you're inside. */
 export function itemActions(item: Item, isOpenBoard = false): ItemAction[] {
+  const list = kindActions(item, isOpenBoard);
+  if (!COMMENTABLE.has(item.kind)) return list;
+  // Comment: opens the comment box beside the item (again to close it).
+  const comment: ItemAction = {
+    key: 'comment', label: 'Comment', glyph: <MessageSquare {...ICON_PROPS} size={18} />,
+    pressed: useUi.getState().commenting === item.id,
+    run: () => {
+      const ui = useUi.getState();
+      ui.set({ commenting: ui.commenting === item.id ? null : item.id, flyout: null, editingId: null });
+    },
+  };
+  const at = list.findIndex((a) => a.danger);
+  return at < 0 ? [...list, comment] : [...list.slice(0, at), comment, ...list.slice(at)];
+}
+
+function kindActions(item: Item, isOpenBoard: boolean): ItemAction[] {
   const colorGlyph = <span className="glyph-swatch" style={{ background: ('color' in item && item.color) || `var(--${item.kind}-default)` }} />;
   const color: ItemAction = { key: 'color', label: 'Colour', glyph: colorGlyph, panel: 'color' };
   const del: ItemAction = {

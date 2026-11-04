@@ -26,7 +26,7 @@ const ICON = { size: 14, strokeWidth: 2.2, 'aria-hidden': true } as const;
 const QUICK_MAX = 5;
 /** Replies shown per thread beside a card (the rest are in "Show all"). */
 const QUICK_REPLIES = 2;
-const POP_WIDTH = 300;
+const POP_WIDTH = 240;
 const GAP = 14;
 
 // --- Badge on the card ------------------------------------------------------------
@@ -93,7 +93,7 @@ function CommentRow({ c, reply, onSeek, footer }: { c: Comment; reply?: boolean;
       <Avatar profile={{ name, icon: profile?.icon ?? null }} color={personalColor(c.authorId)} size={reply ? 20 : 24} />
       <div className="cmt-body">
         <header className="cmt-meta">
-          <span className="cmt-author">{mine ? `${name} (you)` : name}</span>
+          <span className="cmt-author" title={name}>{mine ? 'You' : name}</span>
           <span className="cmt-when" title={new Date(c.createdAt).toLocaleString()}>{timeAgo(c.createdAt)}</span>
           {mine && (
             <button className="cmt-act cmt-delete" title={reply ? 'Delete reply' : 'Delete comment'} aria-label="Delete" onClick={() => deleteComment(c.id)}>
@@ -129,6 +129,9 @@ function CommentRow({ c, reply, onSeek, footer }: { c: Comment; reply?: boolean;
   );
 }
 
+/** Threads already shown once in this session. */
+const seenThreads = new Set<string>();
+
 /** A thread: the first comment, its replies, and a reply box on demand. */
 function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index }: {
   t: Thread;
@@ -140,10 +143,16 @@ function ThreadCard({ t, targetId, onSeek, maxReplies, onMore, index }: {
   index: number;
 }) {
   const [replying, setReplying] = useState(false);
+  // Plays the settle once, for a comment that's just been posted (not on every reselect).
+  const [fresh] = useState(() => {
+    const isNew = !seenThreads.has(t.root.id) && Date.now() - t.root.createdAt < 1500;
+    seenThreads.add(t.root.id);
+    return isNew;
+  });
   const hidden = maxReplies != null ? Math.max(0, t.replies.length - maxReplies) : 0;
   const replies = hidden ? t.replies.slice(-maxReplies!) : t.replies;
   return (
-    <article className="cmt-thread" style={{ '--i': index } as CSSProperties}>
+    <article className="cmt-thread" data-fresh={fresh || undefined} style={{ '--i': index } as CSSProperties}>
       <CommentRow
         c={t.root}
         onSeek={onSeek}
@@ -362,8 +371,12 @@ export function CommentList({ targetId, clock, onSeek, onBack, initialTab = 'ope
   );
 }
 
-/** Beside a selected card: up to five open threads, then "Show all". */
-function QuickThread({ targetId, clock, onSeek, onExpand }: ThreadProps & { onExpand: (tab: 'open' | 'resolved') => void }) {
+/** Beside a selected card: up to five open threads, then "Show all", and the comment box. */
+function QuickThread({ targetId, clock, onSeek, onExpand, composing }: ThreadProps & {
+  onExpand: (tab: 'open' | 'resolved') => void;
+  /** Opened from the toolbar: show the box (even with no comments yet) with the caret in it. */
+  composing: boolean;
+}) {
   const all = useComments(targetId);
   const threads = useMemo(() => toThreads(all), [all]);
   const open = threads.filter((t) => !t.root.resolved);
@@ -383,10 +396,19 @@ function QuickThread({ targetId, clock, onSeek, onExpand }: ThreadProps & { onEx
           {hidden > 0 ? `Show all ${open.length} comments` : `${resolvedCount} resolved`}
         </button>
       )}
-      <div className="cmt-quick-compose">
-        <Typing targetId={targetId} />
-        <Composer targetId={targetId} clock={clock} />
-      </div>
+      {(composing || open.length > 0) && (
+        <div className="cmt-quick-compose">
+          <Typing targetId={targetId} />
+          <Composer
+            key={composing ? 'opened' : 'idle'}
+            targetId={targetId}
+            clock={clock}
+            autoFocus={composing}
+            onCancel={composing ? () => useUi.getState().set({ commenting: null }) : undefined}
+          />
+        </div>
+      )}
+      {!composing && !open.length && <Typing targetId={targetId} />}
     </div>
   );
 }
@@ -399,9 +421,13 @@ export function CommentsPopover() {
   const hidden = useUi((s) => s.movingId != null || s.dragId != null || s.flyout != null || s.viewer != null || s.contextMenu != null);
   const item = useBoard((s) => (id ? s.items[id] : undefined));
   const slot = useLayout((s) => (id ? s.slots[id] : undefined));
+  const commenting = useUi((s) => s.commenting);
+  const hasComments = useComments(id ?? '').length > 0;
+  const typing = useTypers(id ?? '').length > 0;
   useSyncExternalStore(camera.subscribe, () => camera.version);
   if (!item || hidden || item.boardId !== boardId || !COMMENTABLE.has(item.kind)) return null;
   void slot; // follow the card when its place in a section changes
+  if (!hasComments && commenting !== item.id && !typing) return null;
 
   const at = posOf(item);
   const tl = camera.worldToScreen(at.x, at.y);
@@ -417,6 +443,7 @@ export function CommentsPopover() {
 
 function Popover({ id, style, video }: { id: string; style: CSSProperties; video: boolean }) {
   const [expanded, setExpanded] = useState<null | 'open' | 'resolved'>(null);
+  const composing = useUi((s) => s.commenting === id);
   const clock = video ? () => cardVideos.get(id)?.currentTime ?? null : undefined;
   const onSeek = video
     ? (t: number) => { const v = cardVideos.get(id); if (v) { v.pause(); v.currentTime = t; } }
@@ -432,7 +459,7 @@ function Popover({ id, style, video }: { id: string; style: CSSProperties; video
       {expanded ? (
         <CommentList targetId={id} clock={clock} onSeek={onSeek} initialTab={expanded} onBack={() => setExpanded(null)} />
       ) : (
-        <QuickThread targetId={id} clock={clock} onSeek={onSeek} onExpand={setExpanded} />
+        <QuickThread targetId={id} clock={clock} onSeek={onSeek} onExpand={setExpanded} composing={composing} />
       )}
     </div>
   );

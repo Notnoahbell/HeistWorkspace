@@ -1146,12 +1146,13 @@ html, body, #root {
 }
 .cmt-pop[data-expanded] { max-height: min(72vh, 640px); }
 
-/* Threads slide down and fade in, one after another. */
-@keyframes cmt-in { from { opacity: 0; transform: translateY(-8px); } }
-.cmt-quick > * {
-  animation: cmt-in 0.24s ease-out both;
-  animation-delay: calc(var(--i, var(--n, 0)) * 40ms);
-}
+/* Threads drop in together, quickly. */
+@keyframes cmt-in { from { opacity: 0; transform: translateY(-4px); } }
+.cmt-quick > * { animation: cmt-in 0.12s ease-out both; }
+/* A comment just posted leaves the rounded box and settles into a square card. */
+@keyframes cmt-settle { from { border-radius: 12px; } }
+.cmt-thread[data-fresh] { animation: cmt-settle 0.35s 0.05s ease-out both; }
+.cmt-quick > .cmt-thread[data-fresh] { animation: cmt-in 0.12s ease-out both, cmt-settle 0.35s 0.05s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .cmt-quick > * { animation: none; } }
 
 .cmt { display: grid; grid-template-columns: 24px 1fr auto; gap: 9px; padding: 10px 10px 10px 11px; color: var(--text); }
@@ -1206,7 +1207,8 @@ html, body, #root {
 .cmt-quick-compose { display: flex; flex-direction: column; gap: 4px; }
 .cmt-composer {
   position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 6px;
-  padding: 7px 7px 7px 10px; background: var(--panel); border: 1px solid var(--panel-border); cursor: text;
+  padding: 7px 7px 7px 12px; background: var(--panel); border: 1px solid var(--panel-border); cursor: text;
+  border-radius: 12px;
 }
 .cmt-quick .cmt-composer { box-shadow: var(--panel-shadow); }
 .cmt-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -1216,15 +1218,15 @@ html, body, #root {
   font: 13.5px/1.35 var(--font);
 }
 .cmt-composer textarea::placeholder { color: var(--text-dim); }
-.cmt-composer[data-reply] { margin: 4px 0 2px; padding: 5px 6px 5px 8px; box-shadow: none; }
+.cmt-composer[data-reply] { margin: 4px 0 2px; padding: 5px 6px 5px 10px; box-shadow: none; border-radius: 10px; }
 .cmt-composer[data-reply] textarea { font-size: 13px; }
 .cmt-send {
-  flex: none; height: 24px; padding: 0 10px; border: 0; background: var(--accent); color: #fff;
+  flex: none; height: 24px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--accent); color: #fff;
   font: 600 12px var(--font); cursor: pointer;
 }
 .cmt-chip {
   flex-basis: 100%; flex-grow: 0; width: max-content; display: inline-flex; align-items: center; gap: 4px;
-  padding: 1px 6px; border: 1px dashed var(--panel-border); background: none; color: var(--text-dim);
+  padding: 1px 6px; border: 1px dashed var(--panel-border); border-radius: 6px; background: none; color: var(--text-dim);
   font: 600 11px var(--mono); cursor: pointer;
 }
 .cmt-chip[aria-pressed='true'] { border-style: solid; border-color: transparent; background: var(--accent-soft); color: var(--accent); }
@@ -1233,6 +1235,7 @@ html, body, #root {
 .cmt-suggest {
   position: absolute; left: -1px; right: -1px; bottom: calc(100% + 4px); z-index: 2; padding: 4px 0;
   background: var(--panel); border: 1px solid var(--panel-border); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+  border-radius: 10px; overflow: hidden;
 }
 .cmt-suggest button {
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px; border: 0; background: none;

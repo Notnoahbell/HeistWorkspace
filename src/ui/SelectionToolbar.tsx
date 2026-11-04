@@ -79,6 +79,7 @@ function SingleToolbar() {
   const selectedId = useUi((s) => s.selectedId);
   const hidden = useUi((s) => (s.movingId != null && s.movingId === s.selectedId) || s.editingId != null);
   const flyout = useUi((s) => (s.flyout?.from === 'toolbar' ? s.flyout : null));
+  useUi((s) => s.commenting); // the comment button shows pressed while its box is open
   const item = useBoard((s) => (selectedId ? s.items[selectedId] : undefined));
   const slot = useLayout((s) => (selectedId ? s.slots[selectedId] : undefined));
   useSyncExternalStore(camera.subscribe, () => camera.version);
@@ -113,7 +114,7 @@ function SingleToolbar() {
             data-danger={a.danger}
             title={a.label}
             aria-label={a.label}
-            aria-pressed={a.panel ? flyout?.panel === a.panel : undefined}
+            aria-pressed={a.panel ? flyout?.panel === a.panel : a.pressed}
             onClick={() => {
               if (!a.panel) { a.run?.(); return; }
               const open = flyout?.panel === a.panel;

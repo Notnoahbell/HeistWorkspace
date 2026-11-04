@@ -70,7 +70,7 @@ export function App() {
 
   // A settings pop-up belongs to the item it was opened for.
   const selectedId = useUi((s) => s.selectedId);
-  useEffect(() => { useUi.getState().set({ flyout: null }); }, [selectedId]);
+  useEffect(() => { useUi.getState().set({ flyout: null, commenting: null }); }, [selectedId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

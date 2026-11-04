@@ -238,8 +238,8 @@ npm run build      # typecheck + production build
   GIFs loop on their own. Double-click (or Enter) opens the full-size player: Space/K
   play-pause, ←/→ 5s, , and . one frame, M mute, F full screen, Esc close. Click the time
   readout to switch to frame numbers; speed menu 0.25×–2×; , and . also step a selected card's video (assumes 24 fps until the backend reads the real rate)
-- Comments: select a note, to-do, link, photo or video — up to 5 open comments swing out
-  beside it (Enter posts, Shift+Enter new line); "Show all" opens Open/Resolved tabs; the
+- Comments: the toolbar's comment button opens a comment box beside the item; once it has
+  comments, up to 5 open ones show beside it whenever it's selected (Enter posts, Shift+Enter new line); "Show all" opens Open/Resolved tabs; the
   tick resolves, ↺ reopens. On a video the comment is pinned to the card's current time
   (click the time chip for a whole-video comment); click a timecode to jump there. The
   player lists every comment beside the video, with marks on the timeline. Reply under any
