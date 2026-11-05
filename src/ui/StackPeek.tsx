@@ -1,5 +1,5 @@
-// A look inside a video's version stack: hold Alt while hovering a stacked
-// card and its picture shrinks back to show every version as a tile, right in
+// A look inside a video's version stack: while Alt is held over a stacked
+// card (and only then), its picture shrinks back to show every version as a tile, right in
 // the card. Click tiles to pick several; drag one (or the picked ones) out onto
 // the board to unstack them into cards of their own.
 //
@@ -27,6 +27,10 @@ const SLACK = 14;
 const DRAG_START = 4;
 /** A tile is being dragged out (the peek stays put meanwhile). */
 let dragging = false;
+/** Alt is held: the peek shows only while it is. */
+let altHeld = false;
+/** A drag out ended: close too if Alt was let go during it. */
+const dragEnded = () => { dragging = false; if (!altHeld) setPeek(null); };
 
 /** The stacked video card under a screen point, if any. */
 function stackAt(x: number, y: number): string | null {
@@ -57,18 +61,24 @@ export function StackPeek() {
     const move = (e: PointerEvent) => {
       px = e.clientX; py = e.clientY;
       if (dragging) return;
-      if (e.altKey && !e.buttons && tryOpen()) return;
+      altHeld = e.altKey;
+      if (!e.altKey) { setPeek(null); return; }
+      if (!e.buttons && tryOpen()) return;
       const id = usePeek.getState().id;
       if (id && !inside(cardRect(id), px, py, SLACK)) setPeek(null);
     };
     const down = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') altHeld = true;
       if (e.key === 'Alt' && !e.repeat && tryOpen()) { e.preventDefault(); usedAlt = true; }
       if (e.key === 'Escape' && !dragging) setPeek(null);
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' && usedAlt) { e.preventDefault(); usedAlt = false; }
+      if (e.key !== 'Alt') return;
+      altHeld = false;
+      if (usedAlt) { e.preventDefault(); usedAlt = false; }
+      if (!dragging) setPeek(null);
     };
-    const close = () => { if (!dragging) setPeek(null); };
+    const close = () => { altHeld = false; if (!dragging) setPeek(null); };
     window.addEventListener('pointermove', move, true);
     window.addEventListener('keydown', down, true);
     window.addEventListener('keyup', up, true);
@@ -120,8 +130,8 @@ export function CardStack({ media }: { media: Media }) {
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', up, true);
-      dragging = false;
       setDrag(null);
+      if (moved) dragEnded(); else dragging = false;
       if (!moved) {
         setPicked((p) => (p.includes(v.n) ? p.filter((n) => n !== v.n) : [...p, v.n]));
         return;

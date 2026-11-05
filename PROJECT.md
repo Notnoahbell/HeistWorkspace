@@ -202,7 +202,7 @@ Sized for ~150 users; a single modest server handles this comfortably.
   `untracked()`) are folded into the kept copies, so undo never reverts them. Comments
   aren't undone (they have their own edit/delete). Undo goes to the step's board and
   selects what changed.
-- **2026-11-05: Unstacking.** Alt + hover a stacked video: its picture shrinks back and its
+- **2026-11-05: Unstacking.** While Alt is held over a stacked video (only then): its picture shrinks back and its
   versions show as tiles inside the card (StackPeek.tsx; a panel beside the card was tried
   first and dropped); click to pick several, drag out onto the board to make them
   cards again (`unstackVersions`: each takes its name, status and comments; at least one
