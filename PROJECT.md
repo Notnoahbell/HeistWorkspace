@@ -268,7 +268,7 @@ Sized for ~150 users; a single modest server handles this comfortably.
   (2). A media card's review status lives on the card, not the toolbar: a dot in the
   top-left corner in its colour with its symbol (check / pen / eye), plus a 4px strip and a
   soft wash of the colour from the top; unset, an outlined grey ring on hover (light or dark to suit the picture's corner, sampled on hover). Pressing the dot
-  shows its name beside it and opens a small frosted menu growing out of the dot (dot +
+  opens a small frosted menu growing out of the dot (names only there) (dot +
   name per row, 38px rows). (A radial picker was tried and dropped as fiddly.)
 - **2026-11-04: Downloads** (`src/board/download.ts`, panel `src/ui/Downloads.tsx`). Download
   sits left of Delete on a photo/video's toolbar and on a multi-selection's (the photos and
