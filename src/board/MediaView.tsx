@@ -1,5 +1,4 @@
-import { memo, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
-import { createPortal } from 'react-dom';
+import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
 import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, Repeat, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta, type ReviewStatus } from './store';
 import { useLayout } from './layout';
@@ -15,8 +14,8 @@ import { openViewer } from '../ui/MediaViewer';
 import { useCachedSrc } from '../lib/mediaCache';
 import { mediaFacts, useAddedBy } from './details';
 import { CommentBadge } from '../ui/Comments';
-import { commentVersion, setStatus, STATUSES, statusInfo, versionOf } from './versions';
-import { Check, Eye, PenLine } from 'lucide-react';
+import { commentVersion, setStatus, statusInfo, versionOf } from './versions';
+import { placeMenu, StatusDot, StatusPopup, type MenuAt } from '../ui/StatusPicker';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -315,30 +314,14 @@ function Skim({ video, at, strip }: { video: HTMLVideoElement | null; at: number
   );
 }
 
-const STATUS_GLYPH = { approved: Check, changes: PenLine, review: Eye } as const;
-
-/** The status's dot: its colour and symbol (or empty grey with none). */
-function StatusDot({ value }: { value: ReviewStatus | null }) {
-  const st = statusInfo(value);
-  const Glyph = value ? STATUS_GLYPH[value] : null;
-  return (
-    <span className="rs-dot" style={st ? ({ '--st': st.color } as CSSProperties) : undefined} data-none={!st || undefined} aria-hidden="true">
-      {Glyph && <Glyph size={12} strokeWidth={3} />}
-    </span>
-  );
-}
-
-const MENU_W = 200, MENU_H = 4 * 38 + 10;
-
 /**
  * Review status: a dot in the card's top-left corner, in the status's colour with its
- * symbol (or, with none set, an empty grey dot while the card is hovered); hovering
- * shows its name beside it. Pressing it opens a small menu growing out of the dot
- * (fixed to the screen, so nothing clips it, and the same size at any zoom). Picks for
- * the version on show.
+ * symbol (or, with none set, an empty grey ring while the card is hovered). Pressing it
+ * opens the status menu growing out of the dot. Picks for the version on show.
  */
 function CardStatus({ id, version, value }: { id: string; version: number; value: ReviewStatus | null }) {
-  const [at, setAt] = useState<{ left: number; top: number; origin: string } | null>(null);
+  const [at, setAt] = useState<MenuAt | null>(null);
+  const close = useCallback(() => setAt(null), []);
   const st = statusInfo(value);
   const open = !!at;
   // Unset, the ring is grey: light over a dark corner of the picture, dark over a light one
@@ -358,22 +341,6 @@ function CardStatus({ id, version, value }: { id: string; version: number; value
     card.addEventListener('pointerenter', sample);
     return () => card.removeEventListener('pointerenter', sample);
   }, [st]);
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setAt(null);
-    const away = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.status-menu, .media-status-pill')) close(); };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-    window.addEventListener('pointerdown', away, true);
-    window.addEventListener('keydown', esc, true);
-    window.addEventListener('wheel', close, { passive: true, capture: true });
-    window.addEventListener('resize', close);
-    return () => {
-      window.removeEventListener('pointerdown', away, true);
-      window.removeEventListener('keydown', esc, true);
-      window.removeEventListener('wheel', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [open]);
   // Its own clicks don't pick up or select the card.
   const keep = { onPointerDown: (e: SyntheticEvent) => e.stopPropagation(), onClick: (e: SyntheticEvent) => e.stopPropagation(), onDoubleClick: (e: SyntheticEvent) => e.stopPropagation() };
   return (
@@ -386,37 +353,13 @@ function CardStatus({ id, version, value }: { id: string; version: number; value
         aria-label={st ? `Review status: ${st.label}` : 'Set a review status'}
         onClick={(e) => {
           if (open) { setAt(null); return; }
-          // Opens down and to the right of the dot, or flips to stay on screen.
-          const r = (e.currentTarget.firstElementChild ?? e.currentTarget).getBoundingClientRect();
-          const right = r.left + MENU_W + 8 < window.innerWidth;
-          const down = r.top + MENU_H + 8 < window.innerHeight;
-          setAt({
-            left: right ? r.left - 6 : r.right + 6 - MENU_W,
-            top: down ? r.top - 6 : r.bottom + 6 - MENU_H,
-            origin: `${down ? 'top' : 'bottom'} ${right ? 'left' : 'right'}`,
-          });
+          setAt(placeMenu((e.currentTarget.firstElementChild ?? e.currentTarget).getBoundingClientRect(), 'over'));
         }}
       >
         <StatusDot value={value} />
         <span className="media-status-word">{st ? st.label : 'Status'}</span>
       </button>
-      {at && createPortal(
-        <div className="status-menu" role="menu" aria-label="Review status" style={{ left: at.left, top: at.top, transformOrigin: at.origin }}>
-          {[...STATUSES, null].map((s) => (
-            <button
-              key={s?.value ?? 'none'}
-              role="menuitemradio"
-              aria-checked={(s?.value ?? null) === value}
-              onClick={() => { setStatus(id, version, s?.value ?? null); setAt(null); }}
-            >
-              <StatusDot value={s?.value ?? null} />
-              <span>{s?.label ?? 'No status'}</span>
-              {(s?.value ?? null) === value && <Check size={14} strokeWidth={2.6} aria-hidden="true" />}
-            </button>
-          ))}
-        </div>,
-        document.body,
-      )}
+      {at && <StatusPopup at={at} value={value} onPick={(v) => setStatus(id, version, v)} onClose={close} opener=".media-status-pill" />}
     </span>
   );
 }

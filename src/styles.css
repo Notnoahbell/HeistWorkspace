@@ -2725,3 +2725,7 @@ button, a, label { cursor: var(--cursor, default); }
 .status-menu button[aria-checked='true'] { font-weight: 650; }
 .status-menu button > svg { color: var(--text-dim); }
 @media (prefers-reduced-motion: reduce) { .status-menu { animation: none; } }
+
+/* A selection's review-status button: the dot they share (or a pie of their mix). */
+.selection-toolbar [data-key='status'] .rs-dot { width: 16px; height: 16px; }
+.selection-toolbar [data-key='status'] .rs-dot svg { width: 10px; height: 10px; }

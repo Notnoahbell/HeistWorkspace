@@ -2,7 +2,7 @@
 // panels, or group actions when several things are selected. Rendered in
 // screen space so it stays a constant size.
 
-import { Fragment, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, useCallback, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalSpaceAround,
@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import { SectionIcon } from './SectionIcon';
 import { camera } from '../canvas/camera';
-import { useBoard } from '../board/store';
+import { useBoard, type ReviewStatus } from '../board/store';
+import { setStatus, STATUSES, versionOf } from '../board/versions';
+import { placeMenu, StatusDot, StatusPopup, type MenuAt } from './StatusPicker';
 import { arrangeSelection, canArrange, deleteSelection, groupIntoColumn, itemSize, planArrange, posOf, wrapInFrame, type Arrange } from '../board/actions';
 import { useLayout } from '../board/layout';
 import { useUi } from '../board/ui';
@@ -27,6 +29,9 @@ const GAP = 12;
 function GroupToolbar({ ids }: { ids: string[] }) {
   const items = useBoard(useShallow((s) => ids.map((id) => s.items[id]).filter(Boolean)));
   const hidden = useUi((s) => s.movingId != null || s.dragId != null);
+  /** The review-status menu, when open. */
+  const [statusAt, setStatusAt] = useState<MenuAt | null>(null);
+  const closeStatus = useCallback(() => setStatusAt(null), []);
   useLayout((s) => s.slots); // follow column reflows
   useSyncExternalStore(camera.subscribe, () => camera.version);
   if (!items.length || hidden) return null;
@@ -38,7 +43,12 @@ function GroupToolbar({ ids }: { ids: string[] }) {
     x1 = Math.max(x1, at.x + itemSize(it).w);
   }
   const a = camera.worldToScreen(x0, y0), b = camera.worldToScreen(x1, y0);
-  const media = items.filter((it) => it.kind === 'media').length;
+  const mediaItems = items.filter((it) => it.kind === 'media');
+  const media = mediaItems.length;
+  // Their statuses: one they all share (ticked in the menu, shown on the button), or a mix.
+  const statuses = [...new Set(mediaItems.map((it) => it.status ?? null))];
+  const common: ReviewStatus | null | undefined = statuses.length === 1 ? statuses[0] : undefined;
+  const mix = common === undefined ? [...STATUSES.filter((s) => statuses.includes(s.value)).map((s) => s.color), ...(statuses.includes(null) ? ['rgb(128 128 140 / 0.45)'] : [])] : undefined;
   /** Photos and videos to download (inside selected sections too). */
   const files = downloadableIn(ids).length;
   const actions: ToolAction[] = [
@@ -47,6 +57,17 @@ function GroupToolbar({ ids }: { ids: string[] }) {
       label: media > MAX_WALL ? `Play together (Enter): the first ${MAX_WALL} of ${media}` : `Play ${media} together (Enter)`,
       icon: <Play {...ICON_PROPS} size={14} fill="currentColor" />,
       run: () => openWall(ids),
+    }] : []),
+    ...(media ? [{
+      key: 'status', group: 'review' as const,
+      label: `Review status for ${media === 1 ? 'the photo or video' : `all ${media} photos and videos`}`,
+      icon: <StatusDot value={common ?? null} mix={mix} />,
+      pressed: !!statusAt,
+      run: () => {
+        if (statusAt) { setStatusAt(null); return; }
+        const btn = document.querySelector('.selection-toolbar [data-key="status"]');
+        if (btn) setStatusAt(placeMenu(btn.getBoundingClientRect(), 'below'));
+      },
     }] : []),
     { key: 'frame', group: 'organise', label: 'Wrap in a frame (Ctrl+G)', icon: <Frame {...ICON_PROPS} />, run: () => wrapInFrame() },
     { key: 'column', group: 'organise', label: 'Gather into a new section', icon: <SectionIcon size={16} />, run: () => groupIntoColumn() },
@@ -71,6 +92,17 @@ function GroupToolbar({ ids }: { ids: string[] }) {
         ))}
       </div>
       <AlignToolbar x={b.x + camera.origin.x + GAP} y={a.y + camera.origin.y} />
+      {statusAt && (
+        <StatusPopup
+          at={statusAt}
+          value={common}
+          label={`Review status for ${media} items`}
+          opener='.selection-toolbar [data-key="status"]'
+          onClose={closeStatus}
+          // Each one's current version, like the dot on its card.
+          onPick={(v) => { for (const it of mediaItems) if (it.kind === 'media') setStatus(it.id, versionOf(it), v); }}
+        />
+      )}
     </>
   );
 }
