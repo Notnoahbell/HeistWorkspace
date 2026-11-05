@@ -16,6 +16,7 @@ import { mediaFacts, useAddedBy } from './details';
 import { CommentBadge } from '../ui/Comments';
 import { commentVersion, setStatus, statusInfo, versionOf } from './versions';
 import { placeMenu, StatusDot, StatusPopup, type MenuAt } from '../ui/StatusPicker';
+import { CardStack, usePeek } from '../ui/StackPeek';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -52,6 +53,8 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
   // Another video is being dragged over this one: it would become the next version.
   const versionTarget = useUi((s) => s.versionDrop === id);
   const incoming = useVersionUploads((s) => s[id]);
+  // Alt + hover on a stack: its versions show in the card.
+  const peeking = usePeek((s) => s.id === id);
 
   // Let comments read and set this card's video time.
   useEffect(() => {
@@ -134,7 +137,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
       onContextMenu={onContextMenu}
       onClick={onClick}
     >
-      <div ref={visRef} className="media" data-selected={selected} data-stacked={stacked} data-version-drop={versionTarget || undefined} style={{ width: fill ?? media.w }}>
+      <div ref={visRef} className="media" data-selected={selected} data-stacked={stacked} data-version-drop={versionTarget || undefined} data-peeking={peeking || undefined} style={{ width: fill ?? media.w }}>
         <div
           className="media-frame"
           style={{ aspectRatio: `${width} / ${height}` }}
@@ -167,7 +170,8 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
             <div className="media-pending">{failed ? 'Upload failed' : 'Uploading…'}</div>
           )}
 
-          {media.mediaType === 'video' && src && skim != null && (
+          {peeking && !!media.versions?.length && <CardStack media={media} />}
+          {media.mediaType === 'video' && src && skim != null && !peeking && (
             <Skim video={video} at={skim} strip={media.meta.strip} />
           )}
           {media.mediaType === 'video' && src && (

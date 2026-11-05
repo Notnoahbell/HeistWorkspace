@@ -1,10 +1,14 @@
 // A look inside a video's version stack: hold Alt while hovering a stacked
-// card and its versions fan out in a small folder-like panel beside it. Click
-// versions to pick several; drag one (or the picked ones) out onto the board to
-// unstack them into cards of their own.
+// card and its picture shrinks back to show every version as a tile, right in
+// the card. Click tiles to pick several; drag one (or the picked ones) out onto
+// the board to unstack them into cards of their own.
+//
+// StackPeek (mounted once) decides which card is peeking; the card draws
+// CardStack inside its own frame, so it zooms and moves with the card.
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
+import { create } from 'zustand';
 import { Layers } from 'lucide-react';
 import { useBoard, type Media } from '../board/store';
 import { useUi } from '../board/ui';
@@ -14,10 +18,15 @@ import { isVideo, statusInfo, unstackVersions, versionList, type VersionInfo } f
 import { camera } from '../canvas/camera';
 import { StatusDot } from './StatusPicker';
 
-const PANEL_GAP = 10;
-/** How far the pointer may stray from the card and panel before it closes. */
+/** The card showing its stack, if any. */
+export const usePeek = create<{ id: string | null }>()(() => ({ id: null }));
+const setPeek = (id: string | null) => { if (usePeek.getState().id !== id) usePeek.setState({ id }); };
+
+/** How far the pointer may stray from the card before it closes. */
 const SLACK = 14;
 const DRAG_START = 4;
+/** A tile is being dragged out (the peek stays put meanwhile). */
+let dragging = false;
 
 /** The stacked video card under a screen point, if any. */
 function stackAt(x: number, y: number): string | null {
@@ -27,99 +36,69 @@ function stackAt(x: number, y: number): string | null {
   return isVideo(it) && it.versions?.length ? it.id : null;
 }
 
-const cardEl = (id: string) => document.querySelector<HTMLElement>(`[data-media-id="${CSS.escape(id)}"] .media`);
-const inside = (r: DOMRect, x: number, y: number, pad: number) =>
-  x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
+const cardRect = (id: string) =>
+  document.querySelector<HTMLElement>(`[data-media-id="${CSS.escape(id)}"] .media`)?.getBoundingClientRect();
+const inside = (r: DOMRect | undefined, x: number, y: number, pad: number) =>
+  !!r && x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad;
 
+/** Opens and closes the peek: Alt over a stacked card, until the pointer leaves it. */
 export function StackPeek() {
-  const [peekId, setPeekId] = useState<string | null>(null);
-  const pointer = useRef({ x: -1, y: -1 });
-  const panelRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
-  /** Alt opened the peek during this press (so its release doesn't focus the browser menu). */
-  const usedAlt = useRef(false);
-
   useEffect(() => {
+    let px = -1, py = -1;
+    /** Alt opened the peek during this press (so its release doesn't focus the browser menu). */
+    let usedAlt = false;
     const tryOpen = () => {
       const ui = useUi.getState();
       if (ui.dragId || ui.viewer || ui.wall) return false;
-      const id = stackAt(pointer.current.x, pointer.current.y);
-      if (id) setPeekId(id);
+      const id = stackAt(px, py);
+      if (id) setPeek(id);
       return !!id;
     };
     const move = (e: PointerEvent) => {
-      pointer.current = { x: e.clientX, y: e.clientY };
-      if (dragging.current) return;
+      px = e.clientX; py = e.clientY;
+      if (dragging) return;
       if (e.altKey && !e.buttons && tryOpen()) return;
-      // Strayed away from both the card and the panel: close.
-      setPeekId((id) => {
-        if (!id) return id;
-        const card = cardEl(id)?.getBoundingClientRect();
-        const panel = panelRef.current?.getBoundingClientRect();
-        const near = (card && inside(card, e.clientX, e.clientY, SLACK)) || (panel && inside(panel, e.clientX, e.clientY, SLACK));
-        return near ? id : null;
-      });
+      const id = usePeek.getState().id;
+      if (id && !inside(cardRect(id), px, py, SLACK)) setPeek(null);
     };
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' && !e.repeat && tryOpen()) { e.preventDefault(); usedAlt.current = true; }
-      if (e.key === 'Escape') setPeekId(null);
+      if (e.key === 'Alt' && !e.repeat && tryOpen()) { e.preventDefault(); usedAlt = true; }
+      if (e.key === 'Escape' && !dragging) setPeek(null);
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' && usedAlt.current) { e.preventDefault(); usedAlt.current = false; }
+      if (e.key === 'Alt' && usedAlt) { e.preventDefault(); usedAlt = false; }
     };
-    const close = () => { if (!dragging.current) setPeekId(null); };
+    const close = () => { if (!dragging) setPeek(null); };
     window.addEventListener('pointermove', move, true);
     window.addEventListener('keydown', down, true);
     window.addEventListener('keyup', up, true);
-    window.addEventListener('wheel', close, { passive: true, capture: true });
-    window.addEventListener('resize', close);
     window.addEventListener('blur', close);
-    const offBoard = subscribeBoard(() => setPeekId(null));
+    const offBoard = subscribeBoard(close);
+    // Unstacked down to one, gone, or picked up and dragged: nothing left to show.
+    const offItems = useBoard.subscribe((s) => {
+      const id = usePeek.getState().id;
+      const it = id ? s.items[id] : undefined;
+      if (id && !(isVideo(it) && it.versions?.length)) setPeek(null);
+    });
+    const offUi = useUi.subscribe((s) => { if (s.dragId) setPeek(null); });
     return () => {
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('keydown', down, true);
       window.removeEventListener('keyup', up, true);
-      window.removeEventListener('wheel', close, true);
-      window.removeEventListener('resize', close);
       window.removeEventListener('blur', close);
-      offBoard();
+      offBoard(); offItems(); offUi();
     };
   }, []);
-
-  const media = useBoard((s) => (peekId ? s.items[peekId] : undefined));
-  // Unstacked down to one (or gone, or picked up): nothing left to show.
-  const dragId = useUi((s) => s.dragId);
-  const live = isVideo(media) && !!media.versions?.length && !dragId;
-  useEffect(() => { if (peekId && !live) setPeekId(null); }, [peekId, live]);
-  if (!peekId || !live) return null;
-  return <Panel key={peekId} media={media as Media} panelRef={panelRef} dragging={dragging} />;
+  return null;
 }
 
 interface Drag { ns: number[]; v: VersionInfo; x: number; y: number }
 
-function Panel({ media, panelRef, dragging }: {
-  media: Media;
-  panelRef: React.RefObject<HTMLDivElement | null>;
-  dragging: React.MutableRefObject<boolean>;
-}) {
+/** The versions, drawn over the card's (shrunk) picture. */
+export function CardStack({ media }: { media: Media }) {
   const versions = versionList(media);
   const [picked, setPicked] = useState<number[]>([]);
-  const [at, setAt] = useState<{ left: number; top: number; below: boolean } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-
-  // Beside the card: under it, or above when there's no room.
-  useLayoutEffect(() => {
-    const card = cardEl(media.id)?.getBoundingClientRect();
-    const panel = panelRef.current;
-    if (!card || !panel) return;
-    const w = panel.offsetWidth, h = panel.offsetHeight;
-    const below = card.bottom + PANEL_GAP + h + 8 < window.innerHeight || card.top - PANEL_GAP - h < 8;
-    setAt({
-      left: Math.max(8, Math.min(card.left, window.innerWidth - w - 8)),
-      top: below ? card.bottom + PANEL_GAP : card.top - PANEL_GAP - h,
-      below,
-    });
-  }, [media.id, versions.length, panelRef]);
 
   // Drop the picks of versions that have gone.
   useEffect(() => { setPicked((p) => p.filter((n) => n <= versions.length)); }, [versions.length]);
@@ -134,24 +113,21 @@ function Panel({ media, panelRef, dragging }: {
     const move = (ev: PointerEvent) => {
       if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < DRAG_START) return;
       moved = true;
-      dragging.current = true;
+      dragging = true;
       setDrag({ ns, v, x: ev.clientX, y: ev.clientY });
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', up, true);
-      dragging.current = false;
+      dragging = false;
       setDrag(null);
       if (!moved) {
         setPicked((p) => (p.includes(v.n) ? p.filter((n) => n !== v.n) : [...p, v.n]));
         return;
       }
-      if (ev.type === 'pointercancel') return;
-      // Let go over the panel (or the card itself): nothing happens.
-      const panel = panelRef.current?.getBoundingClientRect();
-      const card = cardEl(media.id)?.getBoundingClientRect();
-      if ((panel && inside(panel, ev.clientX, ev.clientY, 0)) || (card && inside(card, ev.clientX, ev.clientY, 0))) return;
+      // Let go over the card itself (or cancelled): nothing happens.
+      if (ev.type === 'pointercancel' || inside(cardRect(media.id), ev.clientX, ev.clientY, 0)) return;
       const w = camera.clientToWorld(ev.clientX, ev.clientY);
       const ui = useUi.getState();
       let p = { x: w.x - media.w / 2, y: w.y - 24 };
@@ -169,60 +145,56 @@ function Panel({ media, panelRef, dragging }: {
     window.addEventListener('pointercancel', up, true);
   };
 
-  const all = versions.length;
-  const pulling = drag ? Math.min(drag.ns.length, all - 1) : 0;
+  const pulling = drag ? Math.min(drag.ns.length, versions.length - 1) : 0;
+  // Its own presses and clicks don't drag, select or open the card underneath.
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-  return createPortal(
-    <>
-      <div
-        ref={panelRef}
-        className="stack-peek"
-        data-below={at?.below || undefined}
-        role="dialog"
-        aria-label={`Versions of ${media.name}`}
-        style={at ? { left: at.left, top: at.top } : { visibility: 'hidden', left: 0, top: 0 }}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        <div className="stack-peek-head">
-          <Layers size={14} strokeWidth={2} aria-hidden="true" />
-          <span className="stack-peek-title">{all} versions</span>
-          <span className="stack-peek-hint">
-            {picked.length ? `${picked.length} picked · drag out to unstack` : 'Click to pick · drag out to unstack'}
-          </span>
-        </div>
-        <div className="stack-peek-grid">
-          {versions.map((v) => (
-            <button
-              key={v.n}
-              className="stack-peek-tile"
-              data-picked={picked.includes(v.n) || undefined}
-              data-pulling={drag?.ns.includes(v.n) || undefined}
-              aria-pressed={picked.includes(v.n)}
-              title={`${v.label || v.name}${v.current ? '\nCurrent version' : ''}`}
-              onPointerDown={(e) => startDrag(e, v)}
-            >
-              <span className="stack-peek-thumb">
-                <Thumb v={v} />
-                <span className="stack-peek-n">v{v.n}</span>
-                {statusInfo(v.status) && <span className="stack-peek-status"><StatusDot value={v.status} /></span>}
-              </span>
-              <span className="stack-peek-name">{v.label || v.name}</span>
-              {v.current && <span className="stack-peek-cur">Current</span>}
-            </button>
-          ))}
-        </div>
+  return (
+    <div
+      className="card-stack"
+      role="group"
+      aria-label={`Versions of ${media.name}`}
+      onPointerDown={stop}
+      onClick={stop}
+      onDoubleClick={stop}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+    >
+      <div className="card-stack-head">
+        <Layers size={11} strokeWidth={2.4} aria-hidden="true" />
+        <span>{versions.length} versions</span>
+        <span className="card-stack-hint">{picked.length ? `${picked.length} picked · drag out` : 'Drag out to unstack'}</span>
       </div>
-      {drag && (
-        <div className="stack-peek-ghost" style={{ left: drag.x, top: drag.y } as CSSProperties} aria-hidden="true">
-          <span className="stack-peek-thumb"><Thumb v={drag.v} /></span>
+      <div className="card-stack-grid">
+        {versions.map((v, i) => (
+          <div
+            key={v.n}
+            role="button"
+            tabIndex={-1}
+            className="card-stack-tile"
+            data-picked={picked.includes(v.n) || undefined}
+            data-pulling={drag?.ns.includes(v.n) || undefined}
+            aria-pressed={picked.includes(v.n)}
+            title={`${v.label || v.name}${v.current ? '\nCurrent version' : ''}`}
+            style={{ '--i': i } as CSSProperties}
+            onPointerDown={(e) => startDrag(e, v)}
+          >
+            <span className="card-stack-thumb">
+              <Thumb v={v} />
+              <span className="card-stack-n">v{v.n}</span>
+              {statusInfo(v.status) && <span className="card-stack-status"><StatusDot value={v.status} /></span>}
+            </span>
+            <span className="card-stack-name">{v.label || v.name}</span>
+          </div>
+        ))}
+      </div>
+      {drag && createPortal(
+        <div className="stack-peek-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
+          <span className="card-stack-thumb"><Thumb v={drag.v} /></span>
           {pulling > 1 && <span className="stack-peek-count">{pulling}</span>}
-        </div>
+        </div>,
+        document.body,
       )}
-    </>,
-    document.body,
+    </div>
   );
 }
 
