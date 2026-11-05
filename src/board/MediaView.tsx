@@ -16,7 +16,7 @@ import { useCachedSrc } from '../lib/mediaCache';
 import { mediaFacts, useAddedBy } from './details';
 import { CommentBadge } from '../ui/Comments';
 import { commentVersion, setStatus, STATUSES, statusInfo, versionOf } from './versions';
-import { Check } from 'lucide-react';
+import { Check, Eye, PenLine } from 'lucide-react';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -350,6 +350,14 @@ function CardStatus({ id, version, value }: { id: string; version: number; value
   const keep = { onPointerDown: (e: SyntheticEvent) => e.stopPropagation(), onClick: (e: SyntheticEvent) => e.stopPropagation(), onDoubleClick: (e: SyntheticEvent) => e.stopPropagation() };
   return (
     <span ref={ctl} className="media-status-ctl" data-set={st ? true : undefined} data-open={open || undefined} {...keep}>
+      {/* At rest: a round badge with the status's symbol (the full tag shows on hover). */}
+      {st && (
+        <span className="media-status-dot" style={{ '--st': st.color } as CSSProperties} title={st.label} role="img" aria-label={`Review status: ${st.label}`}>
+          {value === 'approved' ? <Check size={12} strokeWidth={3.2} aria-hidden="true" />
+            : value === 'changes' ? <PenLine size={11} strokeWidth={2.8} aria-hidden="true" />
+            : <Eye size={12} strokeWidth={2.8} aria-hidden="true" />}
+        </span>
+      )}
       <button
         className="media-status"
         style={st ? ({ '--st': st.color } as CSSProperties) : undefined}

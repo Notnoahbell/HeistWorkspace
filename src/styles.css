@@ -2686,10 +2686,23 @@ button, a, label { cursor: var(--cursor, default); }
 .media-tags > .media-version { flex: none; }
 /* At rest the status is just the strip along the top: its tag (or, unset, the "Status"
    button) shows while the card is hovered, or its list is open. */
-.media:not(:hover) .media-status-ctl:not([data-open]) { display: none; }
+/* At rest a set status is the strip, a soft wash of its colour from the top, and a round
+   badge with its symbol; hovering (or the list being open) swaps the badge for the tag. */
+.media:not(:hover) .media-status-ctl:not([data-set]):not([data-open]) { display: none; }
+.media:not(:hover) .media-status-ctl:not([data-open]) > .media-status { display: none; }
+.media:hover .media-status-dot, .media-status-ctl[data-open] > .media-status-dot { display: none; }
+.media-status-dot {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--st); color: #fff;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.9), 0 1px 4px rgb(0 0 0 / 0.35);
+}
 .media-status-strip {
   position: absolute; left: 0; right: 0; top: 0; z-index: 1; height: 4px;
   background: var(--st); pointer-events: none;
+}
+.media-status-strip::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 72px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--st) 38%, transparent), transparent);
 }
 .media-frame .media-status-ctl[data-set] > .media-status:hover { background: var(--st); filter: brightness(1.1); }
 .media-status-menu {
