@@ -267,8 +267,9 @@ Sized for ~150 users; a single modest server handles this comfortably.
   toolbar starts "N selected"; the arrange strip stays to its right. Toolbar icons share one stroke
   (2). A media card's review status lives on the card, not the toolbar: a dot in the
   top-left corner in its colour with its symbol (check / pen / eye), plus a 4px strip and a
-  soft wash of the colour from the top; unset, an empty grey dot on hover. Pressing the dot
-  fans the choices out in a ring around it, like the comment reactions.
+  soft wash of the colour from the top; unset, an empty grey dot on hover. Hovering shows
+  the name beside the dot; pressing it opens a small menu growing out of the dot (dot +
+  name per row, 38px rows). (A radial picker was tried and dropped as fiddly.)
 - **2026-11-04: Downloads** (`src/board/download.ts`, panel `src/ui/Downloads.tsx`). Download
   sits left of Delete on a photo/video's toolbar and on a multi-selection's (the photos and
   videos in it, sections' contents included). Files are fetched by the page (2 at a time,
