@@ -29,8 +29,8 @@ import type { SyncServer } from './sync.ts';
 import type { UploadRecord } from './uploads.ts';
 
 const MEDIA_RE = /^([0-9a-f]{24})\.(png|jpe?g|gif|webp|avif|mp4|webm|mov)$/i;
-const DERIVED = ['derived.json', 'poster.jpg', 'strip.jpg', 'proxy.mp4', 'q50.mp4', 'q25.mp4', 'meta.json'];
-const DERIVED_RE = /^([0-9a-f]{24})\.(derived\.json|poster\.jpg|strip\.jpg|proxy\.mp4|q50\.mp4|q25\.mp4|meta\.json)$/i;
+const DERIVED = ['derived.json', 'poster.jpg', 'strip.jpg', 'proxy.mp4', 'meta.json'];
+const DERIVED_RE = /^([0-9a-f]{24})\.(derived\.json|poster\.jpg|strip\.jpg|proxy\.mp4|meta\.json)$/i;
 /** Any reference to an upload, anywhere in an item. */
 const REF_RE = /\/uploads\/([0-9a-f]{24})\./gi;
 /** Wrong keys allowed per address per minute. */

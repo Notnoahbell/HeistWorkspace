@@ -44,7 +44,6 @@ const server = createServer((req, res) => {
   if (url.pathname === '/api/upload') return uploads.upload(req, res);
   if (url.pathname.startsWith('/uploads/')) return uploads.serve(req, res);
   if (url.pathname === '/api/derive') return derive.handle(req, res);
-  if (url.pathname === '/api/rendition') return derive.rendition(req, res);
   if (url.pathname.startsWith('/api/admin/')) return void admin.handle(req, res);
   if (url.pathname.startsWith('/api/pinterest')) return void handlePinterest(req, res);
 
