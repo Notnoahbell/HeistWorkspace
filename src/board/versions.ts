@@ -186,3 +186,54 @@ export function deleteVersion(id: string, n: number) {
   });
   if (wasCurrent) useLocalMedia.setState((s) => { const next = { ...s }; delete next[id]; return next; }, true);
 }
+
+/**
+ * Pull versions out of a video's stack as cards of their own (the opposite of
+ * stacking): each becomes a new card at `at` (in a row, newest first), taking
+ * its name, status and comments; the versions left behind close up. At least
+ * one version always stays on the original card. Returns the new cards' ids.
+ */
+export function unstackVersions(id: string, ns: number[], at: Point): string[] {
+  const { items } = useBoard.getState();
+  const m = items[id];
+  if (!isVideo(m) || !m.versions?.length) return [];
+  const total = versionOf(m);
+  const pick = [...new Set(ns)].filter((n) => n >= 1 && n <= total).sort((a, b) => b - a).slice(0, total - 1);
+  if (!pick.length) return [];
+  const all = [...m.versions, currentEntry(m)];
+  const local = useLocalMedia.getState()[id];
+  const out: string[] = [];
+  let x = at.x;
+  const gap = 32;
+  for (const n of pick) {
+    const v = all[n - 1];
+    const { addItem } = useBoard.getState();
+    const newId = addItem('media', {
+      boardId: m.boardId, x, y: at.y, w: m.w, mediaType: 'video',
+      src: v.src, name: v.name, meta: v.meta, captionHidden: m.captionHidden,
+      versionLabel: v.label ?? null, status: v.status ?? null,
+    });
+    // The newest version's local copy (a fresh upload) goes with it.
+    if (n === total && local) useLocalMedia.setState({ [newId]: local });
+    out.push(newId);
+    x += m.w + gap;
+  }
+  // Comments follow their version; the rest are renumbered to match what's left.
+  const left = all.map((_, i) => i + 1).filter((n) => !pick.includes(n));
+  const { items: now, updateItem } = useBoard.getState();
+  for (const c of Object.values(now)) {
+    if (c.kind !== 'comment' || c.targetId !== id) continue;
+    const v = commentVersion(c);
+    const moved = pick.indexOf(v);
+    if (moved >= 0) updateItem(c.id, { targetId: out[moved], version: 1 });
+    else updateItem(c.id, { version: left.indexOf(v) + 1 });
+  }
+  const keep = left.map((n) => all[n - 1]);
+  const cur = keep.pop()!;
+  updateItem(id, {
+    versions: keep, src: cur.src, name: cur.name, meta: cur.meta, versionAt: keep.length ? cur.addedAt || null : null,
+    versionBy: keep.length ? cur.addedBy ?? null : null, versionLabel: cur.label ?? null, status: cur.status ?? null,
+  });
+  if (pick.includes(total)) useLocalMedia.setState((s) => { const next = { ...s }; delete next[id]; return next; }, true);
+  return out;
+}

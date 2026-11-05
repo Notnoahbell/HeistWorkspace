@@ -64,7 +64,7 @@ self-hosted.
 - [x] Columns became **sections**: a grid with 1–6 columns (drag the right edge or pick a count)
 - [ ] Resize
 - [ ] Alignment guides
-- [ ] Undo / redo
+- [x] Undo / redo
 - [x] Copy / cut / paste / duplicate (not boards; columns bring their contents)
 - [x] Drag items into other boards: onto a board tile, or up into a parent via the path
 - [ ] Viewport culling (only mount items near the viewport)
@@ -194,6 +194,19 @@ Sized for ~150 users; a single modest server handles this comfortably.
   renamed (`label`), restored (copied back on top as a new version, comments stay put)
   and deleted (its comments go; later versions and theirs move down one). Each version
   has a review status (`status`: review / changes / approved), shown as a tag on the card.
+- **2026-11-05: Undo / redo** (board/history.ts; buttons in the top bar, Ctrl+Z, Ctrl+Shift+Z /
+  Ctrl+Y). Local only: every local change to the board store is kept as before/after copies
+  of the items it touched. A press (drag, click, menu pick) is one step; changes made in one
+  go are one step; typing into one thing is one step until a 1s pause. Changes that aren't
+  yours (other people's, uploads finishing, link previews, video details: wrap new ones in
+  `untracked()`) are folded into the kept copies, so undo never reverts them. Comments
+  aren't undone (they have their own edit/delete). Undo goes to the step's board and
+  selects what changed.
+- **2026-11-05: Unstacking.** Alt + hover a stacked video shows its versions in a panel
+  beside it (StackPeek.tsx); click to pick several, drag out onto the board to make them
+  cards again (`unstackVersions`: each takes its name, status and comments; at least one
+  stays). A dragged multi-selection now drops into a section together, in reading order
+  (frames stay on the board).
 - **2026-11-05: Player.** Skip to start / end sit either side of Play (Home / End keys).
 - **2026-11-04: Review tools.** A comment can cover a range (`timeEnd`) and carry a
   drawing (`drawing`: shapes in 0–1 picture coordinates, so they fit any size). The comment

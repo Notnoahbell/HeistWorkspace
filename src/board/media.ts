@@ -12,6 +12,7 @@ import { snap } from './layout';
 import { MEDIA_WIDTH, MEDIA_WIDTH_PORTRAIT } from './constants';
 import { addVersion } from './versions';
 import { withIdentity } from '../sync/client';
+import { untracked } from './history';
 
 /** File types the server accepts (no SVG: it can carry script). */
 export const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,video/mp4,video/webm,video/quicktime';
@@ -64,8 +65,8 @@ function uploadFile(file: File, onProgress: (p: number) => void): Promise<string
 async function send(id: string, file: File) {
   const url = await uploadFile(file, (progress) =>
     useLocalMedia.setState((s) => (s[id] ? { [id]: { ...s[id], progress } } : s)));
-  if (!url) { useBoard.getState().updateItem(id, { upload: 'failed' }); return; }
-  useBoard.getState().updateItem(id, { src: url, upload: undefined });
+  if (!url) { untracked(() => useBoard.getState().updateItem(id, { upload: 'failed' })); return; }
+  untracked(() => useBoard.getState().updateItem(id, { src: url, upload: undefined }));
   const it = useBoard.getState().items[id];
   if (it?.kind === 'media' && it.mediaType === 'video') ensureDerived(url, it.meta);
 }
@@ -186,6 +187,10 @@ function applyDerived(src: string, d: Derived) {
     ...(d.strip ? { strip: d.strip } : {}),
     ...(d.proxy !== undefined ? { proxy: d.proxy } : {}),
   };
+  untracked(() => applyDerivedNow(src, meta));
+}
+
+function applyDerivedNow(src: string, meta: Partial<MediaMeta>) {
   const { items, updateItem } = useBoard.getState();
   for (const it of Object.values(items)) {
     if (it.kind !== 'media') continue;

@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Link2, Share2 } from 'lucide-react';
+import { Check, Link2, Redo2, Share2, Undo2 } from 'lucide-react';
 import { useBoard, type Board } from '../board/store';
 import { useBoardId } from '../board/nav';
 import { isHome, session } from '../session';
@@ -12,6 +12,7 @@ import { useMyColor, usePresence, type Peer, type Profile } from '../sync/presen
 import { camera } from '../canvas/camera';
 import { setProfile } from '../sync/client';
 import { NotificationBell } from './Notifications';
+import { redo, undo, useHistory } from '../board/history';
 
 const ICON = { size: 16, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 const PROFILE_ICONS = [
@@ -237,11 +238,33 @@ function ProfileMenu() {
   );
 }
 
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const MOD = isMac ? '⌘' : 'Ctrl+';
+
+/** Undo / redo for board changes (also Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y). */
+function UndoRedo() {
+  const { canUndo, canRedo } = useHistory();
+  return (
+    <div className="top-history">
+      <button className="top-btn top-icon" disabled={!canUndo} onClick={() => undo()} title={`Undo
+${MOD}Z`} aria-label="Undo">
+        <Undo2 size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+      <button className="top-btn top-icon" disabled={!canRedo} onClick={() => redo()} title={`Redo
+${isMac ? '⇧⌘Z' : 'Ctrl+Y'}`} aria-label="Redo">
+        <Redo2 size={16} strokeWidth={2} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 export function CollabBar() {
   return (
     <div className="top-right">
       <HereNow />
       <ShareBoard />
+      <UndoRedo />
+      <span className="top-sep" aria-hidden="true" />
       <NotificationBell />
       <ProfileMenu />
     </div>

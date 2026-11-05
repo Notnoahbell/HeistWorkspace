@@ -17,6 +17,7 @@ import { useUi } from '../board/ui';
 import { homeId, isHome, session, setSessionUser } from '../session';
 import { usePresence, type Peer, type Profile } from './presence';
 import { newId } from '../lib/id';
+import { untracked } from '../board/history';
 
 type ServerMsg =
   | { t: 'welcome'; userId: string; connId: string; profile: Profile }
@@ -79,7 +80,7 @@ const send = (msg: unknown) => { if (ws?.readyState === WebSocket.OPEN) ws.send(
 function remote(fn: (items: Record<string, Item>) => Record<string, Item>) {
   applyingRemote = true;
   try {
-    useBoard.setState((s) => ({ items: fn(s.items) }));
+    untracked(() => useBoard.setState((s) => ({ items: fn(s.items) })));
   } finally {
     applyingRemote = false;
   }
@@ -222,6 +223,11 @@ function syncShortcuts() {
   let x = mine.length ? Math.max(...mine.map((it) => it.x + it.w)) + 48 : 0;
   const y = mine.length ? Math.min(...mine.map((it) => it.y)) : 0;
   x = Math.round(x / 16) * 16;
+  untracked(() => addShortcuts(add, stale, x, y, items));
+}
+
+function addShortcuts(add: Item[], stale: Item[], x: number, y: number, items: Record<string, Item>) {
+  const home = homeId();
   const store = useBoard.getState();
   for (const r of add) {
     const id = shortcutId(r.id);

@@ -29,11 +29,13 @@ import { MediaViewer, openViewer } from './ui/MediaViewer';
 import { MediaWall, openWall } from './ui/MediaWall';
 import { AdminPage, isAdminOpen } from './ui/AdminPage';
 import { TooltipLayer } from './ui/Tooltip';
+import { StackPeek } from './ui/StackPeek';
 import { Downloads } from './ui/Downloads';
 import { CommentsPopover } from './ui/Comments';
 import { copySelection, cutSelection, duplicateSelection, isOwnCopy, paste } from './board/clipboard';
 import { pastePoint, pasteText } from './board/pasteText';
 import { camera } from './canvas/camera';
+import { redo, undo } from './board/history';
 
 function useIds(boardId: string, kind: ItemKind) {
   return useBoard(useShallow((s) =>
@@ -93,6 +95,16 @@ export function App() {
       // The player has its own keys.
       if (isTyping(e) || ui.viewer || ui.wall || isAdminOpen()) return;
       const selected = ui.selectedId ? useBoard.getState().items[ui.selectedId] : undefined;
+
+      // Undo: Ctrl/⌘+Z. Redo: Ctrl/⌘+Shift+Z or Ctrl+Y.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === 'z' || k === 'y') {
+          e.preventDefault();
+          if (k === 'z' && !e.shiftKey) undo(); else redo();
+          return;
+        }
+      }
 
       // Ctrl/Cmd shortcuts: select all, copy, cut, paste, duplicate.
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
@@ -248,6 +260,7 @@ export function App() {
       <Marquee />
       <ContextMenu />
       <Toast />
+      <StackPeek />
       <PeerSelections />
       <PeerCursors />
       <CursorChat />

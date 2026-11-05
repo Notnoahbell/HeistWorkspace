@@ -285,6 +285,23 @@ function moveIntoBoard(body: Body, id: string, targetId: string) {
 }
 
 /**
+ * A dragged selection dropped into a section: everything selected goes in at
+ * the drop point, in reading order (frames stay on the board). The section
+ * hands out the slots, so the carried cards are let go to glide into them.
+ */
+function moveGroupToColumn(body: Body, id: string, columnId: string, index: number) {
+  const { items } = board();
+  const sel = new Set(ui().selectedIds);
+  const ids = [id, ...body.followers.map((f) => f.body.id).filter((f) => sel.has(f))]
+    .filter((m, i, all) => all.indexOf(m) === i && items[m] && items[m].kind !== 'frame' && m !== columnId);
+  const order = ids.map((m) => ({ id: m, ...posOf(items[m]) }))
+    .sort((a, b) => (Math.abs(a.y - b.y) > 24 ? a.y - b.y : a.x - b.x));
+  order.forEach((m, i) => board().moveToColumn(m.id, columnId, index + i));
+  for (const f of body.followers) f.body.release();
+  body.followers = [];
+}
+
+/**
  * Behaviour shared by every item: drag it freely, into or out of columns
  * (columns nest), or as part of a multi-selection.
  */
@@ -328,9 +345,9 @@ export function itemHooks(id: string): BodyHooks {
       if (onto !== ui().versionDrop) ui().set({ versionDrop: onto, ...(onto ? { drop: null } : {}) });
       if (onto) return;
 
-      // Groups and frames move freely; neither drops into a column.
-      if (body.multi || self?.kind === 'frame') return;
-      const col = columnAt(p, new Set([id, ...contentsOf(id)]));
+      // Frames move freely (they never go into a section); a group drops in together.
+      if (self?.kind === 'frame') return;
+      const col = columnAt(p, draggedWith(id, body.multi));
       const current = ui().drop;
       if (!col) {
         if (current) ui().set({ drop: null });
@@ -368,6 +385,10 @@ export function itemHooks(id: string): BodyHooks {
       }
 
       if (drop) {
+        if (body.multi) {
+          moveGroupToColumn(body, id, drop.columnId, drop.index);
+          return null;
+        }
         board().moveToColumn(id, drop.columnId, drop.index);
         return null; // the column hands out the slot
       }

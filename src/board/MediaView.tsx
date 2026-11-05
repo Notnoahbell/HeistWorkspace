@@ -128,6 +128,7 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
       ref={posRef}
       className="item-pos"
       data-item
+      data-media-id={id}
       style={{ zIndex: lifted ?? stackIndex, visibility: rest ? undefined : 'hidden' }}
       onPointerDown={onPointerDown}
       onContextMenu={onContextMenu}

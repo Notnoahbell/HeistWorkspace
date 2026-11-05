@@ -9,6 +9,7 @@ import { isLight } from '../lib/color';
 import { fetchPreview, hostOf, normalizeUrl } from '../lib/links';
 import { CommentBadge } from '../ui/Comments';
 import { useAddedBy } from './details';
+import { untracked } from './history';
 
 const LINK_ICON = { size: 18, strokeWidth: 1.8, strokeLinecap: 'square', strokeLinejoin: 'miter', 'aria-hidden': true } as const;
 
@@ -43,7 +44,7 @@ export const LinkView = memo(function LinkView({ id }: { id: string }) {
     let live = true;
     fetchPreview(url).then((preview) => {
       const now = useBoard.getState().items[id];
-      if (live && now?.kind === 'link' && now.url === url) useBoard.getState().updateItem(id, { preview });
+      if (live && now?.kind === 'link' && now.url === url) untracked(() => useBoard.getState().updateItem(id, { preview }));
     });
     return () => { live = false; };
   }, [id, url, needsPreview]);

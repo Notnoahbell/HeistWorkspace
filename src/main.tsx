@@ -12,9 +12,11 @@ import { usePresence } from './sync/presence';
 import { camera } from './canvas/camera';
 import { currentBoardId } from './board/nav';
 import { registerMediaCache } from './lib/mediaCache';
+import { useHistory } from './board/history';
+import { stackVersion } from './board/versions';
 
 // Handy for poking at state from the console while developing.
-if (import.meta.env.DEV) Object.assign(window, { heist: { bodies, useBoard, useUi, useLayout, usePresence, camera, currentBoardId } });
+if (import.meta.env.DEV) Object.assign(window, { heist: { bodies, useBoard, useUi, useLayout, usePresence, camera, currentBoardId, useHistory, stackVersion } });
 
 installCursor();
 connect();
