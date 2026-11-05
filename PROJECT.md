@@ -195,7 +195,7 @@ Sized for ~150 users; a single modest server handles this comfortably.
   and deleted (its comments go; later versions and theirs move down one). Each version
   has a review status (`status`: review / changes / approved), shown as a tag on the card.
 - **2026-11-05: Card text.** The stack peek runs oldest to newest, left to right, the
-  current version ringed in purple (#a371f7). Media names: a pencil on hover renames in one
+  current version in a solid ring of the selection colour (--accent); picked ones ring white. Media names: a pencil on hover renames in one
   click (a selected card's name still does too); the field gets an accent ring and an
   "Enter to save · Esc to cancel" line, and Escape puts the old name back. To-do lists have
   a header (`title`, '' = shows a faint "To-do list"); a new list starts on it.
