@@ -258,6 +258,45 @@ function boardTargetAt(p: Point, client: Point, exclude: Set<string>): string | 
 
 const GAP_IN_TARGET = 48;
 
+// Stacking a video onto another, versus dropping it beside it, mustn't flicker
+// (in a section, the gap opening for a drop moves the cards under the pointer):
+// a video becomes the target only from the middle of it, after a moment's
+// hover, and stays the target until the pointer leaves it altogether. Places
+// in a section hold until the pointer is clearly past the next one.
+/** Fraction off each side of a video that doesn't start a stack. */
+const STACK_INSET = 0.2;
+/** How long to hover over the middle of a video before it's the target (ms). */
+const STACK_DWELL = 150;
+/** Screen px beyond the target's edge before it lets go. */
+const STACK_EXIT = 12;
+/** Screen px the pointer must be past a slot boundary to change the drop place. */
+const SLOT_SLACK = 14;
+
+/** The video being hovered towards stacking (and whether it's been there long enough). */
+let stackPending: { id: string; ready: boolean; timer: number } | null = null;
+const clearStackPending = () => { if (stackPending) clearTimeout(stackPending.timer); stackPending = null; };
+
+/** The video a dragged one would be stacked onto now (see above). `recheck` runs once a hover has lasted. */
+function stackTargetAt(id: string, p: Point, recheck: () => void): string | null {
+  const { items } = board();
+  const self = items[id];
+  const current = ui().versionDrop;
+  const held = current ? items[current] : undefined;
+  if (held) {
+    const o = posOf(held), { w, h } = itemSize(held), pad = STACK_EXIT / camera.z;
+    if (p.x >= o.x - pad && p.x <= o.x + w + pad && p.y >= o.y - pad && p.y <= o.y + h + pad) return held.id;
+    clearStackPending();
+  }
+  const hit = self ? videoTargetAt(p, self.boardId, new Set([id]), STACK_INSET) : null;
+  if (!hit) { clearStackPending(); return null; }
+  if (stackPending?.id === hit) return stackPending.ready ? hit : null;
+  clearStackPending();
+  const pending = { id: hit, ready: false, timer: 0 };
+  pending.timer = window.setTimeout(() => { if (stackPending === pending) { pending.ready = true; recheck(); } }, STACK_DWELL);
+  stackPending = pending;
+  return null;
+}
+
 /**
  * Move a dragged item (and the rest of its group) into another board,
  * placed to the right of what's already there, keeping their arrangement.
@@ -306,7 +345,9 @@ function moveGroupToColumn(body: Body, id: string, columnId: string, index: numb
  * (columns nest), or as part of a multi-selection.
  */
 export function itemHooks(id: string): BodyHooks {
-  return {
+  /** The latest drag position (to look again once a hover has lasted). */
+  let last: { body: Body; p: Point; client: Point } | null = null;
+  const hooks: BodyHooks = {
     grab(body: Body) {
       const sel = ui().selectedIds;
       const group = sel.length > 1 && sel.includes(id);
@@ -334,6 +375,7 @@ export function itemHooks(id: string): BodyHooks {
     },
 
     dragMove(body, p, client) {
+      last = { body, p, client };
       // Over another board (on the canvas or in the path above)? That wins.
       const target = boardTargetAt(p, client, draggedWith(id, body.multi));
       if (target !== ui().boardDrop) ui().set({ boardDrop: target, ...(target ? { drop: null } : {}) });
@@ -341,8 +383,11 @@ export function itemHooks(id: string): BodyHooks {
 
       // A video over another video: it would become that one's new version.
       const self = board().items[id];
-      const onto = !body.multi && isVideo(self) && self.src ? videoTargetAt(p, self.boardId, new Set([id])) : null;
-      if (onto !== ui().versionDrop) ui().set({ versionDrop: onto, ...(onto ? { drop: null } : {}) });
+      const onto = !body.multi && isVideo(self) && self.src
+        ? stackTargetAt(id, p, () => { if (last && ui().dragId) hooks.dragMove?.(last.body, last.p, last.client); })
+        : null;
+      // (A section's drop gap stays put meanwhile: closing it would move the cards under the pointer.)
+      if (onto !== ui().versionDrop) ui().set({ versionDrop: onto });
       if (onto) return;
 
       // Frames move freely (they never go into a section); a group drops in together.
@@ -355,7 +400,14 @@ export function itemHooks(id: string): BodyHooks {
       }
       const { heights, widths } = layout();
       const sizes = Object.fromEntries(col.childIds.map((c) => [c, stackedSize(c, { heights, widths })]));
-      const index = dropIndex(col, posOf(col), sizes, id, p);
+      let index = dropIndex(col, posOf(col), sizes, id, p);
+      // Hold the current place unless the pointer is clearly past it.
+      if (current?.columnId === col.id && current.index !== index) {
+        const m = SLOT_SLACK / camera.z;
+        const near = [[m, 0], [-m, 0], [0, m], [0, -m]]
+          .some(([dx, dy]) => dropIndex(col, posOf(col), sizes, id, { x: p.x + dx, y: p.y + dy }) === current.index);
+        if (near) index = current.index;
+      }
       if (current?.columnId === col.id && current.index === index) return;
       const item = board().items[id];
       // The size it will have once stacked (boards become rows; columns keep theirs).
@@ -364,6 +416,8 @@ export function itemHooks(id: string): BodyHooks {
     },
 
     release(body, land, moved) {
+      last = null;
+      clearStackPending();
       const drop = ui().drop;
       const targetBoard = ui().boardDrop;
       const onto = ui().versionDrop;
@@ -403,6 +457,7 @@ export function itemHooks(id: string): BodyHooks {
       return land;
     },
   };
+  return hooks;
 }
 
 // --- Commands ----------------------------------------------------------------

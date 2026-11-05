@@ -194,6 +194,12 @@ Sized for ~150 users; a single modest server handles this comfortably.
   renamed (`label`), restored (copied back on top as a new version, comments stay put)
   and deleted (its comments go; later versions and theirs move down one). Each version
   has a review status (`status`: review / changes / approved), shown as a tag on the card.
+- **2026-11-05: Drop targeting.** Stacking a video vs dropping it beside one mustn't flicker:
+  a video becomes the stack target only from its middle (20% in from each side), after a
+  150ms hover, and holds until the pointer is 12px off it; a section's drop gap stays open
+  while stacking (closing it moved the cards under the pointer); a place in a section holds
+  until the pointer is 14px past the boundary; in one-column sections, above/below a card
+  goes by which half of it (vertically) the pointer is over.
 - **2026-11-05: Card text.** The stack peek runs oldest to newest, left to right, the
   current version in a solid ring of the selection colour (--accent); picked ones ring white. Media names: a pencil on hover renames in one
   click (a selected card's name still does too); the field gets an accent ring and an

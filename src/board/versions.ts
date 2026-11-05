@@ -68,8 +68,11 @@ export function versionInfo(m: Media, n: number): VersionInfo {
   return all.find((v) => v.n === n) ?? all[0];
 }
 
-/** Video card under the pointer that a dragged video could be stacked onto. */
-export function videoTargetAt(p: Point, boardId: string, exclude: Set<string>): string | null {
+/**
+ * Video card under the pointer that a dragged video could be stacked onto.
+ * `inset` (a fraction of its size off each side) counts only its middle.
+ */
+export function videoTargetAt(p: Point, boardId: string, exclude: Set<string>, inset = 0): string | null {
   const { items } = useBoard.getState();
   let hit: string | null = null;
   let hitZ = -Infinity;
@@ -77,7 +80,8 @@ export function videoTargetAt(p: Point, boardId: string, exclude: Set<string>): 
     if (!isVideo(it) || !it.src || it.boardId !== boardId || exclude.has(it.id)) continue;
     const o = posOf(it);
     const { w, h } = itemSize(it);
-    if (p.x < o.x || p.x > o.x + w || p.y < o.y || p.y > o.y + h) continue;
+    const ix = w * inset, iy = h * inset;
+    if (p.x < o.x + ix || p.x > o.x + w - ix || p.y < o.y + iy || p.y > o.y + h - iy) continue;
     const z = stackZ(items, it.id);
     if (z > hitZ) { hit = it.id; hitZ = z; }
   }

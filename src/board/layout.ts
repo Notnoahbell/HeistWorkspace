@@ -111,6 +111,11 @@ export function dropIndex(col: Column, origin: Point, sizes: Record<string, Size
   const { rows, slots, cell } = columnLayout(col, sizes, excludeId, null);
   const y = p.y - origin.y;
   const x = p.x - origin.x;
+  // One column: above or below a card by which half of it the pointer is over.
+  if (gridCols(col) === 1) {
+    const i = rows.findIndex((row) => y < (row.top + row.bottom) / 2);
+    return i === -1 ? members.length : i;
+  }
   // The row the pointer is in (between rows counts as the one below).
   let r = rows.findIndex((row) => y < row.bottom + COLUMN_GAP / 2);
   if (r === -1) return members.length; // below everything: append
