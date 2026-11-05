@@ -16,7 +16,7 @@ import { useCachedSrc } from '../lib/mediaCache';
 import { mediaFacts, useAddedBy } from './details';
 import { CommentBadge } from '../ui/Comments';
 import { commentVersion, setStatus, STATUSES, statusInfo, versionOf } from './versions';
-import { Check, Eye, PenLine } from 'lucide-react';
+import { Ban, Check, Eye, PenLine, X } from 'lucide-react';
 
 const ICON = { strokeWidth: 2, 'aria-hidden': true } as const;
 /** Buttons on the card mustn't start a drag or select the card. */
@@ -315,78 +315,85 @@ function Skim({ video, at, strip }: { video: HTMLVideoElement | null; at: number
   );
 }
 
+const STATUS_GLYPH = { approved: Check, changes: PenLine, review: Eye } as const;
+
 /**
- * Review status, in the card's top-left corner: the status tag when there is one
- * (click to change it), or a faint "Status" button while the card is hovered or
- * selected. Picks for the version on show. The list opens as a pop-up above the
- * board (so the card can't clip it, and it's the same size at any zoom).
+ * Review status: a dot in the card's top-left corner, in the status's colour with its
+ * symbol (or, with none set, an empty grey dot while the card is hovered). Pressing it
+ * fans the choices out in a ring around it, like the comment reactions (fixed to the
+ * screen, so nothing clips it); pick one, press the middle, click away, scroll or Escape
+ * to close. Picks for the version on show.
  */
 function CardStatus({ id, version, value }: { id: string; version: number; value: ReviewStatus | null }) {
-  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
-  const ctl = useRef<HTMLSpanElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
   const st = statusInfo(value);
   const open = !!at;
   useEffect(() => {
     if (!open) return;
     const close = () => setAt(null);
-    const off = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (!menu.current?.contains(t) && !ctl.current?.contains(t)) close();
-    };
+    const away = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.status-ring, .media-status-dot')) close(); };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-    window.addEventListener('pointerdown', off, true);
+    window.addEventListener('pointerdown', away, true);
     window.addEventListener('keydown', esc, true);
-    window.addEventListener('wheel', close, { passive: true });
+    window.addEventListener('wheel', close, { passive: true, capture: true });
     window.addEventListener('resize', close);
     return () => {
-      window.removeEventListener('pointerdown', off, true);
+      window.removeEventListener('pointerdown', away, true);
       window.removeEventListener('keydown', esc, true);
-      window.removeEventListener('wheel', close);
+      window.removeEventListener('wheel', close, true);
       window.removeEventListener('resize', close);
     };
   }, [open]);
   // Its own clicks don't pick up or select the card.
   const keep = { onPointerDown: (e: SyntheticEvent) => e.stopPropagation(), onClick: (e: SyntheticEvent) => e.stopPropagation(), onDoubleClick: (e: SyntheticEvent) => e.stopPropagation() };
+  const Glyph = value ? STATUS_GLYPH[value] : null;
   return (
-    <span ref={ctl} className="media-status-ctl" data-set={st ? true : undefined} data-open={open || undefined} {...keep}>
-      {/* At rest: a round badge with the status's symbol (the full tag shows on hover). */}
-      {st && (
-        <span className="media-status-dot" style={{ '--st': st.color } as CSSProperties} title={st.label} role="img" aria-label={`Review status: ${st.label}`}>
-          {value === 'approved' ? <Check size={12} strokeWidth={3.2} aria-hidden="true" />
-            : value === 'changes' ? <PenLine size={11} strokeWidth={2.8} aria-hidden="true" />
-            : <Eye size={12} strokeWidth={2.8} aria-hidden="true" />}
-        </span>
-      )}
+    <span className="media-status-ctl" data-set={st ? true : undefined} data-open={open || undefined} {...keep}>
       <button
-        className="media-status"
+        className="media-status-dot"
         style={st ? ({ '--st': st.color } as CSSProperties) : undefined}
+        data-none={!st || undefined}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={st ? `Review status: ${st.label} (click to change)` : 'Set a review status'}
+        aria-label={st ? `Review status: ${st.label}` : 'Set a review status'}
+        title={st ? `${st.label} (click to change)` : 'Set a review status'}
         onClick={(e) => {
           if (open) { setAt(null); return; }
           const r = e.currentTarget.getBoundingClientRect();
-          setAt({ left: Math.min(r.left, window.innerWidth - 180), top: r.bottom + 6 });
+          setAt({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
         }}
       >
-        {st ? st.label : 'Status'}
-        <ChevronDown size={11} strokeWidth={2.6} aria-hidden="true" />
+        {Glyph && <Glyph size={12} strokeWidth={3} aria-hidden="true" />}
       </button>
       {at && createPortal(
-        <div ref={menu} className="media-status-menu" role="menu" style={{ left: at.left, top: at.top }}>
-          {[...STATUSES, null].map((s) => (
-            <button
-              key={s?.value ?? 'none'}
-              role="menuitemradio"
-              aria-checked={(s?.value ?? null) === value}
-              onClick={() => { setStatus(id, version, s?.value ?? null); setAt(null); }}
-            >
-              <span className="review-dot" style={{ background: s?.color ?? 'transparent' }} data-none={!s || undefined} />
-              <span>{s?.label ?? 'No status'}</span>
-              {(s?.value ?? null) === value && <Check size={13} strokeWidth={2.6} aria-hidden="true" />}
-            </button>
-          ))}
+        <div
+          className="status-ring"
+          role="menu"
+          aria-label="Review status"
+          style={{ left: at.x, top: at.y }}
+          onClick={(e) => { if (e.target === e.currentTarget) setAt(null); }}
+        >
+          {[...STATUSES, null].map((s, i) => {
+            const G = s ? STATUS_GLYPH[s.value] : Ban;
+            return (
+              <button
+                key={s?.value ?? 'none'}
+                className="status-ring-opt"
+                role="menuitemradio"
+                aria-checked={(s?.value ?? null) === value}
+                aria-label={s?.label ?? 'No status'}
+                title={s?.label ?? 'No status'}
+                data-none={!s || undefined}
+                style={{ '--st': s?.color, '--a': `${i * 90 - 90}deg`, '--i': i } as CSSProperties}
+                onClick={() => { setStatus(id, version, s?.value ?? null); setAt(null); }}
+              >
+                <G size={14} strokeWidth={s ? 3 : 2.4} aria-hidden="true" />
+              </button>
+            );
+          })}
+          <button className="status-ring-close" title="Close" aria-label="Close" onClick={() => setAt(null)}>
+            <X size={12} strokeWidth={2.6} aria-hidden="true" />
+          </button>
         </div>,
         document.body,
       )}

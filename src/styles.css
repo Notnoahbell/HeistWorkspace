@@ -2670,32 +2670,26 @@ button, a, label { cursor: var(--cursor, default); }
   .downloads, .downloads-glyph[data-busy] svg, .downloads-bar[data-indeterminate] i { animation: none; }
 }
 
-/* Review status in a media card's top-left corner, first in the row of tags: the tag
-   (click to change), or a faint "Status" button on hover / when selected (taking no
-   room otherwise). */
-.media-status-ctl { position: relative; pointer-events: auto; }
-/* (More specific than the card's own overlay-button rule, which would make it a floating grey square.) */
-.media-frame .media-status-ctl > .media-status {
-  position: static; display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 6px 2px 7px; border: 0; border-radius: 6px; white-space: nowrap;
-  background: var(--st); color: #fff; cursor: pointer;
-}
-.media-frame .media-status-ctl > .media-status svg { opacity: 0.85; }
-.media-frame .media-status-ctl:not([data-set]) > .media-status { background: rgb(0 0 0 / 0.6); text-shadow: none; }
-.media-frame .media-status-ctl:not([data-set]) > .media-status:hover { background: rgb(0 0 0 / 0.78); }
+/* Review status: a dot in a media card's top-left corner, first in the row of tags (all
+   centred on one line). Set: its colour and symbol. None: an empty grey dot, on hover only. */
+.media-tags { align-items: center; }
+.media-frame:has(.media-status-strip) .media-tags { top: 11px; }
 .media-tags > .media-version { flex: none; }
-/* At rest the status is just the strip along the top: its tag (or, unset, the "Status"
-   button) shows while the card is hovered, or its list is open. */
-/* At rest a set status is the strip, a soft wash of its colour from the top, and a round
-   badge with its symbol; hovering (or the list being open) swaps the badge for the tag. */
+.media-status-ctl { position: relative; display: flex; pointer-events: auto; }
 .media:not(:hover) .media-status-ctl:not([data-set]):not([data-open]) { display: none; }
-.media:not(:hover) .media-status-ctl:not([data-open]) > .media-status { display: none; }
-.media:hover .media-status-dot, .media-status-ctl[data-open] > .media-status-dot { display: none; }
-.media-status-dot {
-  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
-  background: var(--st); color: #fff;
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.9), 0 1px 4px rgb(0 0 0 / 0.35);
+/* (More specific than the card's own overlay-button rule.) */
+.media-frame .media-status-ctl > .media-status-dot {
+  position: static; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--st); color: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); cursor: pointer;
+  transition: scale 0.12s ease-out, filter 0.12s;
 }
+.media-frame .media-status-ctl > .media-status-dot[data-none] {
+  background: rgb(60 60 66 / 0.55); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.55);
+  backdrop-filter: blur(4px);
+}
+.media-frame .media-status-ctl > .media-status-dot:hover { scale: 1.12; filter: brightness(1.08); }
+.media-status-ctl[data-open] > .media-status-dot { visibility: hidden; }
+/* A set status also runs a strip along the top, with a soft wash of its colour below it. */
 .media-status-strip {
   position: absolute; left: 0; right: 0; top: 0; z-index: 1; height: 4px;
   background: var(--st); pointer-events: none;
@@ -2704,17 +2698,25 @@ button, a, label { cursor: var(--cursor, default); }
   content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 72px;
   background: linear-gradient(to bottom, color-mix(in srgb, var(--st) 38%, transparent), transparent);
 }
-.media-frame .media-status-ctl[data-set] > .media-status:hover { background: var(--st); filter: brightness(1.1); }
-.media-status-menu {
-  position: fixed; z-index: 70;
-  display: flex; flex-direction: column; gap: 1px; min-width: 150px; padding: 4px;
-  background: var(--panel); color: var(--text);
-  border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: var(--panel-shadow), 0 8px 24px rgb(0 0 0 / 0.18);
+/* The choices, fanned out around the dot (like the comment reactions). */
+.status-ring { position: fixed; z-index: 1000; width: 0; height: 0; }
+.status-ring::before { content: ''; position: absolute; left: -56px; top: -56px; width: 112px; height: 112px; border-radius: 50%; }
+.status-ring-opt {
+  position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--st); color: #fff; box-shadow: 0 3px 10px rgb(0 0 0 / 0.22);
+  transform: rotate(var(--a)) translate(36px) rotate(calc(-1 * var(--a)));
+  transition: scale 0.12s ease-out;
+  animation: ring-pop 0.24s calc(var(--i) * 14ms) cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
-.media-status-menu button {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 7px;
-  background: none; color: inherit; font: 12.5px var(--font); text-align: left; cursor: pointer;
+.status-ring-opt[data-none] { background: var(--panel); color: var(--text-dim); box-shadow: 0 3px 10px rgb(0 0 0 / 0.16), inset 0 0 0 1px var(--panel-border); }
+.status-ring-opt:hover { scale: 1.15; }
+.status-ring-opt[aria-checked='true'] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--st), 0 3px 10px rgb(0 0 0 / 0.22); }
+.status-ring-opt[data-none][aria-checked='true'] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text-dim); }
+.status-ring-close {
+  position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%;
+  display: grid; place-items: center; background: var(--panel); color: var(--text-dim); cursor: pointer;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); animation: cmt-in 0.15s ease-out backwards;
 }
-.media-status-menu button:hover { background: var(--hover); }
-.media-status-menu button > span:nth-child(2) { flex: 1; }
-.media-status-menu button[aria-checked='true'] { font-weight: 650; }
+.status-ring-close:hover { color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .status-ring-opt { animation: none; } }
