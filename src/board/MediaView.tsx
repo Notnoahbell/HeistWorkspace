@@ -341,6 +341,23 @@ function CardStatus({ id, version, value }: { id: string; version: number; value
   const [at, setAt] = useState<{ left: number; top: number; origin: string } | null>(null);
   const st = statusInfo(value);
   const open = !!at;
+  // Unset, the ring is grey: light over a dark corner of the picture, dark over a light one
+  // (sampled as the card is hovered, like the timeline's tone).
+  const ctl = useRef<HTMLSpanElement>(null);
+  const [tone, setTone] = useState<'light' | 'dark'>('light');
+  useEffect(() => {
+    if (st) return;
+    const card = ctl.current?.closest('.media');
+    const frame = ctl.current?.closest('.media-frame');
+    if (!card || !frame) return;
+    const sample = () => {
+      const pic = frame.querySelector<HTMLImageElement | HTMLVideoElement>(':scope > img, :scope > video');
+      const t = pic && cornerTone(pic);
+      if (t) setTone(t);
+    };
+    card.addEventListener('pointerenter', sample);
+    return () => card.removeEventListener('pointerenter', sample);
+  }, [st]);
   useEffect(() => {
     if (!open) return;
     const close = () => setAt(null);
@@ -360,7 +377,7 @@ function CardStatus({ id, version, value }: { id: string; version: number; value
   // Its own clicks don't pick up or select the card.
   const keep = { onPointerDown: (e: SyntheticEvent) => e.stopPropagation(), onClick: (e: SyntheticEvent) => e.stopPropagation(), onDoubleClick: (e: SyntheticEvent) => e.stopPropagation() };
   return (
-    <span className="media-status-ctl" data-set={st ? true : undefined} data-open={open || undefined} {...keep}>
+    <span ref={ctl} className="media-status-ctl" data-set={st ? true : undefined} data-open={open || undefined} data-tone={st ? undefined : tone} {...keep}>
       <button
         className="media-status-pill"
         style={st ? ({ '--st': st.color } as CSSProperties) : undefined}
@@ -402,4 +419,24 @@ function CardStatus({ id, version, value }: { id: string; version: number; value
       )}
     </span>
   );
+}
+
+/** Whether a light or dark mark shows up best over a picture's top-left corner (null if it can't be read). */
+function cornerTone(pic: HTMLImageElement | HTMLVideoElement): 'light' | 'dark' | null {
+  const w = pic instanceof HTMLVideoElement ? pic.videoWidth : pic.naturalWidth;
+  const h = pic instanceof HTMLVideoElement ? pic.videoHeight : pic.naturalHeight;
+  if (!w || !h) return null;
+  try {
+    const c = document.createElement('canvas');
+    c.width = 8; c.height = 8;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    if (!g) return null;
+    // Roughly where the ring sits: the top-left ~15% (the picture is cropped to cover the card, near enough).
+    const side = Math.min(w, h) * 0.15;
+    g.drawImage(pic, 0, 0, side, side, 0, 0, 8, 8);
+    const d = g.getImageData(0, 0, 8, 8).data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    return sum / (d.length / 4) / 255 > 0.6 ? 'dark' : 'light';
+  } catch { return null; } // cross-origin picture
 }

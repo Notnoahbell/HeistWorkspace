@@ -2690,8 +2690,9 @@ button, a, label { cursor: var(--cursor, default); }
   transition: background 0.14s, padding 0.14s, gap 0.14s;
 }
 .media-frame .media-status-pill .rs-dot { box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); }
-/* Unset on a card: just a ring (white, with a faint dark edge so it shows on light pictures too). */
-.media-frame .media-status-pill .rs-dot[data-none] { background: transparent; box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px rgb(0 0 0 / 0.25), inset 0 0 0 3px rgb(0 0 0 / 0.18); }
+/* Unset on a card: just a grey ring, light or dark to stand out from the picture's corner. */
+.media-frame .media-status-pill .rs-dot[data-none] { background: transparent; box-shadow: inset 0 0 0 2px rgb(200 200 208 / 0.9); }
+.media-status-ctl[data-tone='dark'] .rs-dot[data-none] { box-shadow: inset 0 0 0 2px rgb(72 72 82 / 0.85); }
 .media-status-word { max-width: 0; overflow: hidden; opacity: 0; transition: max-width 0.18s ease-out, opacity 0.14s; }
 .media-status-ctl[data-open] > .media-status-pill { gap: 6px; padding-right: 9px; }
 .media-frame .media-status-ctl[data-open] > .media-status-pill { background: color-mix(in srgb, var(--st, #3c3c42) 92%, black); box-shadow: 0 1px 4px rgb(0 0 0 / 0.3); }
