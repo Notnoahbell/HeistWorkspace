@@ -1164,7 +1164,7 @@ html, body, #root {
 .viewer-scrub .scrub-track { height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.22); box-shadow: none; }
 .viewer-scrub .scrub-fill { border-radius: 3px; }
 .viewer-scrub .scrub-fill::after { width: 14px; height: 14px; margin-top: -7px; right: -7px; }
-.viewer-scrub .scrub-fill { background: #6f7dff; }
+.viewer-scrub .scrub-fill { background: linear-gradient(90deg, #3fa9ff, #6f7dff 55%, #b36bff); }
 .viewer-scrub .scrub-fill::after { background: #fff; }
 .viewer-scrub .scrub-hover { bottom: 16px; }
 .viewer-markers { position: relative; height: 22px; margin: 0 10px; }
