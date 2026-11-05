@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type SyntheticEvent } from 'react';
-import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Play, Repeat, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Layers, Maximize2, Pause, Pencil, Play, Repeat, RotateCw } from 'lucide-react';
 import { stackDepth, stackTone, stackZ, useBoard, type MediaMeta, type ReviewStatus } from './store';
 import { useLayout } from './layout';
 import { useUi } from './ui';
@@ -258,15 +258,35 @@ export const MediaView = memo(function MediaView({ id }: { id: string }) {
                   defaultValue={media.name}
                   placeholder="Untitled"
                   spellCheck={false}
-                  ref={(el) => { if (el && document.activeElement !== el) { el.focus({ preventScroll: true }); el.select(); } }}
+                  aria-label="Name"
+                  ref={(el) => { if (el && document.activeElement !== el) { el.dataset.was = media.name; el.focus({ preventScroll: true }); el.select(); } }}
                   onChange={(e) => useBoard.getState().updateItem(id, { name: e.target.value })}
                   onBlur={() => { if (useUi.getState().editingId === id) useUi.getState().set({ editingId: null }); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
+                  onKeyDown={(e) => {
+                    // Escape puts the name back as it was.
+                    if (e.key === 'Escape') useBoard.getState().updateItem(id, { name: e.currentTarget.dataset.was ?? media.name });
+                    if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur();
+                  }}
+                  {...keep}
                 />
               ) : (
-                <div ref={nameRef} className="media-name" data-empty={!media.name}>{media.name || 'Untitled'}</div>
+                <div className="media-name-row">
+                  <div ref={nameRef} className="media-name" data-empty={!media.name}>{media.name || 'Untitled'}</div>
+                  <button
+                    className="media-rename"
+                    title="Rename"
+                    aria-label="Rename"
+                    {...keep}
+                    onClick={(e) => { e.stopPropagation(); useUi.getState().set({ selectedIds: [id], selectedId: id, editingId: id }); }}
+                  >
+                    <Pencil size={12} {...ICON} />
+                  </button>
+                </div>
               )}
-              <div className="media-sub">{uploading && local ? `Uploading… ${Math.round(local.progress * 100)}%` : mediaSubtitle(media.meta)}</div>
+              <div className="media-sub">
+                {editing ? 'Enter to save · Esc to cancel'
+                  : uploading && local ? `Uploading… ${Math.round(local.progress * 100)}%` : mediaSubtitle(media.meta)}
+              </div>
             </div>
             <button
               className="media-hide"

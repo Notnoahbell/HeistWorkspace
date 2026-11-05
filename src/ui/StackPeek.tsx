@@ -6,7 +6,7 @@
 // StackPeek (mounted once) decides which card is peeking; the card draws
 // CardStack inside its own frame, so it zooms and moves with the card.
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { Layers } from 'lucide-react';
@@ -106,7 +106,11 @@ interface Drag { ns: number[]; v: VersionInfo; x: number; y: number }
 
 /** The versions, drawn over the card's (shrunk) picture. */
 export function CardStack({ media }: { media: Media }) {
-  const versions = versionList(media);
+  // Oldest on the left, newest (the card's own) on the right.
+  const versions = versionList(media).reverse();
+  const rowRef = useRef<HTMLDivElement>(null);
+  // Start at the newest end.
+  useLayoutEffect(() => { const el = rowRef.current; if (el) el.scrollLeft = el.scrollWidth; }, [versions.length]);
   const [picked, setPicked] = useState<number[]>([]);
   const [drag, setDrag] = useState<Drag | null>(null);
 
@@ -174,18 +178,19 @@ export function CardStack({ media }: { media: Media }) {
         <span>{versions.length} versions</span>
         <span className="card-stack-hint">{picked.length ? `${picked.length} picked · drag out` : 'Drag out to unstack'}</span>
       </div>
-      <div className="card-stack-grid">
+      <div className="card-stack-grid" ref={rowRef}>
         {versions.map((v, i) => (
           <div
             key={v.n}
             role="button"
             tabIndex={-1}
             className="card-stack-tile"
+            data-current={v.current || undefined}
             data-picked={picked.includes(v.n) || undefined}
             data-pulling={drag?.ns.includes(v.n) || undefined}
             aria-pressed={picked.includes(v.n)}
             title={`${v.label || v.name}${v.current ? '\nCurrent version' : ''}`}
-            style={{ '--i': i } as CSSProperties}
+            style={{ '--i': versions.length - 1 - i } as CSSProperties}
             onPointerDown={(e) => startDrag(e, v)}
           >
             <span className="card-stack-thumb">

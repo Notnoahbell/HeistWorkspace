@@ -435,6 +435,14 @@ html, body, #root {
   }
 }
 
+.todo-head {
+  display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 11px 12px 0 12px; border: 0; outline: none;
+  background: transparent; color: inherit; font: 700 15px/1.35 var(--font);
+  overflow-wrap: anywhere;
+}
+.todo-head[data-empty] { opacity: 0.4; }
+.todo-head-input::placeholder { color: inherit; opacity: 0.4; }
+.todo-head + .todo-list { padding-top: 4px; }
 .todo-list {
   margin: 0;
   padding: 10px 12px 10px 10px;
@@ -1276,7 +1284,22 @@ html, body, #root {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .media-name[data-empty='true'] { opacity: 0.45; }
-.media-name-input { cursor: text; }
+/* Name + a pencil to rename it (on hover). Click the name of a selected card to rename too. */
+.media-name-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.media-name-row > .media-name { width: auto; min-width: 0; flex: 0 1 auto; }
+.media-name { padding: 1px 5px; margin: -1px -5px; border-radius: 5px; transition: background 0.12s; }
+.media[data-selected='true'] .media-name-row > .media-name { cursor: text; }
+.media[data-selected='true'] .media-name-row > .media-name:hover { background: rgb(128 128 140 / 0.16); }
+.media-rename {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-left: 4px; border: 0; padding: 0; border-radius: 5px;
+  background: none; color: var(--text-dim); cursor: pointer; opacity: 0; transition: opacity 0.12s;
+}
+.media:hover .media-rename, .media-rename:focus-visible { opacity: 1; }
+.media-rename:hover { color: var(--text); background: rgb(128 128 140 / 0.16); }
+.media-name-input {
+  cursor: text; width: calc(100% + 10px); user-select: text;
+  background: color-mix(in srgb, var(--accent) 8%, transparent); box-shadow: 0 0 0 1.5px var(--accent);
+}
 .media-name-input::placeholder { color: inherit; opacity: 0.45; }
 .media-sub { margin-top: 2px; font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-hide {
@@ -2749,8 +2772,9 @@ button, a, label { cursor: var(--cursor, default); }
 .card-stack-head { flex: none; display: flex; align-items: center; gap: 5px; font: 700 10.5px/1 var(--font); text-shadow: 0 1px 2px rgb(0 0 0 / 0.5); }
 .card-stack-hint { margin-left: auto; font-weight: 500; opacity: 0.75; white-space: nowrap; }
 .card-stack-grid {
-  flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); align-content: start;
-  gap: 6px; overflow: auto; scrollbar-width: thin;
+  /* One row, oldest to newest, left to right (scrolls when there are more than fit). */
+  flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 12px) / 3);
+  align-content: center; gap: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
 }
 .card-stack-tile {
   display: flex; flex-direction: column; gap: 3px; padding: 3px; border-radius: 8px; min-width: 0; cursor: grab;
@@ -2765,7 +2789,9 @@ button, a, label { cursor: var(--cursor, default); }
   position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 5px; overflow: hidden;
   background: rgb(0 0 0 / 0.5); box-shadow: 0 2px 8px rgb(0 0 0 / 0.35), inset 0 0 0 1px rgb(255 255 255 / 0.12);
 }
+.card-stack-tile[data-current] .card-stack-thumb { box-shadow: 0 0 0 2px #a371f7, 0 2px 10px rgb(163 113 247 / 0.45); }
 .card-stack-tile[data-picked] .card-stack-thumb { box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgb(0 0 0 / 0.35); }
+.card-stack-tile[data-current][data-picked] .card-stack-thumb { box-shadow: 0 0 0 2px #a371f7, 0 0 0 4px var(--accent); }
 .card-stack-thumb > img, .card-stack-thumb > video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .card-stack-n {
   position: absolute; left: 3px; bottom: 3px; padding: 2px 4px; border-radius: 4px;

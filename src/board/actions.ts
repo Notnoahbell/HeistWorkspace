@@ -699,7 +699,7 @@ export function nameOf(it: Item | undefined): string {
   if (!it) return '';
   switch (it.kind) {
     case 'note': return it.text;
-    case 'todo': return it.entries[0]?.text ?? '';
+    case 'todo': return it.title || (it.entries[0]?.text ?? '');
     case 'link': return it.preview?.title || it.url;
     case 'media': return it.name;
     case 'board': return it.title;

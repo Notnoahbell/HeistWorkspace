@@ -86,7 +86,7 @@ function plainText(roots: string[]): string {
     if (!it) return '';
     switch (it.kind) {
       case 'note': return it.text;
-      case 'todo': return it.entries.map((e) => `${e.done ? '[x]' : '[ ]'} ${e.text}`).join('\n');
+      case 'todo': return [it.title, ...it.entries.map((e) => `${e.done ? '[x]' : '[ ]'} ${e.text}`)].filter(Boolean).join('\n');
       case 'link': return it.url;
       case 'media': return it.name;
       case 'column': return [it.title, ...it.childIds.map(one)].filter(Boolean).join('\n');

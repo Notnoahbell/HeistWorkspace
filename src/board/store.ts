@@ -55,6 +55,8 @@ export interface TodoEntry {
 export interface Todo extends ItemBase, Stacked {
   kind: 'todo';
   color: string | null;
+  /** Header above the tasks ('' = none yet; older lists have no field). */
+  title?: string;
   entries: TodoEntry[];
 }
 
@@ -270,7 +272,7 @@ const DEFAULTS: { [K in ItemKind]: Omit<ItemOf<K>, 'id' | 'kind' | 'z' | 'x' | '
     w: NOTE_WIDTH, color: null, text: '', parentId: null,
     textSize: 'md', textAlign: 'left', bold: false,
   },
-  todo: { w: NOTE_WIDTH, color: null, entries: [], parentId: null },
+  todo: { w: NOTE_WIDTH, color: null, title: '', entries: [], parentId: null },
   link: { w: NOTE_WIDTH, color: null, url: '', preview: null, parentId: null },
   media: { w: MEDIA_WIDTH, mediaType: 'image', src: '', name: '', meta: {}, captionHidden: false, parentId: null },
   comment: { w: 0, parentId: null, targetId: '', authorId: '', authorName: '', text: '', createdAt: 0, time: null, resolved: false },

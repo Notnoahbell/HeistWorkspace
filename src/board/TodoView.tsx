@@ -10,6 +10,9 @@ import { newId } from '../lib/id';
 import { CommentBadge } from '../ui/Comments';
 
 const setEntries = (id: string, entries: TodoEntry[]) => useBoard.getState().updateItem(id, { entries });
+const setTitle = (id: string, title: string) => useBoard.getState().updateItem(id, { title });
+/** Editing was opened from the header (so it starts there, not on the last task). */
+let startOnTitle = false;
 
 function Checkbox({ entry, onToggle }: { entry: TodoEntry; onToggle: () => void }) {
   return (
@@ -42,7 +45,10 @@ export const TodoView = memo(function TodoView({ id }: { id: string }) {
 
   const rest = !todo ? null : todo.parentId ? (slot ?? null) : { x: todo.x, y: todo.y };
   const { posRef, visRef, onPointerDown, onClick, onContextMenu } = useBody(id, itemHooks, rest, undefined, undefined,
-    () => useUi.getState().set({ selectedId: id, editingId: id }));
+    (e) => {
+      startOnTitle = !!(e.target as Element).closest?.('.todo-head');
+      useUi.getState().set({ selectedId: id, editingId: id });
+    });
   useReportHeight(id, visRef);
 
   if (!todo) return null;
@@ -72,8 +78,10 @@ export const TodoView = memo(function TodoView({ id }: { id: string }) {
         style={{ width: fill ?? todo.w, '--item-bg': todo.color ?? undefined } as CSSProperties}
       >
         {editing ? (
-          <TodoEditor id={id} entries={todo.entries} onToggle={toggle} />
+          <TodoEditor id={id} title={todo.title ?? ''} entries={todo.entries} onToggle={toggle} />
         ) : (
+          <>
+          <div className="todo-head" data-empty={!todo.title || undefined}>{todo.title || 'To-do list'}</div>
           <ul className="todo-list">
             {todo.entries.map((e) => (
               <li key={e.id} data-done={e.done}>
@@ -83,6 +91,7 @@ export const TodoView = memo(function TodoView({ id }: { id: string }) {
             ))}
             {todo.entries.length === 0 && <li className="todo-empty">Double-click to add tasks…</li>}
           </ul>
+          </>
         )}
         {todo.entries.length > 0 && (
           <div className="todo-progress">
@@ -96,19 +105,23 @@ export const TodoView = memo(function TodoView({ id }: { id: string }) {
   );
 });
 
-function TodoEditor({ id, entries, onToggle }: { id: string; entries: TodoEntry[]; onToggle: (id: string) => void }) {
-  const listRef = useRef<HTMLUListElement>(null);
+const TITLE = 'title';
+
+function TodoEditor({ id, title, entries, onToggle }: { id: string; title: string; entries: TodoEntry[]; onToggle: (id: string) => void }) {
+  const listRef = useRef<HTMLDivElement>(null);
   const inputs = useRef(new Map<string, HTMLInputElement>());
   const [focusId, setFocusId] = useState<string | null>(null);
 
-  // Start with one empty line to type into.
+  // Start with one empty line to type into; a new list starts on its header.
   useLayoutEffect(() => {
+    const onTitle = startOnTitle;
+    startOnTitle = false;
     if (entries.length === 0) {
       const first = { id: newId(), text: '', done: false };
       setEntries(id, [first]);
-      setFocusId(first.id);
+      setFocusId(title ? first.id : TITLE);
     } else {
-      setFocusId(entries[entries.length - 1].id);
+      setFocusId(onTitle ? TITLE : entries[entries.length - 1].id);
     }
   }, []);
 
@@ -127,13 +140,28 @@ function TodoEditor({ id, entries, onToggle }: { id: string; entries: TodoEntry[
   };
 
   return (
-    <ul
+    <div
       ref={listRef}
-      className="todo-list"
       onBlur={(e) => {
         if (!listRef.current?.contains(e.relatedTarget as Node)) finish();
       }}
     >
+    <input
+      ref={(el) => { if (el) inputs.current.set(TITLE, el); else inputs.current.delete(TITLE); }}
+      className="todo-head todo-head-input"
+      value={title}
+      placeholder="To-do list"
+      onChange={(e) => setTitle(id, e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (entries[0]) setFocusId(entries[0].id);
+        } else if (e.key === 'Escape') {
+          e.currentTarget.blur();
+        }
+      }}
+    />
+    <ul className="todo-list">
       {entries.map((entry, i) => (
         <li key={entry.id} data-done={entry.done}>
           <Checkbox entry={entry} onToggle={() => onToggle(entry.id)} />
@@ -153,8 +181,8 @@ function TodoEditor({ id, entries, onToggle }: { id: string; entries: TodoEntry[
                 e.preventDefault();
                 setEntries(id, entries.filter((x) => x.id !== entry.id));
                 setFocusId((i > 0 ? entries[i - 1] : entries[1]).id);
-              } else if (e.key === 'ArrowUp' && i > 0) {
-                setFocusId(entries[i - 1].id);
+              } else if (e.key === 'ArrowUp') {
+                setFocusId(i > 0 ? entries[i - 1].id : TITLE);
               } else if (e.key === 'ArrowDown' && i < entries.length - 1) {
                 setFocusId(entries[i + 1].id);
               } else if (e.key === 'Escape') {
@@ -165,5 +193,6 @@ function TodoEditor({ id, entries, onToggle }: { id: string; entries: TodoEntry[
         </li>
       ))}
     </ul>
+    </div>
   );
 }

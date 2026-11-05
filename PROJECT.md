@@ -194,6 +194,11 @@ Sized for ~150 users; a single modest server handles this comfortably.
   renamed (`label`), restored (copied back on top as a new version, comments stay put)
   and deleted (its comments go; later versions and theirs move down one). Each version
   has a review status (`status`: review / changes / approved), shown as a tag on the card.
+- **2026-11-05: Card text.** The stack peek runs oldest to newest, left to right, the
+  current version ringed in purple (#a371f7). Media names: a pencil on hover renames in one
+  click (a selected card's name still does too); the field gets an accent ring and an
+  "Enter to save · Esc to cancel" line, and Escape puts the old name back. To-do lists have
+  a header (`title`, '' = shows a faint "To-do list"); a new list starts on it.
 - **2026-11-05: Undo / redo** (board/history.ts; buttons in the top bar, Ctrl+Z, Ctrl+Shift+Z /
   Ctrl+Y). Local only: every local change to the board store is kept as before/after copies
   of the items it touched. A press (drag, click, menu pick) is one step; changes made in one
