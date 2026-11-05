@@ -1183,6 +1183,9 @@ html, body, #root {
 }
 .viewer-bar-side { display: flex; align-items: center; gap: 2px; }
 .viewer-bar-end { justify-content: flex-end; }
+/* Groups in the bar: transport | volume … time … loop, speed | comments, full screen. */
+.viewer-bar-sep { flex: none; width: 1px; height: 18px; margin: 0 8px; background: rgb(255 255 255 / 0.16); }
+.viewer-bar-end .viewer-speed-menu { left: auto; right: 0; }
 .viewer-time {
   min-width: 128px; padding: 5px 12px; border: 1px solid var(--vline); background: rgb(255 255 255 / 0.04); color: inherit;
   font: 600 15px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; text-align: center; cursor: pointer;

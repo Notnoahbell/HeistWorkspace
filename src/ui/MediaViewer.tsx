@@ -519,29 +519,7 @@ function Player({ id, start }: { id: string; start: number }) {
                   <button className="viewer-btn" onClick={toEnd} title="To the end (End)" aria-label="To the end">
                     <SkipForward {...ICON} fill="currentColor" />
                   </button>
-                  <button className="viewer-btn" aria-pressed={loop} onClick={() => setLoop((l) => !l)} title="Loop" aria-label="Loop">
-                    <Repeat size={17} strokeWidth={2} aria-hidden="true" />
-                  </button>
-                  <div className="viewer-speed">
-                    <button
-                      className="viewer-btn viewer-rate"
-                      aria-haspopup="menu"
-                      aria-expanded={speedMenu}
-                      title="Playback speed"
-                      onClick={() => setSpeedMenu((o) => !o)}
-                    >
-                      {rate}x
-                    </button>
-                    {speedMenu && (
-                      <div className="viewer-speed-menu" role="menu">
-                        {[...SPEEDS].reverse().map((r) => (
-                          <button key={r} role="menuitemradio" aria-checked={r === rate} onClick={() => { stopShuttle(); rate0.current = r; setRate(r); setSpeedMenu(false); }}>
-                            {r === 1 ? 'Normal' : `${r}×`}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <span className="viewer-bar-sep" aria-hidden="true" />
                   <div className="viewer-volume">
                     <button
                       className="viewer-btn"
@@ -581,6 +559,34 @@ function Player({ id, start }: { id: string; start: number }) {
               />
             )}
             <div className="viewer-bar-side viewer-bar-end">
+              {isVideo && (
+                <>
+                  <button className="viewer-btn" aria-pressed={loop} onClick={() => setLoop((l) => !l)} title="Loop" aria-label="Loop">
+                    <Repeat size={17} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                  <div className="viewer-speed">
+                    <button
+                      className="viewer-btn viewer-rate"
+                      aria-haspopup="menu"
+                      aria-expanded={speedMenu}
+                      title="Playback speed"
+                      onClick={() => setSpeedMenu((o) => !o)}
+                    >
+                      {rate}x
+                    </button>
+                    {speedMenu && (
+                      <div className="viewer-speed-menu" role="menu">
+                        {[...SPEEDS].reverse().map((r) => (
+                          <button key={r} role="menuitemradio" aria-checked={r === rate} onClick={() => { stopShuttle(); rate0.current = r; setRate(r); setSpeedMenu(false); }}>
+                            {r === 1 ? 'Normal' : `${r}×`}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className="viewer-bar-sep" aria-hidden="true" />
+                </>
+              )}
               <button
                 className="viewer-btn viewer-side-toggle"
                 aria-pressed={side}
