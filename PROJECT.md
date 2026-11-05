@@ -194,6 +194,11 @@ Sized for ~150 users; a single modest server handles this comfortably.
   renamed (`label`), restored (copied back on top as a new version, comments stay put)
   and deleted (its comments go; later versions and theirs move down one). Each version
   has a review status (`status`: review / changes / approved), shown as a tag on the card.
+- **2026-11-05: Player quality.** The player's quality setting (1× / 0.5× / 0.25×, remembered
+  per browser) plays a smaller copy the server makes on first ask (/api/rendition →
+  `<id>.q50.mp4` / `.q25.mp4`, sized against what plays at 1×, keyframe every second). Full
+  quality plays until the copy is ready; switching keeps the place. Only uploaded videos
+  (not Pinterest ones). Skip to start / end sit either side of Play (Home / End keys).
 - **2026-11-04: Review tools.** A comment can cover a range (`timeEnd`) and carry a
   drawing (`drawing`: shapes in 0–1 picture coordinates, so they fit any size). The comment
   being written in the player lives in a small local draft store (Annotate.tsx) the comment

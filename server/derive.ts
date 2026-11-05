@@ -10,9 +10,15 @@
 // .proxy.mp4), so each file is done once. The proxy can take a while: until
 // it's made, `status` is 'working' and `proxy` is 'pending'; ask again. Without
 // ffmpeg on the machine (or FFMPEG_PATH / FFPROBE_PATH), status is 'unavailable'.
+//
+//   GET /api/rendition?src=/uploads/<file>&q=0.5|0.25
+//     → { status: 'ready' | 'working' | 'failed' | 'unavailable', url? }
+//
+// A smaller copy for the player's quality setting (half or a quarter of the size
+// it plays at full quality), made on first ask and kept (<id>.q50.mp4, .q25.mp4).
 
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
@@ -92,6 +98,59 @@ export function createDerive(dir: string) {
     proxy: join(dir, `${id}.proxy.mp4`),
   });
 
+  /** Lower-quality copies being made (or that failed), by "<id>.q50" etc. */
+  const renditions = new Map<string, 'working' | 'failed'>();
+
+  async function makeRendition(id: string, ext: string, tag: string, q: number) {
+    const key = `${id}.${tag}`;
+    renditions.set(key, 'working');
+    const src = paths(id).file(ext);
+    const part = join(dir, `${key}.part.mp4`);
+    try {
+      // Sized against what plays at full quality: the 720p proxy if there is one, else the original.
+      let height = 0, proxied = false;
+      try {
+        const rec = JSON.parse(readFileSync(paths(id).record, 'utf8')) as Derived;
+        height = rec.height ?? 0;
+        proxied = !!rec.proxy && rec.proxy !== 'pending';
+      } catch { /* not worked out yet: ask ffprobe */ }
+      if (!height) {
+        const probe = JSON.parse((await run(FFPROBE, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=height', '-of', 'json', src])).out);
+        height = Number(probe.streams?.[0]?.height ?? 0) || 720;
+      }
+      const base = proxied ? Math.min(720, height) : height;
+      const h = Math.max(72, Math.round((base * q) / 2) * 2);
+      await slot(() => run(FFMPEG, [
+        '-v', 'error', '-y', '-i', src,
+        '-vf', `scale=-2:${h}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-pix_fmt', 'yuv420p',
+        '-force_key_frames', 'expr:gte(t,n_forced*1)',
+        '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', part,
+      ]));
+      renameSync(part, join(dir, `${key}.mp4`));
+      renditions.delete(key);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') missing = true;
+      renditions.set(key, 'failed');
+      try { rmSync(part, { force: true }); } catch { /* fine */ }
+    }
+  }
+
+  function rendition(req: IncomingMessage, res: ServerResponse) {
+    const params = new URL(req.url ?? '/', 'http://local').searchParams;
+    const m = /^\/uploads\/([a-f0-9]{24})\.(mp4|webm|mov)$/.exec(params.get('src') ?? '');
+    const tag = ({ '0.5': 'q50', '0.25': 'q25' } as Record<string, string>)[params.get('q') ?? ''];
+    if (!m || !tag) return json(res, 400, { error: 'src must be an uploaded video; q 0.5 or 0.25' });
+    const [, id, ext] = m;
+    if (!existsSync(paths(id).file(ext))) return json(res, 404, { error: 'no such upload' });
+    const key = `${id}.${tag}`;
+    if (existsSync(join(dir, `${key}.mp4`))) return json(res, 200, { status: 'ready', url: `/uploads/${key}.mp4` });
+    if (missing) return json(res, 200, { status: 'unavailable' });
+    const state = renditions.get(key);
+    if (state) return json(res, 200, { status: state });
+    void makeRendition(id, ext, tag, tag === 'q50' ? 0.5 : 0.25);
+    return json(res, 200, { status: 'working' });
+  }
+
   async function work(id: string, ext: string) {
     const p = paths(id);
     const src = p.file(ext);
@@ -170,7 +229,7 @@ export function createDerive(dir: string) {
     return json(res, 200, jobs.get(id) ?? { status: 'working' });
   }
 
-  return { handle };
+  return { handle, rendition };
 }
 
 /** The longest stretch between keyframes in the first minute (keyframes only are read, so it's quick). */

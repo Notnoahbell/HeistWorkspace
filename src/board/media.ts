@@ -3,6 +3,7 @@
 // local preview and progress), uploads to the server, then points at the
 // uploaded copy so everyone sharing the board can see it.
 
+import { useEffect, useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import type { Point } from '../canvas/camera';
 import { useBoard, type MediaMeta } from './store';
@@ -227,3 +228,45 @@ export function ensureDerived(src: string, meta: MediaMeta | undefined) {
  */
 export const playable = (src: string, meta: MediaMeta | undefined, local?: string) =>
   meta?.proxy && meta.proxy !== 'pending' ? meta.proxy : local || src;
+
+// --- Lower-quality copies, for the player's quality setting ------------------
+
+export type Rendition = { status: 'working' | 'ready' | 'failed' | 'unavailable'; url?: string };
+const renditions = new Map<string, Rendition>();
+const renditionSubs = new Set<() => void>();
+const setRendition = (key: string, r: Rendition) => { renditions.set(key, r); renditionSubs.forEach((f) => f()); };
+
+function askRendition(src: string, q: number) {
+  const key = `${src}|${q}`;
+  if (renditions.has(key)) return;
+  setRendition(key, { status: 'working' });
+  const ask = async () => {
+    try {
+      const r = await fetch(`/api/rendition?src=${encodeURIComponent(src)}&q=${q}`);
+      const d = (r.ok ? await r.json() : { status: 'failed' }) as Rendition;
+      setRendition(key, d);
+      if (d.status === 'working') setTimeout(ask, POLL_MS);
+    } catch {
+      setRendition(key, { status: 'failed' });
+      setTimeout(() => renditions.delete(key), POLL_MS * 10);
+    }
+  };
+  void ask();
+}
+
+/** Whether a video can be played at lower quality (only uploads: the server makes the copies). */
+export const canRender = (src: string | undefined) => !!src && src.startsWith('/uploads/');
+
+/**
+ * A smaller copy of an uploaded video for quality q (0.5 or 0.25); the server
+ * makes it on first ask. null at full quality (or for videos that aren't uploads).
+ */
+export function useRendition(src: string | undefined, q: number): Rendition | null {
+  const on = canRender(src) && q < 1;
+  useEffect(() => { if (on) askRendition(src!, q); }, [on, src, q]);
+  const r = useSyncExternalStore(
+    (f) => { renditionSubs.add(f); return () => { renditionSubs.delete(f); }; },
+    () => (on ? renditions.get(`${src}|${q}`) : undefined),
+  );
+  return on ? r ?? { status: 'working' } : null;
+}

@@ -17,13 +17,13 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  ChevronLeft, ChevronRight, Columns2, ExternalLink, Maximize, MessageSquare, Minimize, Pause, Play, Repeat, Volume1, Volume2, VolumeX,
+  ChevronLeft, ChevronRight, Columns2, ExternalLink, Maximize, MessageSquare, Minimize, Pause, Play, Repeat, SkipBack, SkipForward, Volume1, Volume2, VolumeX,
 } from 'lucide-react';
-import { onCanvas, useBoard } from '../board/store';
+import { onCanvas, useBoard, type MediaMeta } from '../board/store';
 import { useUi } from '../board/ui';
 import { pathTo } from '../board/nav';
 import { posOf } from '../board/actions';
-import { ensureDerived, mediaSubtitle, playable, useLocalMedia } from '../board/media';
+import { canRender, ensureDerived, mediaSubtitle, playable, useLocalMedia, useRendition } from '../board/media';
 import { commentIndex, useOpenCount } from '../board/comments';
 import { commentVersion, setStatus, versionInfo, versionList, versionOf } from '../board/versions';
 import { isTyping } from '../canvas/input';
@@ -44,6 +44,12 @@ const UNITS_KEY = 'heist:timecode';
 const VOLUME_KEY = 'heist:volume';
 const SIDE_KEY = 'heist:viewer-comments';
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+/** Render quality: a fraction of the full size (smaller plays and jumps faster). */
+const QUALITIES = [1, 0.5, 0.25];
+const QUALITY_KEY = 'heist:quality';
+function readQuality(): number {
+  try { const q = parseFloat(localStorage.getItem(QUALITY_KEY) ?? ''); return QUALITIES.includes(q) ? q : 1; } catch { return 1; }
+}
 
 export const openViewer = (id: string, time = 0) => useUi.getState().set({ viewer: { id, time } });
 
@@ -104,6 +110,8 @@ function Player({ id, start }: { id: string; start: number }) {
   /** The speed picked from the menu (what the shuttle goes back to). */
   const rate0 = useRef(1);
   const [speedMenu, setSpeedMenu] = useState(false);
+  const [quality, setQuality] = useState(readQuality);
+  const [qualityMenu, setQualityMenu] = useState(false);
   const [duration, setDuration] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
   const draft = useDraft();
@@ -140,13 +148,15 @@ function Player({ id, start }: { id: string; start: number }) {
   useEffect(() => { if (video) video.loop = loop; }, [video, loop]);
   useEffect(() => { if (video) video.volume = readVolume(); }, [video]);
 
-  // Close the speed menu on any press outside it.
+  // Close the speed / quality menu on any press outside it.
   useEffect(() => {
-    if (!speedMenu) return;
-    const off = (e: PointerEvent) => { if (!(e.target as Element).closest?.('.viewer-speed')) setSpeedMenu(false); };
+    if (!speedMenu && !qualityMenu) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element).closest?.('.viewer-speed')) { setSpeedMenu(false); setQualityMenu(false); }
+    };
     window.addEventListener('pointerdown', off, true);
     return () => window.removeEventListener('pointerdown', off, true);
-  }, [speedMenu]);
+  }, [speedMenu, qualityMenu]);
 
   // Start where the card left off, playing; after switching versions, carry on from the same moment.
   useEffect(() => {
@@ -282,6 +292,9 @@ function Player({ id, start }: { id: string; start: number }) {
     try { localStorage.setItem(UNITS_KEY, next); } catch { /* fine: just not remembered */ }
   };
   const seek = (t: number) => { if (video) { video.pause(); video.currentTime = t; } };
+  /** To the last frame (a hair before the very end, so it doesn't count as finished and loop). */
+  const toEnd = () => { if (video && Number.isFinite(video.duration)) seek(Math.max(0, video.duration - 1 / fps)); };
+  const pickQuality = (q: number) => { setQuality(q); remember(QUALITY_KEY, String(q)); setQualityMenu(false); };
   const toggleSide = () => setSide((on) => { remember(SIDE_KEY, on ? 'hidden' : 'shown'); return !on; });
   const toggleMute = () => {
     if (!video) return;
@@ -296,7 +309,7 @@ function Player({ id, start }: { id: string; start: number }) {
       const v = video;
       const keys: Record<string, () => void> = {
         Escape: () => {
-          if (speedMenu) setSpeedMenu(false);
+          if (speedMenu || qualityMenu) { setSpeedMenu(false); setQualityMenu(false); }
           else if (useDraft.getState().drawing) useDraft.setState({ drawing: false });
           else if (!document.fullscreenElement) dismiss();
         },
@@ -307,6 +320,8 @@ function Player({ id, start }: { id: string; start: number }) {
         Enter: startComment,
         '[': () => jumpComment(-1), ']': () => jumpComment(1),
         i: () => markRange('a'), o: () => markRange('b'),
+        Home: () => seek(0),
+        End: () => toEnd(),
         ArrowLeft: () => { if (v) v.currentTime = Math.max(0, v.currentTime - 5); },
         ArrowRight: () => { if (v) v.currentTime = Math.min(v.duration || 0, v.currentTime + 5); },
         ',': () => { if (v) stepFrame(v, -1, fps); }, '.': () => { if (v) stepFrame(v, 1, fps); },
@@ -340,7 +355,20 @@ function Player({ id, start }: { id: string; start: number }) {
 
   // The copy saved on this device when there is one (lib/mediaCache).
   const shown0 = item?.kind === 'media' ? versionInfo(item, version) : null;
-  const src = useCachedSrc(shown0 ? playable(shown0.src, shown0.meta, shown0.current ? local?.url : undefined) : undefined) ?? '';
+  const full0 = useCachedSrc(shown0 ? playable(shown0.src, shown0.meta, shown0.current ? local?.url : undefined) : undefined) ?? '';
+  // Lower quality: the server's smaller copy once it's made (full quality until then).
+  const isVideo0 = item?.kind === 'media' && item.mediaType === 'video';
+  const rendition = useRendition(isVideo0 ? shown0?.src : undefined, quality);
+  const src = rendition?.status === 'ready' && rendition.url ? rendition.url : full0;
+  const otherShown0 = item?.kind === 'media' && compareWith != null ? versionInfo(item, compareWith) : null;
+  const otherRendition = useRendition(isVideo0 ? otherShown0?.src : undefined, quality);
+  // Switching to another file (quality or version): carry on from the same moment.
+  const lastSrc = useRef(src);
+  if (lastSrc.current !== src) {
+    if (video && lastSrc.current && video.readyState >= 1) resume.current = { at: video.currentTime, play: !video.paused };
+    lastSrc.current = src;
+  }
+  const preparing = rendition?.status === 'working';
   if (item?.kind !== 'media') return null;
   const shown = versionInfo(item, version);
   const versioned = isVideo && current > 1;
@@ -435,7 +463,15 @@ function Player({ id, start }: { id: string; start: number }) {
             </div>
             {comparing && otherInfo && (
               <div className="viewer-pane" data-side={otherInfo.n > version ? 'right' : 'left'}>
-                <video key={otherInfo.src} ref={setOther} src={playable(otherInfo.src, otherInfo.meta)} poster={otherInfo.meta.poster} playsInline muted onClick={togglePlay} />
+                <video
+                  key={otherInfo.src}
+                  ref={setOther}
+                  src={otherRendition?.status === 'ready' && otherRendition.url ? otherRendition.url : playable(otherInfo.src, otherInfo.meta)}
+                  poster={otherInfo.meta.poster}
+                  playsInline
+                  muted
+                  onClick={togglePlay}
+                />
                 <VersionMenu
                   media={item}
                   value={otherInfo.n}
@@ -506,8 +542,14 @@ function Player({ id, start }: { id: string; start: number }) {
             <div className="viewer-bar-side">
               {isVideo && (
                 <>
+                  <button className="viewer-btn" onClick={() => seek(0)} title="To the start (Home)" aria-label="To the start">
+                    <SkipBack {...ICON} fill="currentColor" />
+                  </button>
                   <button className="viewer-btn" onClick={togglePlay} title={playing ? 'Pause (Space)' : 'Play (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
                     {playing ? <Pause {...ICON} fill="currentColor" /> : <Play {...ICON} fill="currentColor" />}
+                  </button>
+                  <button className="viewer-btn" onClick={toEnd} title="To the end (End)" aria-label="To the end">
+                    <SkipForward {...ICON} fill="currentColor" />
                   </button>
                   <button className="viewer-btn" aria-pressed={loop} onClick={() => setLoop((l) => !l)} title="Loop" aria-label="Loop">
                     <Repeat size={17} strokeWidth={2} aria-hidden="true" />
@@ -518,7 +560,7 @@ function Player({ id, start }: { id: string; start: number }) {
                       aria-haspopup="menu"
                       aria-expanded={speedMenu}
                       title="Playback speed"
-                      onClick={() => setSpeedMenu((o) => !o)}
+                      onClick={() => { setQualityMenu(false); setSpeedMenu((o) => !o); }}
                     >
                       {rate}x
                     </button>
@@ -532,6 +574,30 @@ function Player({ id, start }: { id: string; start: number }) {
                       </div>
                     )}
                   </div>
+                  {canRender(shown.src) && (
+                    <div className="viewer-speed viewer-quality">
+                      <button
+                        className="viewer-btn viewer-rate"
+                        aria-haspopup="menu"
+                        aria-expanded={qualityMenu}
+                        data-preparing={preparing || undefined}
+                        title={preparing ? `Preparing ${quality}× quality… (full quality until it's ready)` : 'Render quality (lower plays and jumps faster)'}
+                        onClick={() => { setSpeedMenu(false); setQualityMenu((o) => !o); }}
+                      >
+                        {qualityLabel(quality, shown.meta)}
+                      </button>
+                      {qualityMenu && (
+                        <div className="viewer-speed-menu" role="menu">
+                          <div className="viewer-menu-head">Quality</div>
+                          {QUALITIES.map((q) => (
+                            <button key={q} role="menuitemradio" aria-checked={q === quality} onClick={() => pickQuality(q)}>
+                              {q}×{shown.meta.height ? <span className="viewer-menu-note">{qualityLabel(q, shown.meta)}</span> : null}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="viewer-volume">
                     <button
                       className="viewer-btn"
@@ -604,4 +670,10 @@ function Player({ id, start }: { id: string; start: number }) {
       </div>
     </div>
   );
+}
+
+/** "1080p" (or "0.5×" when the size isn't known): the height that actually plays (a proxy plays at 720p at most). */
+function qualityLabel(q: number, meta: MediaMeta): string {
+  const full = meta.height && meta.proxy && meta.proxy !== 'pending' ? Math.min(720, meta.height) : meta.height;
+  return full ? `${Math.max(72, Math.round((full * q) / 2) * 2)}p` : `${q}×`;
 }

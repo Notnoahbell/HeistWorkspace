@@ -19,7 +19,9 @@ function syncPlugin(): Plugin {
       const uploads = createUploads(join(data, 'uploads'), sync.userIdFor);
       server.middlewares.use('/api/upload', uploads.upload);
       server.middlewares.use('/uploads', uploads.serve);
-      server.middlewares.use('/api/derive', createDerive(join(data, 'uploads')).handle);
+      const derive = createDerive(join(data, 'uploads'));
+      server.middlewares.use('/api/derive', derive.handle);
+      server.middlewares.use('/api/rendition', derive.rendition);
       const admin = createAdmin(join(data, 'uploads'), sync);
       server.middlewares.use('/api/pinterest', (req, res) => { req.url = '/api/pinterest' + (req.url === '/' ? '' : req.url ?? ''); void handlePinterest(req, res); });
       server.middlewares.use('/api/admin', (req, res) => { req.url = '/api/admin' + (req.url ?? ''); void admin.handle(req, res); });
