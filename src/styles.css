@@ -1057,6 +1057,8 @@ html, body, #root {
 .viewer-btn:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); }
 .viewer-btn:disabled { opacity: 0.3; cursor: default; }
 .viewer-btn[aria-pressed='true'] { color: #8f9bff; }
+/* Play / pause leads the bar: bigger than the buttons round it. */
+.viewer-btn.viewer-play { width: 42px; height: 42px; margin: 0 2px; }
 
 /* Top bar: back, where it lives / file name, open original, ‹ n of m ›. */
 .viewer-top {

@@ -513,8 +513,8 @@ function Player({ id, start }: { id: string; start: number }) {
                   <button className="viewer-btn" onClick={() => seek(0)} title="To the start (Home)" aria-label="To the start">
                     <SkipBack {...ICON} fill="currentColor" />
                   </button>
-                  <button className="viewer-btn" onClick={togglePlay} title={playing ? 'Pause (Space)' : 'Play (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
-                    {playing ? <Pause {...ICON} fill="currentColor" /> : <Play {...ICON} fill="currentColor" />}
+                  <button className="viewer-btn viewer-play" onClick={togglePlay} title={playing ? 'Pause (Space)' : 'Play (Space)'} aria-label={playing ? 'Pause' : 'Play'}>
+                    {playing ? <Pause {...ICON} size={24} fill="currentColor" /> : <Play {...ICON} size={24} fill="currentColor" />}
                   </button>
                   <button className="viewer-btn" onClick={toEnd} title="To the end (End)" aria-label="To the end">
                     <SkipForward {...ICON} fill="currentColor" />
